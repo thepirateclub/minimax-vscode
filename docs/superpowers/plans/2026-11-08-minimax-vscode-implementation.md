@@ -83,7 +83,7 @@ test/
 - Produces: `Logger = { info(msg: string): void; error(msg: string, err?: unknown): void; redact(text: string): string }`
 - Produces: `StatusBarController` с `setState(state: AgentState, tokens?: number): void`
 
-- [ ] **Step 1: Создать `package.json`**
+- [x] **Step 1: Создать `package.json`**
 
 ```json
 {
@@ -176,7 +176,7 @@ test/
 }
 ```
 
-- [ ] **Step 2: Создать `tsconfig.json`**
+- [x] **Step 2: Создать `tsconfig.json`**
 
 ```json
 {
@@ -203,7 +203,7 @@ test/
 }
 ```
 
-- [ ] **Step 3: Создать `esbuild.mjs`**
+- [x] **Step 3: Создать `esbuild.mjs`**
 
 ```javascript
 import * as esbuild from 'esbuild';
@@ -249,7 +249,7 @@ if (watch) {
 }
 ```
 
-- [ ] **Step 4: Создать `vitest.config.ts`**
+- [x] **Step 4: Создать `vitest.config.ts`**
 
 ```typescript
 import { defineConfig } from 'vitest/config';
@@ -263,7 +263,7 @@ export default defineConfig({
 });
 ```
 
-- [ ] **Step 5: Написать падающий тест `test/unit/extension.test.ts`**
+- [x] **Step 5: Написать падающий тест `test/unit/extension.test.ts`**
 
 ```typescript
 import { describe, expect, it } from 'vitest';
@@ -282,12 +282,12 @@ describe('redactSecrets', () => {
 });
 ```
 
-- [ ] **Step 6: Запустить тест, убедиться в падении**
+- [x] **Step 6: Запустить тест, убедиться в падении**
 
 Run: `npm test`
 Expected: FAIL, модуль `src/logger` не найден.
 
-- [ ] **Step 7: Реализовать `src/logger.ts`**
+- [x] **Step 7: Реализовать `src/logger.ts`**
 
 ```typescript
 export interface Logger {
@@ -325,7 +325,7 @@ export function createLogger(channel: { appendLine(value: string): void }): Logg
 }
 ```
 
-- [ ] **Step 8: Реализовать `src/extension.ts`, `src/ui/statusbar.ts` и webview-заготовку**
+- [x] **Step 8: Реализовать `src/extension.ts`, `src/ui/statusbar.ts` и webview-заготовку**
 
 `src/extension.ts`:
 
@@ -406,12 +406,12 @@ export class StatusBarController {
 }
 ```
 
-- [ ] **Step 9: Поставить зависимости и убедиться, что сборка проходит**
+- [x] **Step 9: Поставить зависимости и убедиться, что сборка проходит**
 
 Run: `npm install`, затем `npm run compile`
 Expected: обе сборки esbuild успешны, `dist/extension.js` и `dist/webview/main.js` созданы.
 
-- [ ] **Step 10: Прогнать тесты и закоммитить**
+- [x] **Step 10: Прогнать тесты и закоммитить**
 
 Run: `npm test`
 Expected: PASS.
@@ -441,7 +441,7 @@ git commit -m "feat: каркас расширения, сборка и логг
   - `getApiKey(): Promise<string | undefined>`, `setApiKey(key: string): Promise<void>`, `clearApiKey(): Promise<void>`
   - `interface MiniMaxSettings { baseUrl: BaseUrlPreset; customBaseUrl: string; model: string; effort: EffortLevel; maxTokens: number; maxIterations: number; autoApprove: string[]; enableWebSearch: boolean; rulesEnabled: boolean }`
 
-- [ ] **Step 1: Написать падающий тест `test/unit/config.test.ts`**
+- [x] **Step 1: Написать падающий тест `test/unit/config.test.ts`**
 
 ```typescript
 import { describe, expect, it } from 'vitest';
@@ -481,12 +481,12 @@ describe('MODELS', () => {
 });
 ```
 
-- [ ] **Step 2: Запустить, убедиться в падении**
+- [x] **Step 2: Запустить, убедиться в падении**
 
 Run: `npm test`
 Expected: FAIL, модуль `src/config/models` не найден.
 
-- [ ] **Step 3: Реализовать `src/config/models.ts`**
+- [x] **Step 3: Реализовать `src/config/models.ts`**
 
 ```typescript
 export type EffortLevel = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
@@ -531,7 +531,7 @@ export function resolveBaseUrl(preset: BaseUrlPreset, custom?: string): string {
 }
 ```
 
-- [ ] **Step 4: Реализовать `src/config/secrets.ts`**
+- [x] **Step 4: Реализовать `src/config/secrets.ts`**
 
 ```typescript
 import * as vscode from 'vscode';
@@ -591,7 +591,7 @@ export async function clearApiKey(secrets: vscode.SecretStorage): Promise<void> 
 
 Итоговая версия `src/config/secrets.ts` - вторая (с `context.secrets`). `getApiKey`, `setApiKey`, `clearApiKey` принимают `secrets: vscode.SecretStorage` первым аргументом.
 
-- [ ] **Step 5: Реализовать `src/config/settings.ts`**
+- [x] **Step 5: Реализовать `src/config/settings.ts`**
 
 ```typescript
 import * as vscode from 'vscode';
@@ -633,7 +633,7 @@ export function onSettingsChanged(cb: (settings: MiniMaxSettings) => void): vsco
 }
 ```
 
-- [ ] **Step 6: Прогнать тесты и закоммитить**
+- [x] **Step 6: Прогнать тесты и закоммитить**
 
 Run: `npm test`
 Expected: PASS.
@@ -670,7 +670,7 @@ git commit -m "feat: настройки, секреты и каталог мод
   - `class StreamDecoder { push(chunk: string): StreamEvent[]; flush(): StreamEvent[] }`
   - `function parseSseChunk(buffer: string): { events: SseEvent[]; rest: string }`
 
-- [ ] **Step 1: Написать падающий тест `test/unit/sse.test.ts`**
+- [x] **Step 1: Написать падающий тест `test/unit/sse.test.ts`**
 
 ```typescript
 import { describe, expect, it } from 'vitest';
@@ -765,12 +765,12 @@ describe('StreamDecoder', () => {
 });
 ```
 
-- [ ] **Step 2: Запустить, убедиться в падении**
+- [x] **Step 2: Запустить, убедиться в падении**
 
 Run: `npm test`
 Expected: FAIL, модуль `src/api/sse` не найден.
 
-- [ ] **Step 3: Реализовать `src/api/types.ts`**
+- [x] **Step 3: Реализовать `src/api/types.ts`**
 
 ```typescript
 export type AnthropicRole = 'user' | 'assistant';
@@ -857,7 +857,7 @@ export type StreamEvent =
     };
 ```
 
-- [ ] **Step 4: Реализовать `src/api/sse.ts`**
+- [x] **Step 4: Реализовать `src/api/sse.ts`**
 
 ```typescript
 import type {
@@ -1065,7 +1065,7 @@ export class StreamDecoder {
 }
 ```
 
-- [ ] **Step 5: Прогнать тесты и закоммитить**
+- [x] **Step 5: Прогнать тесты и закоммитить**
 
 Run: `npm test`
 Expected: PASS.
@@ -1093,7 +1093,7 @@ git commit -m "feat: типы Anthropic-совместимого API и парс
   - `function buildRequestBody(request: ChatRequest): Record<string, unknown>`
   - `async function mapHttpError(response: Response): Promise<MiniMaxApiError>`
 
-- [ ] **Step 1: Создать `test/integration/fake-server.ts`**
+- [x] **Step 1: Создать `test/integration/fake-server.ts`**
 
 ```typescript
 import { createServer, type Server } from 'node:http';
@@ -1153,7 +1153,7 @@ export async function startFakeServer(options: FakeServerOptions = {}): Promise<
 }
 ```
 
-- [ ] **Step 2: Написать падающий тест `test/integration/client.integration.test.ts`**
+- [x] **Step 2: Написать падающий тест `test/integration/client.integration.test.ts`**
 
 ```typescript
 import { afterEach, describe, expect, it } from 'vitest';
@@ -1234,12 +1234,12 @@ describe('HttpMiniMaxClient', () => {
 });
 ```
 
-- [ ] **Step 3: Запустить, убедиться в падении**
+- [x] **Step 3: Запустить, убедиться в падении**
 
 Run: `npm test`
 Expected: FAIL, модуль `src/api/client` не найден.
 
-- [ ] **Step 4: Реализовать `src/api/errors.ts`**
+- [x] **Step 4: Реализовать `src/api/errors.ts`**
 
 ```typescript
 export class MiniMaxApiError extends Error {
@@ -1313,7 +1313,7 @@ export async function mapHttpError(response: Response): Promise<MiniMaxApiError>
 }
 ```
 
-- [ ] **Step 5: Реализовать `src/api/client.ts`**
+- [x] **Step 5: Реализовать `src/api/client.ts`**
 
 ```typescript
 import { mapHttpError, MiniMaxApiError } from './errors';
@@ -1419,7 +1419,7 @@ export class HttpMiniMaxClient implements MiniMaxClient {
 }
 ```
 
-- [ ] **Step 6: Прогнать тесты и закоммитить**
+- [x] **Step 6: Прогнать тесты и закоммитить**
 
 Run: `npm test`
 Expected: PASS.
@@ -1448,7 +1448,7 @@ git commit -m "feat: клиент MiniMax и маппинг ошибок API"
   - `function resolveWorkspacePath(root: string, candidate: string): string`, бросает Error при выходе за пределы root
   - `function createFileTools(deps: { backups: BackupStore }): ToolEntry[]`
 
-- [ ] **Step 1: Создать `src/tools/types.ts` и `src/storage/backups.ts`**
+- [x] **Step 1: Создать `src/tools/types.ts` и `src/storage/backups.ts`**
 
 ```typescript
 // src/storage/backups.ts
@@ -1511,7 +1511,7 @@ export interface ToolEntry {
 }
 ```
 
-- [ ] **Step 2: Написать падающий тест `test/unit/diff.test.ts`**
+- [x] **Step 2: Написать падающий тест `test/unit/diff.test.ts`**
 
 ```typescript
 import { describe, expect, it } from 'vitest';
@@ -1545,12 +1545,12 @@ describe('diffLines', () => {
 });
 ```
 
-- [ ] **Step 3: Запустить, убедиться в падении**
+- [x] **Step 3: Запустить, убедиться в падении**
 
 Run: `npm test`
 Expected: FAIL, модуль `src/tools/diff` не найден.
 
-- [ ] **Step 4: Реализовать `src/tools/diff.ts`**
+- [x] **Step 4: Реализовать `src/tools/diff.ts`**
 
 ```typescript
 export interface DiffLine {
@@ -1626,7 +1626,7 @@ function fallbackDiff(oldText: string, newText: string): DiffLine[] {
 }
 ```
 
-- [ ] **Step 5: Написать падающий тест `test/unit/tools-fs.test.ts`**
+- [x] **Step 5: Написать падающий тест `test/unit/tools-fs.test.ts`**
 
 ```typescript
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
@@ -1710,12 +1710,12 @@ describe('file tools', () => {
 });
 ```
 
-- [ ] **Step 6: Запустить, убедиться в падении**
+- [x] **Step 6: Запустить, убедиться в падении**
 
 Run: `npm test`
 Expected: FAIL, модуль `src/tools/fs` не найден.
 
-- [ ] **Step 7: Реализовать `src/tools/fs.ts`**
+- [x] **Step 7: Реализовать `src/tools/fs.ts`**
 
 ```typescript
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
@@ -1880,7 +1880,7 @@ export function createFileTools(deps: { backups: BackupStore }): ToolEntry[] {
 }
 ```
 
-- [ ] **Step 8: Прогнать тесты и закоммитить**
+- [x] **Step 8: Прогнать тесты и закоммитить**
 
 Run: `npm test`
 Expected: PASS.
@@ -1906,7 +1906,7 @@ git commit -m "feat: инструменты работы с файлами и п
   - `function createTerminalTools(): ToolEntry[]` с инструментом `run_terminal`
   - `const IGNORED_DIRS: string[]`
 
-- [ ] **Step 1: Написать падающий тест `test/unit/tools-explore.test.ts`**
+- [x] **Step 1: Написать падающий тест `test/unit/tools-explore.test.ts`**
 
 ```typescript
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
@@ -1957,7 +1957,7 @@ describe('explore tools', () => {
 });
 ```
 
-- [ ] **Step 2: Написать падающий тест `test/unit/tools-terminal.test.ts`**
+- [x] **Step 2: Написать падающий тест `test/unit/tools-terminal.test.ts`**
 
 ```typescript
 import { mkdtemp } from 'node:fs/promises';
@@ -2001,12 +2001,12 @@ describe('run_terminal', () => {
 });
 ```
 
-- [ ] **Step 3: Запустить, убедиться в падении**
+- [x] **Step 3: Запустить, убедиться в падении**
 
 Run: `npm test`
 Expected: FAIL, модули `src/tools/explore` и `src/tools/terminal` не найдены.
 
-- [ ] **Step 4: Реализовать `src/tools/explore.ts`**
+- [x] **Step 4: Реализовать `src/tools/explore.ts`**
 
 ```typescript
 import { readFile, readdir } from 'node:fs/promises';
@@ -2166,7 +2166,7 @@ export function createExploreTools(): ToolEntry[] {
 }
 ```
 
-- [ ] **Step 5: Реализовать `src/tools/terminal.ts`**
+- [x] **Step 5: Реализовать `src/tools/terminal.ts`**
 
 ```typescript
 import { exec } from 'node:child_process';
@@ -2265,7 +2265,7 @@ export function createTerminalTools(): ToolEntry[] {
 }
 ```
 
-- [ ] **Step 6: Прогнать тесты и закоммитить**
+- [x] **Step 6: Прогнать тесты и закоммитить**
 
 Run: `npm test`
 Expected: PASS.
@@ -2292,7 +2292,7 @@ git commit -m "feat: инструменты обзора проекта и те�
   - `interface ApprovalDecision { approved: boolean; allowForSession: boolean }`
   - `class ApprovalGate { constructor(options: { autoApprove: string[]; request: (req: ApprovalRequest) => Promise<ApprovalDecision> }); approve(entry: ToolEntry, input: Record<string, unknown>): Promise<ApprovalDecision> }`
 
-- [ ] **Step 1: Написать падающий тест `test/unit/registry.test.ts`**
+- [x] **Step 1: Написать падающий тест `test/unit/registry.test.ts`**
 
 ```typescript
 import { describe, expect, it, vi } from 'vitest';
@@ -2371,12 +2371,12 @@ describe('ApprovalGate', () => {
 });
 ```
 
-- [ ] **Step 2: Запустить, убедиться в падении**
+- [x] **Step 2: Запустить, убедиться в падении**
 
 Run: `npm test`
 Expected: FAIL, модули `src/tools/registry` и `src/ui/approvals` не найдены.
 
-- [ ] **Step 3: Реализовать `src/tools/registry.ts`**
+- [x] **Step 3: Реализовать `src/tools/registry.ts`**
 
 ```typescript
 import type { ToolDefinition } from '../api/types';
@@ -2407,7 +2407,7 @@ export class ToolRegistry {
 }
 ```
 
-- [ ] **Step 4: Реализовать `src/ui/approvals.ts`**
+- [x] **Step 4: Реализовать `src/ui/approvals.ts`**
 
 ```typescript
 import type { DiffLine } from '../tools/diff';
@@ -2463,7 +2463,7 @@ export class ApprovalGate {
 }
 ```
 
-- [ ] **Step 5: Прогнать тесты и закоммитить**
+- [x] **Step 5: Прогнать тесты и закоммитить**
 
 Run: `npm test`
 Expected: PASS.
@@ -2490,7 +2490,7 @@ git commit -m "feat: реестр инструментов и шлюз подт�
   - `interface AgentOptions { client: MiniMaxClient; registry: ToolRegistry; approval: ApprovalGate; model: string; maxTokens: number; maxIterations: number; effort?: EffortLevel; thinking?: 'adaptive'; systemPrompt: string; workspaceRoot: string; logger: Logger; backups: BackupStore; onEvent: (event: AgentEvent) => void }`
   - `class Agent { constructor(options: AgentOptions); run(userText: string, history: AnthropicMessage[]): Promise<AgentRunResult>; abort(): void }`
 
-- [ ] **Step 1: Написать падающий тест `test/unit/agent.test.ts`**
+- [x] **Step 1: Написать падающий тест `test/unit/agent.test.ts`**
 
 ```typescript
 import { describe, expect, it, vi } from 'vitest';
@@ -2664,12 +2664,12 @@ describe('Agent', () => {
 });
 ```
 
-- [ ] **Step 2: Запустить, убедиться в падении**
+- [x] **Step 2: Запустить, убедиться в падении**
 
 Run: `npm test`
 Expected: FAIL, модуль `src/agent/agent` не найден.
 
-- [ ] **Step 3: Реализовать `src/agent/agent.ts`**
+- [x] **Step 3: Реализовать `src/agent/agent.ts`**
 
 ```typescript
 import type { MiniMaxClient } from '../api/client';
@@ -2918,7 +2918,7 @@ export class Agent {
 }
 ```
 
-- [ ] **Step 4: Прогнать тесты и закоммитить**
+- [x] **Step 4: Прогнать тесты и закоммитить**
 
 Run: `npm test`
 Expected: PASS.
@@ -2945,7 +2945,7 @@ git commit -m "feat: агентный цикл с вызовом инструм�
   - `function renderSnapshot(snapshot: WorkspaceSnapshot): string`
   - `const RULE_FILES: string[]`
 
-- [ ] **Step 1: Написать падающий тест `test/unit/context.test.ts`**
+- [x] **Step 1: Написать падающий тест `test/unit/context.test.ts`**
 
 ```typescript
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
@@ -3008,12 +3008,12 @@ describe('buildSystemPrompt', () => {
 });
 ```
 
-- [ ] **Step 2: Запустить, убедиться в падении**
+- [x] **Step 2: Запустить, убедиться в падении**
 
 Run: `npm test`
 Expected: FAIL, модули `src/agent/context` и `src/agent/prompt` не найдены.
 
-- [ ] **Step 3: Реализовать `src/agent/prompt.ts`**
+- [x] **Step 3: Реализовать `src/agent/prompt.ts`**
 
 ```typescript
 export interface PromptContext {
@@ -3069,7 +3069,7 @@ export function buildSystemPrompt(context: PromptContext): string {
 }
 ```
 
-- [ ] **Step 4: Реализовать `src/agent/context.ts`**
+- [x] **Step 4: Реализовать `src/agent/context.ts`**
 
 ```typescript
 import { readFile, readdir } from 'node:fs/promises';
@@ -3187,7 +3187,7 @@ export function renderSnapshot(snapshot: WorkspaceSnapshot): string {
 }
 ```
 
-- [ ] **Step 5: Прогнать тесты и закоммитить**
+- [x] **Step 5: Прогнать тесты и закоммитить**
 
 Run: `npm test`
 Expected: PASS.
@@ -3214,7 +3214,7 @@ git commit -m "feat: system prompt и сборка контекста проек
   - `function postToWebview(view: vscode.Webview, message: ExtToWeb): void`
   - React-приложение принимает проп `initial: UiState` и вызывает `vscode.postMessage` с `WebToExt`
 
-- [ ] **Step 1: Создать `src/ui/protocol.ts`**
+- [x] **Step 1: Создать `src/ui/protocol.ts`**
 
 ```typescript
 import type { EffortLevel } from '../api/types';
@@ -3308,7 +3308,7 @@ export type WebToExt =
   | { type: 'undo_last_change' };
 ```
 
-- [ ] **Step 2: Создать `src/ui/webview/index.html` и `src/ui/webview/main.tsx`**
+- [x] **Step 2: Создать `src/ui/webview/index.html` и `src/ui/webview/main.tsx`**
 
 ```html
 <!doctype html>
@@ -3345,7 +3345,7 @@ createRoot(container).render(
 );
 ```
 
-- [ ] **Step 3: Создать `src/ui/webview/strings.ts`**
+- [x] **Step 3: Создать `src/ui/webview/strings.ts`**
 
 ```typescript
 export const STRINGS = {
@@ -3371,7 +3371,7 @@ export const STRINGS = {
 } as const;
 ```
 
-- [ ] **Step 4: Создать компоненты `src/ui/webview/components/`**
+- [x] **Step 4: Создать компоненты `src/ui/webview/components/`**
 
 ```tsx
 // ThinkingBlock.tsx
@@ -3648,7 +3648,7 @@ export function Header({
 }
 ```
 
-- [ ] **Step 5: Создать `src/ui/webview/App.tsx`**
+- [x] **Step 5: Создать `src/ui/webview/App.tsx`**
 
 ```tsx
 import { useEffect, useMemo, useState } from 'react';
@@ -3826,7 +3826,7 @@ function appendToLastAssistant(
 }
 ```
 
-- [ ] **Step 6: Создать `src/ui/webview/styles.css`**
+- [x] **Step 6: Создать `src/ui/webview/styles.css`**
 
 ```css
 :root {
@@ -4010,7 +4010,7 @@ body {
 }
 ```
 
-- [ ] **Step 7: Создать `src/ui/panel.ts`**
+- [x] **Step 7: Создать `src/ui/panel.ts`**
 
 ```typescript
 import * as vscode from 'vscode';
@@ -4225,7 +4225,7 @@ createRoot(container).render(
 );
 ```
 
-- [ ] **Step 8: Собрать и закоммитить**
+- [x] **Step 8: Собрать и закоммитить**
 
 Run: `npm run compile`, затем `npm run typecheck`
 Expected: обе команды проходят без ошибок.
@@ -4253,7 +4253,7 @@ git commit -m "feat: протокол UI, панель и React-интерфей
   - `async function buildPreview(toolName: string, input: Record<string, unknown>, workspaceRoot: string): Promise<DiffPreview | undefined>`
   - `class SessionStore { constructor(storage: vscode.Memento); list(): StoredSession[]; get(id: string): StoredSession | undefined; save(session: StoredSession): void; remove(id: string): void }`
 
-- [ ] **Step 1: Написать падающий тест `test/unit/preview.test.ts`**
+- [x] **Step 1: Написать падающий тест `test/unit/preview.test.ts`**
 
 ```typescript
 import { mkdtemp, writeFile } from 'node:fs/promises';
@@ -4289,7 +4289,7 @@ describe('buildPreview', () => {
 });
 ```
 
-- [ ] **Step 2: Написать падающий тест `test/unit/session.test.ts`**
+- [x] **Step 2: Написать падающий тест `test/unit/session.test.ts`**
 
 ```typescript
 import { describe, expect, it, vi } from 'vitest';
@@ -4353,12 +4353,12 @@ describe('AgentSession', () => {
 });
 ```
 
-- [ ] **Step 3: Запустить, убедиться в падении**
+- [x] **Step 3: Запустить, убедиться в падении**
 
 Run: `npm test`
 Expected: FAIL, модули `src/tools/preview` и `src/agent/session` не найдены.
 
-- [ ] **Step 4: Реализовать `src/tools/preview.ts`**
+- [x] **Step 4: Реализовать `src/tools/preview.ts`**
 
 ```typescript
 import { readFile } from 'node:fs/promises';
@@ -4398,7 +4398,7 @@ export async function buildPreview(
 }
 ```
 
-- [ ] **Step 5: Реализовать `src/agent/session.ts`**
+- [x] **Step 5: Реализовать `src/agent/session.ts`**
 
 ```typescript
 import type { MiniMaxClient } from '../api/client';
@@ -4516,7 +4516,7 @@ export class AgentSession {
 
 В `AgentEvent` из `src/agent/agent.ts` добавить вариант `{ type: 'approval_preview'; id: string; path: string; lines: DiffLine[] }`, в `src/agent/agent.ts` импортировать `DiffLine` из `../tools/diff`.
 
-- [ ] **Step 6: Реализовать `src/storage/sessions.ts`**
+- [x] **Step 6: Реализовать `src/storage/sessions.ts`**
 
 ```typescript
 import * as vscode from 'vscode';
@@ -4558,7 +4558,7 @@ export class SessionStore {
 }
 ```
 
-- [ ] **Step 7: Переписать `src/extension.ts`**
+- [x] **Step 7: Переписать `src/extension.ts`**
 
 ```typescript
 import * as vscode from 'vscode';
@@ -5022,7 +5022,7 @@ async function refreshContext(): Promise<void> {
 - ``AgentEvent` в `src/agent/agent.ts` должен получить вариант `approval_preview`, чтобы `src/agent/session.ts` мог его отправлять.
 - `undoLastChange` реализуется через общий `backups`: `const entry = await backups.revertLast();` затем восстановить содержимое или удалить файл, если `entry.previousContent === null`.
 
-- [ ] **Step 8: Прогнать тесты, собрать и закоммитить**
+- [x] **Step 8: Прогнать тесты, собрать и закоммитить**
 
 Run: `npm test`, затем `npm run compile`, затем `npm run typecheck`
 Expected: PASS, сборка успешна, ошибок типов нет.
@@ -5044,7 +5044,7 @@ git commit -m "feat: сессия агента, команды и интегра
 - Consumes: `HttpMiniMaxClient` (Task 4)
 - Produces: рабочий `.vsix` и README с инструкцией по установке и использованию
 
-- [ ] **Step 1: Написать `test/live/live.test.ts`**
+- [x] **Step 1: Написать `test/live/live.test.ts`**
 
 ```typescript
 import { readFileSync, existsSync } from 'node:fs';
@@ -5098,7 +5098,7 @@ describe.skipIf(!key)('live MiniMax API', () => {
 });
 ```
 
-- [ ] **Step 2: Прогнать live-тест с ключом**
+- [x] **Step 2: Прогнать live-тест с ключом**
 
 Положить ключ в `.env.local` (файл в `.gitignore`):
 
@@ -5110,7 +5110,7 @@ Run: `npm run test:live`
 Expected: PASS, тест печатает реальный ответ модели и расход токенов.
 Если тест падает с ошибкой авторизации, проверить `MINIMAX_API_KEY` и регион эндпоинта.
 
-- [ ] **Step 3: Добавить `.vscodeignore` и иконку `media/icon.svg`**
+- [x] **Step 3: Добавить `.vscodeignore` и иконку `media/icon.svg`**
 
 ```
 .vscode/**
@@ -5133,11 +5133,11 @@ node_modules/**
 </svg>
 ```
 
-- [ ] **Step 4: Обновить `package.json`**
+- [x] **Step 4: Обновить `package.json`**
 
 Добавить в `scripts` скрипт `live` уже есть. Убедиться, что поле `icon` равно `media/icon.svg` и в `devDependencies` есть `@vscode/vsce`.
 
-- [ ] **Step 5: Написать `README.md`**
+- [x] **Step 5: Написать `README.md`**
 
 ```markdown
 # MiniMax Agent
@@ -5201,7 +5201,7 @@ Every write and every command needs an explicit approval. File paths are resolve
 MIT
 ```
 
-- [ ] **Step 6: Собрать `.vsix` и проверить установку**
+- [x] **Step 6: Собрать `.vsix` и проверить установку**
 
 Run: `npm run package`
 Expected: создан файл `minimax-agent-0.1.0.vsix`.
@@ -5209,7 +5209,7 @@ Expected: создан файл `minimax-agent-0.1.0.vsix`.
 Run: `code --install-extension minimax-agent-0.1.0.vsix`
 Expected: расширение установлено, команда **MiniMax: Open Panel** доступна в палитре команд.
 
-- [ ] **Step 7: Прогнать полный набор проверок и закоммитить**
+- [x] **Step 7: Прогнать полный набор проверок и закоммитить**
 
 Run: `npm run typecheck && npm test && npm run compile`
 Expected: всё зелёное.
@@ -5266,3 +5266,40 @@ git commit -m "feat: live-тесты, упаковка .vsix и документ
 ## Порядок выполнения
 
 Задачи выполняются строго по порядку: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12. Каждая задача заканчивается зелёным прогоном `npm test` и отдельным коммитом.
+
+
+## Отклонения от плана
+
+Ниже перечислены расхождения между планом и реализацией. Ни одно из них не меняет границ MVP и контракт с API.
+
+| Пункт | План | Реализация | Причина |
+| --- | --- | --- | --- |
+| Бэкапы файлов | `backups` в `SessionOptions` и в `ToolContext` | `createFileTools({ backups })`, один общий `InMemoryBackupStore` в `activate` | Поле в `ToolContext` не помогло бы откату: откат ищет оригиналы по абсолютному пути, а не по контексту инструмента |
+| События подтверждения | `AgentEvent.approval_requested` и `AgentEvent.approval_preview` | `AgentEvent.approval_resolved` плюс колбэк `onApproval(UiApproval)` в `AgentSession` | Схема плана требовала двух событий на одно подтверждение и размазывала превью между агентом и сессией. Теперь агент сообщает только решение, карточку подтверждения и превью диффа собирает сессия |
+| Автоодобрение | список `autoApprove` только при создании гейта | `ApprovalGate.setAutoApprove` и `AgentSession.setAutoApprove` | Без сеттера смена настройки `minimax.autoApprove` не применялась к уже открытой сессии |
+| Границы сообщений ассистента | дельты `text_delta` без идентификатора | `AgentEvent.assistant_start`, `ExtToWeb.user_message` и `ExtToWeb.assistant_start` | Без явного начала хода текст следующего ответа склеивался с предыдущим сообщением ассистента в webview |
+| История сессий | только `StoredSession.messages` | добавлено `StoredSession.uiMessages` | По истории модели нельзя восстановить карточки инструментов и текст размышлений, для отрисовки нужен точный список сообщений |
+| Live-тесты | `npm run test:live` = `vitest run test/live` | отдельный `vitest.live.config.ts` | Общий `include` в `vitest.config.ts` перехватывал `test/live`, и обычный `npm test` начал бы ходить в сеть |
+| Иконка расширения | `media/icon.svg` | `media/icon.png` 128x128, SVG остался для панели активности | `vsce` не принимает SVG в поле `icon` |
+| Сборка пакета | `npm run compile && vsce package` | `node esbuild.mjs --production && vsce package` плюс `vscode:prepublish` | В пакет должен попадать минифицированный бандл без sourcemap |
+| README | английский шаблон из плана | русский текст | По правилам проекта проектная документация на русском, английскими остаются идентификаторы, команды и строки интерфейса |
+| `clearApiKey` | заглушка `clearApiKeyCommand` | `clearStoredApiKey(context.secrets)` | Заглушка из плана не удаляла ключ из secret storage |
+
+Решения, которые стоит зафиксировать отдельно:
+
+- Последовательные `user`-сообщения объединяются в один turn. Документация Anthropic API прямо говорит, что соседние сообщения с одинаковой ролью склеиваются в один turn, но единый turn безопаснее и для более строгой реализации протокола.
+- `AgentSession` пересоздаёт `Agent` на каждое сообщение, а `ApprovalGate` живёт на уровне сессии, поэтому «Always allow in this session» переживает отдельные запросы.
+- При смене настроек агент пересоздаётся, а история сессии сохраняется. Так меняются модель, effort, endpoint и лимит итераций без потери контекста.
+- `output_config.effort` подставляется всегда для `MiniMax-M3.1-Flash` (дефолт `max`, как на сервере), `thinking` в запрос не отправляется никогда.
+
+## Фактическая проверка
+
+| Проверка | Результат |
+| --- | --- |
+| `npm run typecheck` | без ошибок |
+| `npm test` | 75 тестов в 14 файлах, все зелёные |
+| `npm run compile` и production-сборка | `dist/extension.js` 38 КБ, `dist/webview/main.js` 297 КБ |
+| `npm run package` | собран `minimax-agent-0.1.0.vsix`, 9 файлов, 121 КБ |
+| `code --install-extension` | расширение установлено как `local.minimax-agent@0.1.0` |
+| Проба реального эндпоинта | `https://api.minimax.io/anthropic/v1/messages` и `https://api.minimaxi.com/anthropic/v1/messages` отвечают `401` на фиктивный ключ, ошибка корректно превращается в понятное сообщение |
+| Живой запрос с настоящим ключом | требуется `MINIMAX_API_KEY` в `.env.local`, выполняется командой `npm run test:live` |

@@ -9,7 +9,7 @@
     "vscode": "^1.90.0"
   },
   "main": "./dist/extension.js",
-  "icon": "media/icon.svg",
+  "icon": "media/icon.png",
   "categories": [
     "AI",
     "Programming Languages",
@@ -157,8 +157,10 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:live": "vitest run test/live",
-    "package": "npm run compile && vsce package"
+    "test:live": "vitest run --config vitest.live.config.ts",
+    "build:production": "node esbuild.mjs --production",
+    "package": "node esbuild.mjs --production && vsce package",
+    "vscode:prepublish": "node esbuild.mjs --production"
   },
   "devDependencies": {
     "@types/markdown-it": "^14.2.0",
