@@ -1,0 +1,232 @@
+import { describe, expect, it } from 'vitest';
+import { Agent, type AgentEvent } from '../../src/agent/agent';
+import type { MiniMaxClient } from '../../src/api/client';
+import type { ChatRequest, StreamEvent } from '../../src/api/types';
+import { ToolRegistry } from '../../src/tools/registry';
+import { ApprovalGate, type ApprovalDecision, type ApprovalRequest } from '../../src/ui/approvals';
+
+class FakeClient implements MiniMaxClient {
+  readonly requests: ChatRequest[] = [];
+  private index = 0;
+
+  constructor(private readonly responses: StreamEvent[][]) {}
+
+  async *stream(request: ChatRequest): AsyncGenerator<StreamEvent> {
+    this.requests.push(request);
+    const response = this.responses[this.index];
+    this.index += 1;
+    if (!response) {
+      throw new Error('no scripted response left');
+    }
+    for (const event of response) {
+      yield event;
+    }
+  }
+}
+
+function textResponse(text: string, stopReason: 'end_turn' | 'tool_use' = 'end_turn'): StreamEvent[] {
+  return [
+    { type: 'text_delta', text },
+    {
+      type: 'message_stop',
+      stopReason,
+      usage: { inputTokens: 10, outputTokens: 5 },
+      blocks: [{ type: 'text', text }]
+    }
+  ];
+}
+
+function toolResponse(name: string, input: Record<string, unknown>): StreamEvent[] {
+  const block = { type: 'tool_use' as const, id: 'toolu_1', name, input };
+  return [
+    { type: 'tool_use_start', id: 'toolu_1', name },
+    {
+      type: 'message_stop',
+      stopReason: 'tool_use',
+      usage: { inputTokens: 10, outputTokens: 5 },
+      blocks: [block]
+    }
+  ];
+}
+
+function makeAgent(
+  client: FakeClient,
+  decide: ApprovalDecision = { approved: true, allowForSession: false }
+): { agent: Agent; events: AgentEvent[]; requests: ApprovalRequest[] } {
+  const events: AgentEvent[] = [];
+  const requests: ApprovalRequest[] = [];
+  const registry = new ToolRegistry();
+  registry.register({
+    name: 'read_file',
+    description: 'read',
+    approval: 'never',
+    inputSchema: { type: 'object', properties: {} },
+    execute: async () => ({ content: 'file content' })
+  });
+  registry.register({
+    name: 'write_file',
+    description: 'write',
+    approval: 'always',
+    inputSchema: { type: 'object', properties: {} },
+    execute: async () => ({ content: 'written' })
+  });
+  const agent = new Agent({
+    client,
+    registry,
+    approval: new ApprovalGate({
+      autoApprove: [],
+      request: async (request) => {
+        requests.push(request);
+        return decide;
+      }
+    }),
+    model: 'MiniMax-M3.1-Flash',
+    maxTokens: 32000,
+    maxIterations: 5,
+    effort: 'max',
+    systemPrompt: 'system',
+    workspaceRoot: '/tmp/root',
+    logger: { info: () => undefined, error: () => undefined },
+    onEvent: (event) => events.push(event)
+  });
+  return { agent, events, requests };
+}
+
+describe('Agent', () => {
+  it('returns assistant text without calling tools', async () => {
+    const client = new FakeClient([textResponse('hello')]);
+    const { agent, events } = makeAgent(client);
+    const result = await agent.run('hi', []);
+    expect(result.stopReason).toBe('end_turn');
+    expect(result.messages).toHaveLength(2);
+    expect(events.some((e) => e.type === 'assistant_text')).toBe(true);
+    expect(events.some((e) => e.type === 'done')).toBe(true);
+  });
+
+  it('starts an assistant message before the first delta', async () => {
+    const client = new FakeClient([textResponse('hello')]);
+    const { agent, events } = makeAgent(client);
+    await agent.run('hi', []);
+    const types = events.map((event) => event.type);
+    expect(types.filter((type) => type === 'assistant_start')).toHaveLength(1);
+    expect(types.indexOf('assistant_start')).toBeLessThan(types.indexOf('assistant_text'));
+  });
+
+  it('starts a new assistant message for every model turn', async () => {
+    const client = new FakeClient([toolResponse('read_file', { path: 'a.ts' }), textResponse('done')]);
+    const { agent, events } = makeAgent(client);
+    await agent.run('read it', []);
+    const types = events.map((event) => event.type);
+    expect(types.filter((type) => type === 'assistant_start')).toHaveLength(1);
+  });
+
+  it('executes a tool and feeds the result back', async () => {
+    const client = new FakeClient([toolResponse('read_file', { path: 'a.ts' }), textResponse('done')]);
+    const { agent, events } = makeAgent(client);
+    const result = await agent.run('read it', []);
+    expect(client.requests).toHaveLength(2);
+    const second = client.requests[1]!;
+    const userMessage = second.messages[second.messages.length - 1]!;
+    expect(userMessage.role).toBe('user');
+    const block = userMessage.content[0]!;
+    expect(block.type).toBe('tool_result');
+    if (block.type === 'tool_result') {
+      expect(block.content).toBe('file content');
+    }
+    expect(events.some((e) => e.type === 'tool_start')).toBe(true);
+    expect(events.some((e) => e.type === 'tool_end')).toBe(true);
+    expect(result.messages.length).toBeGreaterThan(2);
+  });
+
+  it('asks the gate for a tool that always needs approval', async () => {
+    const client = new FakeClient([
+      toolResponse('write_file', { path: 'a.ts', content: 'x' }),
+      textResponse('ok')
+    ]);
+    const { agent, events, requests } = makeAgent(client, {
+      approved: false,
+      allowForSession: false
+    });
+    await agent.run('write it', []);
+    expect(requests).toHaveLength(1);
+    expect(requests[0]?.toolName).toBe('write_file');
+    const resolved = events.find((e) => e.type === 'approval_resolved');
+    expect(resolved?.type === 'approval_resolved' && resolved.approved).toBe(false);
+    const toolEnd = events.find((e) => e.type === 'tool_end');
+    expect(toolEnd?.type === 'tool_end' && toolEnd.isError).toBe(true);
+  });
+
+  it('does not ask the gate for a tool that never needs approval', async () => {
+    const client = new FakeClient([toolResponse('read_file', { path: 'a.ts' }), textResponse('done')]);
+    const { agent, requests } = makeAgent(client);
+    await agent.run('read it', []);
+    expect(requests).toHaveLength(0);
+  });
+
+  it('keeps thinking blocks in the assistant message', async () => {
+    const client = new FakeClient([
+      [
+        { type: 'thinking_delta', text: 'thinking hard' },
+        {
+          type: 'message_stop',
+          stopReason: 'end_turn',
+          usage: { inputTokens: 1, outputTokens: 1 },
+          blocks: [
+            { type: 'thinking', thinking: 'thinking hard' },
+            { type: 'text', text: 'answer' }
+          ]
+        }
+      ]
+    ]);
+    const { agent } = makeAgent(client);
+    const result = await agent.run('q', []);
+    const assistant = result.messages[1]!;
+    expect(assistant.content[0]?.type).toBe('thinking');
+  });
+
+  it('stops after maxIterations', async () => {
+    const responses = Array.from({ length: 10 }, () => toolResponse('read_file', { path: 'a.ts' }));
+    const client = new FakeClient(responses);
+    const { agent } = makeAgent(client);
+    const result = await agent.run('loop', []);
+    expect(client.requests.length).toBe(5);
+    expect(result.stopReason).toBe('max_iterations');
+  });
+
+  it('refuses to run the same tool call more than three times', async () => {
+    const responses = Array.from({ length: 6 }, () => toolResponse('read_file', { path: 'a.ts' }));
+    const client = new FakeClient(responses);
+    const { agent } = makeAgent(client);
+    const result = await agent.run('loop', []);
+    const lastMessage = result.messages[result.messages.length - 1]!;
+    const block = lastMessage.content[0]!;
+    expect(block.type === 'tool_result' && block.is_error).toBe(true);
+    expect(client.requests.length).toBe(5);
+  });
+
+  it('merges a new user turn into a trailing user message', async () => {
+    const responses = Array.from({ length: 6 }, () => toolResponse('read_file', { path: 'a.ts' }));
+    const first = makeAgent(new FakeClient(responses));
+    const firstResult = await first.agent.run('loop', []);
+    expect(firstResult.messages[firstResult.messages.length - 1]?.role).toBe('user');
+
+    const client = new FakeClient([textResponse('ok')]);
+    const second = makeAgent(client);
+    await second.agent.run('again', firstResult.messages);
+    const request = client.requests[0]!;
+    const last = request.messages[request.messages.length - 1]!;
+    expect(last.role).toBe('user');
+    const types = last.content.map((block) => block.type);
+    expect(types).toContain('tool_result');
+    expect(types).toContain('text');
+  });
+
+  it('passes the tool definitions to the model', async () => {
+    const client = new FakeClient([textResponse('ok')]);
+    const { agent } = makeAgent(client);
+    await agent.run('hi', []);
+    const names = client.requests[0]?.tools?.map((tool) => tool.name) ?? [];
+    expect(names).toContain('read_file');
+    expect(names).toContain('write_file');
+  });
+});

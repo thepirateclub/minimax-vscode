@@ -48,7 +48,12 @@ export interface ToolDefinition {
   input_schema: JsonSchema;
 }
 
-export type StopReason = 'end_turn' | 'tool_use' | 'max_tokens' | 'stop_sequence';
+export type StopReason =
+  | 'end_turn'
+  | 'tool_use'
+  | 'max_tokens'
+  | 'stop_sequence'
+  | 'max_iterations';
 
 export interface Usage {
   inputTokens: number;
