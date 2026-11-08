@@ -1,0 +1,20 @@
+export const STRINGS = {
+  appName: 'MiniMax Agent',
+  placeholder: 'Ask MiniMax to change your code. Use @ to attach files.',
+  send: 'Send',
+  stop: 'Stop',
+  newChat: 'New chat',
+  model: 'Model',
+  effort: 'Thinking',
+  approve: 'Allow',
+  reject: 'Reject',
+  alwaysAllow: 'Always allow in this session',
+  thinking: 'Thinking',
+  toolRunning: 'Running',
+  toolDone: 'Done',
+  toolFailed: 'Failed',
+  attach: 'Attach files',
+  empty: 'Ask a question or describe a task. The agent reads files, runs commands and proposes edits.',
+  noApiKey: 'No API key yet. Run "MiniMax: Add API Key" from the command palette.',
+  tokens: 'tokens'
+} as const;

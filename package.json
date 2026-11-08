@@ -161,6 +161,7 @@
     "package": "npm run compile && vsce package"
   },
   "devDependencies": {
+    "@types/markdown-it": "^14.2.0",
     "@types/node": "^20.14.0",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
