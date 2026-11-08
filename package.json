@@ -1,0 +1,179 @@
+{
+  "name": "minimax-agent",
+  "displayName": "MiniMax Agent",
+  "description": "Coding agent for VS Code powered by MiniMax models",
+  "version": "0.1.0",
+  "publisher": "local",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "main": "./dist/extension.js",
+  "icon": "media/icon.svg",
+  "categories": [
+    "AI",
+    "Programming Languages",
+    "Other"
+  ],
+  "activationEvents": [],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "minimax",
+          "title": "MiniMax",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "minimax": [
+        {
+          "id": "minimax.chat",
+          "name": "Agent",
+          "type": "webview"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "minimax.openPanel",
+        "title": "Open Panel",
+        "category": "MiniMax"
+      },
+      {
+        "command": "minimax.newChat",
+        "title": "New Chat",
+        "category": "MiniMax"
+      },
+      {
+        "command": "minimax.addApiKey",
+        "title": "Add API Key",
+        "category": "MiniMax"
+      },
+      {
+        "command": "minimax.setEndpoint",
+        "title": "Set Endpoint",
+        "category": "MiniMax"
+      },
+      {
+        "command": "minimax.selectModel",
+        "title": "Select Model",
+        "category": "MiniMax"
+      },
+      {
+        "command": "minimax.setEffort",
+        "title": "Set Thinking Effort",
+        "category": "MiniMax"
+      },
+      {
+        "command": "minimax.undoLastChange",
+        "title": "Undo Last File Change",
+        "category": "MiniMax"
+      },
+      {
+        "command": "minimax.refreshContext",
+        "title": "Refresh Workspace Context",
+        "category": "MiniMax"
+      },
+      {
+        "command": "minimax.showLogs",
+        "title": "Show Logs",
+        "category": "MiniMax"
+      },
+      {
+        "command": "minimax.clearApiKey",
+        "title": "Clear API Key",
+        "category": "MiniMax"
+      }
+    ],
+    "configuration": {
+      "title": "MiniMax",
+      "properties": {
+        "minimax.baseUrl": {
+          "type": "string",
+          "default": "auto",
+          "enum": [
+            "auto",
+            "global",
+            "china"
+          ],
+          "description": "API region. auto uses the global endpoint."
+        },
+        "minimax.customBaseUrl": {
+          "type": "string",
+          "default": "",
+          "description": "Custom base URL. Overrides the region preset when set."
+        },
+        "minimax.model": {
+          "type": "string",
+          "default": "MiniMax-M3.1-Flash"
+        },
+        "minimax.effort": {
+          "type": "string",
+          "default": "max",
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ]
+        },
+        "minimax.maxTokens": {
+          "type": "number",
+          "default": 32000,
+          "minimum": 4096,
+          "maximum": 65536
+        },
+        "minimax.maxIterations": {
+          "type": "number",
+          "default": 40,
+          "minimum": 1,
+          "maximum": 200
+        },
+        "minimax.autoApprove": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Tool names approved without confirmation for the whole session."
+        },
+        "minimax.enableWebSearch": {
+          "type": "boolean",
+          "default": false
+        },
+        "minimax.rulesEnabled": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:live": "vitest run test/live",
+    "package": "npm run compile && vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "@types/vscode": "^1.90.0",
+    "@vitejs/plugin-react": "^4.3.0",
+    "@vscode/vsce": "^3.0.0",
+    "esbuild": "^0.23.0",
+    "typescript": "^5.5.0",
+    "vitest": "^2.1.0"
+  },
+  "dependencies": {
+    "markdown-it": "^14.1.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  }
+}

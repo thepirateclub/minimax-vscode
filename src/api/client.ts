@@ -1,0 +1,99 @@
+import { mapHttpError, MiniMaxApiError } from './errors';
+import { StreamDecoder } from './sse';
+import type { ChatRequest, StreamEvent } from './types';
+
+export interface MiniMaxClient {
+  stream(request: ChatRequest, options?: { signal?: AbortSignal }): AsyncGenerator<StreamEvent>;
+}
+
+export function buildRequestBody(request: ChatRequest): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    model: request.model,
+    max_tokens: request.maxTokens,
+    system: request.system,
+    messages: request.messages,
+    stream: true
+  };
+  if (request.tools && request.tools.length > 0) {
+    body['tools'] = request.tools;
+  }
+  if (request.model === 'MiniMax-M3.1-Flash') {
+    body['output_config'] = { effort: request.effort ?? 'max' };
+  } else if (request.thinking === 'adaptive') {
+    body['thinking'] = { type: 'adaptive' };
+  }
+  return body;
+}
+
+export class HttpMiniMaxClient implements MiniMaxClient {
+  private readonly baseUrl: string;
+  private readonly apiKey: string;
+  private readonly fetchImpl: typeof fetch;
+
+  constructor(options: { baseUrl: string; apiKey: string; fetchImpl?: typeof fetch }) {
+    this.baseUrl = options.baseUrl.replace(/\/+$/, '');
+    this.apiKey = options.apiKey;
+    this.fetchImpl = options.fetchImpl ?? fetch;
+  }
+
+  async *stream(request: ChatRequest, options?: { signal?: AbortSignal }): AsyncGenerator<StreamEvent> {
+    const url = this.baseUrl + '/v1/messages';
+    let response: Response;
+    try {
+      response = await this.fetchImpl(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer ' + this.apiKey,
+          'anthropic-version': '2023-06-01'
+        },
+        body: JSON.stringify(buildRequestBody(request)),
+        signal: options?.signal ?? request.signal
+      });
+    } catch (error) {
+      if (error instanceof MiniMaxApiError) {
+        throw error;
+      }
+      throw new MiniMaxApiError(
+        'Network error while contacting MiniMax: ' +
+          (error instanceof Error ? error.message : String(error)),
+        0,
+        undefined,
+        true
+      );
+    }
+
+    if (!response.ok) {
+      throw await mapHttpError(response);
+    }
+    if (!response.body) {
+      throw new MiniMaxApiError(
+        'MiniMax returned an empty response body.',
+        response.status,
+        undefined,
+        true
+      );
+    }
+
+    const decoder = new StreamDecoder();
+    const reader = response.body.getReader();
+    const utf8 = new TextDecoder();
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) {
+          break;
+        }
+        const chunk = utf8.decode(value, { stream: true });
+        for (const event of decoder.push(chunk)) {
+          yield event;
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+    for (const event of decoder.flush()) {
+      yield event;
+    }
+  }
+}
