@@ -1,0 +1,209 @@
+import { describe, expect, it, vi } from 'vitest';
+import { AgentSession, type SessionOptions } from '../../src/agent/session';
+import type { MiniMaxClient } from '../../src/api/client';
+import type { ChatRequest, StreamEvent } from '../../src/api/types';
+import { ToolRegistry } from '../../src/tools/registry';
+import type { UiApproval } from '../../src/ui/protocol';
+
+class FakeClient implements MiniMaxClient {
+  readonly requests: ChatRequest[] = [];
+  private index = 0;
+
+  constructor(private readonly responses: StreamEvent[][]) {}
+
+  async *stream(request: ChatRequest): AsyncGenerator<StreamEvent> {
+    this.requests.push(request);
+    const response = this.responses[this.index];
+    this.index += 1;
+    if (!response) {
+      throw new Error('no scripted response left');
+    }
+    for (const event of response) {
+      yield event;
+    }
+  }
+}
+
+function textResponse(text: string): StreamEvent[] {
+  return [
+    { type: 'text_delta', text },
+    {
+      type: 'message_stop',
+      stopReason: 'end_turn',
+      usage: { inputTokens: 1, outputTokens: 1 },
+      blocks: [{ type: 'text', text }]
+    }
+  ];
+}
+
+function toolResponse(name: string, input: Record<string, unknown>): StreamEvent[] {
+  return [
+    { type: 'tool_use_start', id: 'toolu_1', name },
+    {
+      type: 'message_stop',
+      stopReason: 'tool_use',
+      usage: { inputTokens: 1, outputTokens: 1 },
+      blocks: [{ type: 'tool_use', id: 'toolu_1', name, input }]
+    }
+  ];
+}
+
+function makeSession(
+  responses: StreamEvent[][] = [textResponse('ok')],
+  autoApprove: string[] = []
+): {
+  session: AgentSession;
+  events: unknown[];
+  approvals: UiApproval[];
+  client: FakeClient;
+} {
+  const registry = new ToolRegistry();
+  const events: unknown[] = [];
+  const approvals: UiApproval[] = [];
+  const client = new FakeClient(responses);
+  const options: SessionOptions = {
+    client,
+    registry,
+    model: 'MiniMax-M3.1-Flash',
+    maxTokens: 32000,
+    maxIterations: 5,
+    effort: 'max',
+    systemPrompt: 'system',
+    workspaceRoot: '/tmp/root',
+    logger: { info: () => undefined, error: () => undefined },
+    autoApprove,
+    onEvent: (event) => events.push(event),
+    onApproval: (approval) => approvals.push(approval)
+  };
+  return { session: new AgentSession(options), events, approvals, client };
+}
+
+describe('AgentSession', () => {
+  it('appends the user message and the assistant answer to the history', async () => {
+    const { session } = makeSession();
+    await session.send('hello', []);
+    const history = session.getHistory();
+    expect(history).toHaveLength(2);
+    expect(history[0]?.role).toBe('user');
+    expect(history[1]?.role).toBe('assistant');
+  });
+
+  it('attaches mentioned files as extra context', async () => {
+    const { session } = makeSession();
+    await session.send('look at src', ['src/a.ts']);
+    const history = session.getHistory();
+    const block = history[0]?.content[0];
+    expect(block?.type === 'text' && block.text).toContain('src/a.ts');
+  });
+
+  it('continues a restored history', async () => {
+    const { session, client } = makeSession();
+    session.setHistory([
+      { role: 'user', content: [{ type: 'text', text: 'old question' }] },
+      { role: 'assistant', content: [{ type: 'text', text: 'old answer' }] }
+    ]);
+    await session.send('next question', []);
+    expect(session.getHistory()).toHaveLength(4);
+    const sent = client.requests[0]?.messages ?? [];
+    expect(sent[0]?.role).toBe('user');
+    expect(sent[1]?.role).toBe('assistant');
+  });
+
+  it('asks the UI for an approval and runs the tool after approve', async () => {
+    const registry = new ToolRegistry();
+    registry.register({
+      name: 'write_file',
+      description: 'write',
+      approval: 'always',
+      inputSchema: { type: 'object', properties: {} },
+      execute: async () => ({ content: 'written' })
+    });
+    const approvals: UiApproval[] = [];
+    const events: unknown[] = [];
+    const session = new AgentSession({
+      client: new FakeClient([toolResponse('write_file', { path: 'a.ts' }), textResponse('done')]),
+      registry,
+      model: 'MiniMax-M3.1-Flash',
+      maxTokens: 32000,
+      maxIterations: 5,
+      effort: 'max',
+      systemPrompt: 'system',
+      workspaceRoot: '/tmp/root',
+      logger: { info: () => undefined, error: () => undefined },
+      autoApprove: [],
+      onEvent: (event) => events.push(event),
+      onApproval: (approval) => approvals.push(approval)
+    });
+
+    const running = session.send('write it', []);
+    await vi.waitFor(() => expect(approvals).toHaveLength(1));
+    expect(approvals[0]?.name).toBe('write_file');
+    session.approve(approvals[0]!.id, false);
+    await running;
+
+    const history = session.getHistory();
+    const toolResult = history
+      .flatMap((message) => message.content)
+      .find((block) => block.type === 'tool_result');
+    expect(toolResult?.type === 'tool_result' && toolResult.content).toBe('written');
+  });
+
+  it('runs an auto approved tool without asking the UI', async () => {
+    const registry = new ToolRegistry();
+    registry.register({
+      name: 'write_file',
+      description: 'write',
+      approval: 'always',
+      inputSchema: { type: 'object', properties: {} },
+      execute: async () => ({ content: 'written' })
+    });
+    const approvals: UiApproval[] = [];
+    const session = new AgentSession({
+      client: new FakeClient([toolResponse('write_file', { path: 'a.ts' }), textResponse('done')]),
+      registry,
+      model: 'MiniMax-M3.1-Flash',
+      maxTokens: 32000,
+      maxIterations: 5,
+      effort: 'max',
+      systemPrompt: 'system',
+      workspaceRoot: '/tmp/root',
+      logger: { info: () => undefined, error: () => undefined },
+      autoApprove: ['write_file'],
+      onEvent: () => undefined,
+      onApproval: (approval) => approvals.push(approval)
+    });
+
+    await session.send('write it', []);
+    expect(approvals).toHaveLength(0);
+  });
+
+  it('applies a new auto approve list to the running gate', async () => {
+    const registry = new ToolRegistry();
+    registry.register({
+      name: 'write_file',
+      description: 'write',
+      approval: 'always',
+      inputSchema: { type: 'object', properties: {} },
+      execute: async () => ({ content: 'written' })
+    });
+    const approvals: UiApproval[] = [];
+    const session = new AgentSession({
+      client: new FakeClient([toolResponse('write_file', { path: 'a.ts' }), textResponse('done')]),
+      registry,
+      model: 'MiniMax-M3.1-Flash',
+      maxTokens: 32000,
+      maxIterations: 5,
+      effort: 'max',
+      systemPrompt: 'system',
+      workspaceRoot: '/tmp/root',
+      logger: { info: () => undefined, error: () => undefined },
+      autoApprove: [],
+      onEvent: () => undefined,
+      onApproval: (approval) => approvals.push(approval)
+    });
+
+    session.setAutoApprove(['write_file']);
+    await session.send('write it', []);
+    expect(approvals).toHaveLength(0);
+  });
+});

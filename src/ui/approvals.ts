@@ -20,7 +20,7 @@ export interface ApprovalDecision {
 
 export class ApprovalGate {
   private readonly sessionApproved = new Set<string>();
-  private readonly autoApprove: string[];
+  private autoApprove: string[];
   private readonly request: (request: ApprovalRequest) => Promise<ApprovalDecision>;
 
   constructor(options: {
@@ -29,6 +29,10 @@ export class ApprovalGate {
   }) {
     this.autoApprove = options.autoApprove;
     this.request = options.request;
+  }
+
+  setAutoApprove(names: string[]): void {
+    this.autoApprove = [...names];
   }
 
   async approve(entry: ToolEntry, input: Record<string, unknown>): Promise<ApprovalDecision> {
