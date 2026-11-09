@@ -1,10 +1,16 @@
 export type EffortLevel = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+
 export type BaseUrlPreset = 'auto' | 'global' | 'china';
 
 // Plan mode is read-only: the agent investigates and answers with a plan.
 export type AgentMode = 'plan' | 'code';
 
 export const AGENT_MODES: AgentMode[] = ['plan', 'code'];
+
+// How the reasoning of a model is controlled.
+// 'depth' - the model takes levels of the reasoning depth.
+// 'variants' - the model thinks or does not, the server picks the depth.
+export type ReasoningControl = 'depth' | 'variants';
 
 export interface ModelInfo {
   id: string;
@@ -13,6 +19,7 @@ export interface ModelInfo {
   shortLabel: string;
   supportsEffort: boolean;
   thinkingAlwaysOn: boolean;
+  reasoning: ReasoningControl;
   contextWindow: number;
 }
 
@@ -23,6 +30,7 @@ export const MODELS: ModelInfo[] = [
     shortLabel: 'M3.1 Flash',
     supportsEffort: true,
     thinkingAlwaysOn: true,
+    reasoning: 'depth',
     contextWindow: 1_000_000
   },
   {
@@ -31,6 +39,7 @@ export const MODELS: ModelInfo[] = [
     shortLabel: 'M3',
     supportsEffort: false,
     thinkingAlwaysOn: false,
+    reasoning: 'variants',
     contextWindow: 1_000_000
   }
 ];
@@ -46,4 +55,8 @@ export function resolveBaseUrl(preset: BaseUrlPreset, custom?: string): string {
     return CHINA_BASE_URL;
   }
   return GLOBAL_BASE_URL;
+}
+
+export function findModel(id: string): ModelInfo | undefined {
+  return MODELS.find((model) => model.id === id);
 }

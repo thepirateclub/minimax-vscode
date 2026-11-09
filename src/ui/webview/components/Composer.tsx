@@ -5,7 +5,7 @@ import type { AgentMode, ModelInfo } from '../../../config/models';
 import type { UiSelection, UiSuggestion } from '../../protocol';
 import { IconAttach, IconCode, IconModel, IconPlan, IconThinking } from '../icons';
 import { STRINGS } from '../strings';
-import { IconSelect, IconToggle, type IconSelectOption } from './IconSelect';
+import { IconSelect, type IconSelectOption } from './IconSelect';
 
 export interface InsertRequest {
   paths: string[];
@@ -41,8 +41,24 @@ const EFFORT_OPTIONS: IconSelectOption<EffortLevel>[] = (
   value: level,
   label: level,
   icon: <IconThinking />,
-  hint: STRINGS.effortHint
+  hint: STRINGS.reasoningDepthHint
 }));
+
+// M3 has no levels of the reasoning, the model thinks or does not.
+const REASONING_VARIANT_OPTIONS: IconSelectOption<'off' | 'adaptive'>[] = [
+  {
+    value: 'off',
+    label: STRINGS.reasoningOff,
+    icon: <IconThinking />,
+    hint: STRINGS.reasoningOffHint
+  },
+  {
+    value: 'adaptive',
+    label: STRINGS.reasoningAdaptive,
+    icon: <IconThinking />,
+    hint: STRINGS.reasoningAdaptiveHint
+  }
+];
 
 interface WalkResult extends EditorContent {
   visible: string;
@@ -463,20 +479,20 @@ export function Composer({
           title={STRINGS.model}
           onChange={onModel}
         />
-        {currentModel && !currentModel.thinkingAlwaysOn ? (
-          <IconToggle
-            value={thinking}
+        {currentModel?.reasoning === 'variants' ? (
+          <IconSelect
+            value={thinking ? 'adaptive' : 'off'}
+            options={REASONING_VARIANT_OPTIONS}
             icon={<IconThinking />}
-            label={thinking ? STRINGS.thinkingOn : STRINGS.thinkingOff}
-            title={STRINGS.thinkingHint}
-            onChange={onThinking}
+            title={STRINGS.reasoningVariantsHint}
+            onChange={(value) => onThinking(value === 'adaptive')}
           />
         ) : (
           <IconSelect
             value={effort}
             options={EFFORT_OPTIONS}
             icon={<IconThinking />}
-            title={STRINGS.effortHint}
+            title={STRINGS.reasoningDepthHint}
             onChange={onEffort}
           />
         )}

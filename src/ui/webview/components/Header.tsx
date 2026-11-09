@@ -1,5 +1,6 @@
-import type { AgentState, UiUsageTurn } from '../../protocol';
+import type { AgentState, UiSessionSummary, UiUsageTurn } from '../../protocol';
 import { UsageGraph } from './UsageGraph';
+import { SessionMenu } from './SessionMenu';
 import { STRINGS } from '../strings';
 
 export type PanelTab = 'chat' | 'settings';
@@ -11,6 +12,10 @@ export function Header({
   tokens,
   usage,
   hasApiKey,
+  sessions,
+  activeSessionId,
+  onSelectSession,
+  onDeleteSession,
   onNewChat
 }: {
   tab: PanelTab;
@@ -19,6 +24,10 @@ export function Header({
   tokens: number;
   usage: UiUsageTurn[];
   hasApiKey: boolean;
+  sessions: UiSessionSummary[];
+  activeSessionId: string | undefined;
+  onSelectSession: (id: string) => void;
+  onDeleteSession: (id: string) => void;
   onNewChat: () => void;
 }) {
   return (
@@ -37,6 +46,13 @@ export function Header({
           {STRINGS.settingsTab}
         </button>
         <span className={'state-chip state-' + state}>{state}</span>
+        <SessionMenu
+          sessions={sessions}
+          activeSessionId={activeSessionId}
+          onSelect={onSelectSession}
+          onDelete={onDeleteSession}
+          onNewChat={onNewChat}
+        />
         <button className="icon-button" title={STRINGS.newChat} onClick={onNewChat}>
           +
         </button>

@@ -36,6 +36,29 @@ describe('file tools', () => {
     expect(result.content).toContain('2: two');
   });
 
+  it('reads several files in one call', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-'));
+    await writeFile(join(root, 'a.txt'), 'one\n', 'utf8');
+    await writeFile(join(root, 'b.txt'), 'two\n', 'utf8');
+    const tools = createFileTools({ backups: new InMemoryBackupStore() });
+    const read = tools.find((t) => t.name === 'read_file');
+    const result = await read!.execute({ paths: ['a.txt', 'b.txt'] }, makeContext(root));
+    expect(result.content).toContain('=== a.txt ===');
+    expect(result.content).toContain('1: one');
+    expect(result.content).toContain('=== b.txt ===');
+    expect(result.content).toContain('1: two');
+    expect(result.isError).toBeFalsy();
+  });
+
+  it('reports a read without any path', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-'));
+    const tools = createFileTools({ backups: new InMemoryBackupStore() });
+    const read = tools.find((t) => t.name === 'read_file');
+    const result = await read!.execute({}, makeContext(root));
+    expect(result.isError).toBe(true);
+    expect(result.content).toContain('no path');
+  });
+
   it('writes a file and stores a backup', async () => {
     const root = await mkdtemp(join(tmpdir(), 'mm-'));
     await writeFile(join(root, 'a.txt'), 'old\n', 'utf8');

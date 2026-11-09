@@ -32,4 +32,15 @@ describe('MODELS', () => {
     expect(m3?.supportsEffort).toBe(false);
     expect(flash?.thinkingAlwaysOn).toBe(true);
   });
+
+  it('marks the reasoning control per model', () => {
+    const flash = MODELS.find((m) => m.id === 'MiniMax-M3.1-Flash');
+    const m3 = MODELS.find((m) => m.id === 'MiniMax-M3');
+    expect(flash?.reasoning).toBe('depth');
+    expect(m3?.reasoning).toBe('variants');
+  });
+
+  it('keeps a context window of one million for both models', () => {
+    expect(MODELS.every((model) => model.contextWindow === 1_000_000)).toBe(true);
+  });
 });

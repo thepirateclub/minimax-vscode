@@ -17,6 +17,8 @@ export interface UiToolCall {
   content?: string;
   isError?: boolean;
   running?: boolean;
+  // How long the action took, the host measures it.
+  durationMs?: number;
 }
 
 export interface UiApproval {
@@ -110,7 +112,14 @@ export type ExtToWeb =
   | { type: 'text_delta'; text: string }
   | { type: 'thinking_delta'; text: string }
   | { type: 'tool_start'; id: string; name: string; input: Record<string, unknown> }
-  | { type: 'tool_end'; id: string; name: string; content: string; isError: boolean }
+  | {
+      type: 'tool_end';
+      id: string;
+      name: string;
+      content: string;
+      isError: boolean;
+      durationMs?: number;
+    }
   | { type: 'approval_request'; approval: UiApproval }
   | { type: 'approval_resolved'; id: string; approved: boolean }
   | { type: 'status'; state: AgentState; tokens?: number }

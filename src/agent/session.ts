@@ -1,4 +1,5 @@
 import type { MiniMaxClient } from '../api/client';
+import { fitHistory, MAX_HISTORY_MESSAGES } from '../api/history';
 import type { AnthropicMessage, EffortLevel } from '../api/types';
 import type { AgentMode } from '../config/models';
 import { Agent, type AgentEvent } from './agent';
@@ -16,6 +17,8 @@ export interface SessionOptions {
   maxIterations: number;
   effort: EffortLevel;
   thinking?: 'adaptive';
+  // The context window of the model, the history is cut to fit into it.
+  contextWindow?: number;
   mode: AgentMode;
   systemPrompt: string;
   workspaceRoot: string;
@@ -97,7 +100,11 @@ export class AgentSession {
     });
 
     const result = await this.agent.run(prompt, this.history);
-    this.history = result.messages;
+    this.history = fitHistory(
+      result.messages,
+      MAX_HISTORY_MESSAGES,
+      this.options.contextWindow ?? 1_000_000
+    );
   }
 
   private async requestApproval(

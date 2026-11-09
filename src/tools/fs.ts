@@ -6,6 +6,8 @@ import type { ToolEntry } from './types';
 const MAX_READ_LINES = 2000;
 const MAX_READ_CHARS = 200_000;
 const MAX_WRITE_CHARS = 200_000;
+// One call reads several files, the list is bounded so a single request stays sane.
+const MAX_READ_FILES = 12;
 
 export function resolveWorkspacePath(root: string, candidate: string): string {
   const target = isAbsolute(candidate) ? candidate : resolve(root, candidate);
@@ -29,41 +31,77 @@ function countOccurrences(haystack: string, needle: string): number {
   return count;
 }
 
+// The model reads one file or a list of files in a single call.
+function collectPaths(input: Record<string, unknown>): string[] {
+  const paths: string[] = [];
+  const single = input['path'];
+  if (typeof single === 'string' && single.trim().length > 0) {
+    paths.push(single.trim());
+  }
+  const many = input['paths'];
+  if (Array.isArray(many)) {
+    for (const item of many) {
+      if (typeof item !== 'string') {
+        continue;
+      }
+      const path = item.trim();
+      if (path.length > 0 && !paths.includes(path)) {
+        paths.push(path);
+      }
+    }
+  }
+  return paths.slice(0, MAX_READ_FILES);
+}
+
 export function createFileTools(deps: { backups: BackupStore }): ToolEntry[] {
   const readFileTool: ToolEntry = {
     name: 'read_file',
     description:
-      'Read a UTF-8 text file from the workspace. Returns content with line numbers. Use start_line and end_line for a range.',
+      'Read one or several UTF-8 text files from the workspace. Returns content with line numbers. Use start_line and end_line for a range. Pass paths to read several files in one call.',
     approval: 'never',
     sideEffect: false,
     inputSchema: {
       type: 'object',
       properties: {
         path: { type: 'string', description: 'Path relative to the workspace root.' },
+        paths: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Several paths relative to the workspace root, read in one call.'
+        },
         start_line: { type: 'integer', minimum: 1, description: 'First line to read, 1-based.' },
         end_line: { type: 'integer', minimum: 1, description: 'Last line to read, inclusive.' }
-      },
-      required: ['path']
+      }
     },
     async execute(input, ctx) {
-      try {
-        const target = resolveWorkspacePath(ctx.workspaceRoot, String(input['path'] ?? ''));
-        const raw = await readFileAsync(target, 'utf8');
-        const lines = raw.split('\n');
-        const start = Number(input['start_line'] ?? 1);
-        const end = Number(input['end_line'] ?? start - 1 + MAX_READ_LINES);
-        const slice = lines.slice(Math.max(0, start - 1), Math.max(0, end));
-        const body = slice.map((line, offset) => (start + offset) + ': ' + line).join('\n');
-        if (body.length > MAX_READ_CHARS) {
-          return { content: body.slice(0, MAX_READ_CHARS) + '\n[truncated]', isError: false };
-        }
-        return { content: body.length > 0 ? body : '[empty file]', isError: false };
-      } catch (error) {
-        return {
-          content: 'read_file failed: ' + (error instanceof Error ? error.message : String(error)),
-          isError: true
-        };
+      const paths = collectPaths(input);
+      if (paths.length === 0) {
+        return { content: 'read_file failed: no path given', isError: true };
       }
+      const start = Number(input['start_line'] ?? 1);
+      const end = Number(input['end_line'] ?? start - 1 + MAX_READ_LINES);
+      const blocks: string[] = [];
+      let failed = 0;
+      for (const path of paths) {
+        let body: string;
+        try {
+          const target = resolveWorkspacePath(ctx.workspaceRoot, path);
+          const raw = await readFileAsync(target, 'utf8');
+          const lines = raw.split('\n');
+          const slice = lines.slice(Math.max(0, start - 1), Math.max(0, end));
+          body = slice.map((line, offset) => (start + offset) + ': ' + line).join('\n');
+        } catch (error) {
+          failed += 1;
+          body = 'read_file failed: ' + (error instanceof Error ? error.message : String(error));
+        }
+        const header = paths.length > 1 ? '=== ' + path + ' ===\n' : '';
+        blocks.push(header + (body.length > 0 ? body : '[empty file]'));
+      }
+      let content = blocks.join('\n\n');
+      if (content.length > MAX_READ_CHARS) {
+        content = content.slice(0, MAX_READ_CHARS) + '\n[truncated]';
+      }
+      return { content, isError: failed === paths.length };
     }
   };
 

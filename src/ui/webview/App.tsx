@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
   ExtToWeb,
   UiMessage,
@@ -170,6 +170,22 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
 
   const busy = state.state !== 'idle' && state.state !== 'error';
 
+  // The handlers keep their identity, the rows of the chat are not redrawn
+  // when the answer of the model grows.
+  const approve = useCallback(
+    (id: string, allowForSession: boolean) => {
+      vscode.postMessage({ type: 'approve', id, allowForSession });
+    },
+    [vscode]
+  );
+
+  const reject = useCallback(
+    (id: string) => {
+      vscode.postMessage({ type: 'reject', id });
+    },
+    [vscode]
+  );
+
   const openTab = (next: PanelTab): void => {
     setTab(next);
     if (next === 'settings') {
@@ -206,6 +222,10 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
         tokens={state.tokens}
         usage={state.usage}
         hasApiKey={state.hasApiKey}
+        sessions={state.sessions}
+        activeSessionId={state.activeSessionId}
+        onSelectSession={(id) => vscode.postMessage({ type: 'select_session', id })}
+        onDeleteSession={(id) => vscode.postMessage({ type: 'delete_session', id })}
         onNewChat={() => vscode.postMessage({ type: 'new_session' })}
       />
       <div className={'view' + (tab === 'chat' ? '' : ' view-hidden')}>
@@ -214,10 +234,8 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
         ) : (
           <MessageList
             messages={messages}
-            onApprove={(id, allowForSession) =>
-              vscode.postMessage({ type: 'approve', id, allowForSession })
-            }
-            onReject={(id) => vscode.postMessage({ type: 'reject', id })}
+            onApprove={approve}
+            onReject={reject}
           />
         )}
         <Composer

@@ -79,29 +79,3 @@ export function IconSelect<T extends string>({
   );
 }
 
-// A compact switch, it turns one option on or off.
-export function IconToggle({
-  value,
-  icon,
-  label,
-  title,
-  onChange
-}: {
-  value: boolean;
-  icon?: ReactNode;
-  label: string;
-  title?: string;
-  onChange: (value: boolean) => void;
-}) {
-  return (
-    <button
-      className={'icon-toggle' + (value ? ' on' : '')}
-      title={title}
-      aria-pressed={value}
-      onClick={() => onChange(!value)}
-    >
-      {icon}
-      <span className="icon-select-label">{label}</span>
-    </button>
-  );
-}

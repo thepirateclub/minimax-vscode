@@ -20,6 +20,7 @@ const state = vi.hoisted(() => ({
   editor: undefined as unknown,
   documents: [] as Array<{ uri: { fsPath: string } }>,
   files: [] as string[],
+  failState: false,
   statusBar: undefined as undefined | { text: string; tooltip: string }
 }));
 
@@ -150,6 +151,9 @@ function makeContext(): ExtensionContext {
     globalState: {
       get: (key: string, fallback?: unknown) => state.globalState.get(key) ?? fallback,
       update: (key: string, value: unknown) => {
+        if (state.failState) {
+          throw new Error('the state of the host is full');
+        }
         state.globalState.set(key, value);
         return Promise.resolve();
       }
@@ -216,6 +220,7 @@ describe('extension activation', () => {
     state.editor = undefined;
     state.documents.length = 0;
     state.files.length = 0;
+    state.failState = false;
     state.receive = undefined;
     vi.stubGlobal(
       'fetch',
@@ -692,5 +697,104 @@ describe('extension activation', () => {
     const prompt = body.messages[0]?.content[0]?.text ?? '';
     expect(prompt).toContain('Attached file: context.md');
     expect(prompt).toContain('body line');
+  });
+
+  it('opens the last chat again after a restart', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.globalState.set('minimax.sessions', [
+      {
+        id: 's-old',
+        title: 'Old chat',
+        updatedAt: 5,
+        messages: [],
+        uiMessages: [{ id: 'm1', role: 'user', text: 'old question' }],
+        usage: []
+      }
+    ]);
+    state.globalState.set('minimax.activeSession', 's-old');
+    await boot();
+
+    const init = ofType('init')[0]!;
+    expect(init.state.activeSessionId).toBe('s-old');
+    expect(init.state.messages).toHaveLength(1);
+    expect(init.state.messages[0]?.text).toBe('old question');
+    expect(init.state.sessions.map((item) => item.id)).toContain('s-old');
+  });
+
+  it('measures the duration of an action', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.secrets.set('minimax.apiKey', 'test-key');
+    state.responses.push(TOOL_SSE, TEXT_SSE);
+    await boot();
+
+    state.posted.length = 0;
+    state.receive?.({ type: 'send', text: 'write a note', mentions: [], selections: [] });
+    await vi.waitFor(() => {
+      expect(ofType('approval_request').length).toBe(1);
+    });
+    const approval = ofType('approval_request')[0]!.approval;
+    state.receive?.({ type: 'approve', id: approval.id, allowForSession: false });
+    await vi.waitFor(() => {
+      expect(ofType('tool_end').length).toBe(1);
+    });
+    const end = ofType('tool_end')[0]!;
+    expect(typeof end.durationMs).toBe('number');
+    expect(end.durationMs ?? -1).toBeGreaterThanOrEqual(0);
+  });
+
+  it('keeps the turn alive when the state of the host refuses the write', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.secrets.set('minimax.apiKey', 'test-key');
+    state.responses.push(TEXT_SSE);
+    state.failState = true;
+    await boot();
+
+    state.posted.length = 0;
+    state.receive?.({ type: 'send', text: 'hello', mentions: [], selections: [] });
+    await vi.waitFor(() => {
+      expect(ofType('text_delta').length).toBeGreaterThan(0);
+    });
+    await vi.waitFor(() => {
+      expect(ofType('status').pop()?.state).toBe('idle');
+    });
+    expect(ofType('error').length).toBe(0);
+  });
+
+  it('cuts a huge chat before it reaches the state of the host', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.secrets.set('minimax.apiKey', 'test-key');
+    const messages = Array.from({ length: 600 }, (_, index) => ({
+      id: 'm' + index,
+      role: 'assistant' as const,
+      text: 'line ' + index
+    }));
+    state.globalState.set('minimax.sessions', [
+      {
+        id: 's-big',
+        title: 'Big chat',
+        updatedAt: 5,
+        messages: [],
+        uiMessages: messages,
+        usage: []
+      }
+    ]);
+    state.globalState.set('minimax.activeSession', 's-big');
+    state.responses.push(TEXT_SSE);
+    await boot();
+
+    state.receive?.({ type: 'send', text: 'hello', mentions: [], selections: [] });
+    await vi.waitFor(() => {
+      expect(ofType('text_delta').length).toBeGreaterThan(0);
+    });
+    await vi.waitFor(() => {
+      const stored = state.globalState.get('minimax.sessions') as Array<{
+        uiMessages: unknown[];
+      }>;
+      expect(stored[0]?.uiMessages.length).toBe(400);
+    });
   });
 });

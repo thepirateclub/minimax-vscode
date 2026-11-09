@@ -68,6 +68,8 @@ class MiniMaxController {
   private counter = 0;
   private fileCache: { files: string[]; at: number } | undefined;
   private quota: QuotaSnapshot | undefined;
+  // When every action started, the duration goes to the panel.
+  private readonly toolStarted = new Map<string, number>();
 
   constructor(context: vscode.ExtensionContext, channel: vscode.OutputChannel) {
     this.context = context;
@@ -231,6 +233,7 @@ class MiniMaxController {
       effort: settings.effort,
       mode: settings.mode,
       thinking: this.thinkingMode(settings),
+      contextWindow: MODELS.find((model) => model.id === settings.model)?.contextWindow,
       systemPrompt: await this.buildPrompt(),
       workspaceRoot: this.workspaceRoot(),
       logger: this.logger,
@@ -265,6 +268,7 @@ class MiniMaxController {
       return;
     }
     if (event.type === 'tool_start') {
+      this.toolStarted.set(event.id, Date.now());
       runtime.uiMessages.push({
         id: event.id,
         role: 'tool',
@@ -275,11 +279,17 @@ class MiniMaxController {
       return;
     }
     if (event.type === 'tool_end') {
+      const started = this.toolStarted.get(event.id);
+      this.toolStarted.delete(event.id);
+      const durationMs = started === undefined ? undefined : Date.now() - started;
       for (const message of runtime.uiMessages) {
         if (message.tool && message.tool.id === event.id) {
           message.tool.content = event.content;
           message.tool.isError = event.isError;
           message.tool.running = false;
+          if (durationMs !== undefined) {
+            message.tool.durationMs = durationMs;
+          }
         }
       }
       this.panel.post({
@@ -287,7 +297,8 @@ class MiniMaxController {
         id: event.id,
         name: event.name,
         content: event.content,
-        isError: event.isError
+        isError: event.isError,
+        durationMs
       });
       return;
     }
@@ -740,11 +751,46 @@ class MiniMaxController {
       uiMessages: runtime.uiMessages,
       usage: runtime.usage
     };
-    this.store.save(stored);
-    this.panel.post({ type: 'sessions', sessions: this.store.summaryList() });
+    // A full state of the host must not break the turn, the chat stays in
+    // memory and the failure goes to the log.
+    void this.store.save(stored).then((saved) => {
+      if (!saved) {
+        this.logger.error('the chat was not saved to the state of the host');
+      }
+      this.panel.post({ type: 'sessions', sessions: this.store.summaryList() });
+    });
+  }
+
+  persistActive(): void {
+    const runtime = this.activeSession();
+    if (runtime) {
+      this.persist(runtime);
+    }
+  }
+
+  private runtimeFrom(stored: StoredSession): RuntimeSession {
+    return {
+      id: stored.id,
+      title: stored.title,
+      updatedAt: stored.updatedAt,
+      history: [...stored.messages],
+      uiMessages: [...(stored.uiMessages ?? [])],
+      agent: undefined,
+      busy: false,
+      errorReported: false,
+      usage: (stored.usage ?? []).map((turn) => ({
+        input: turn.input,
+        output: turn.output,
+        cache: turn.cache ?? 0
+      }))
+    };
   }
 
   startNewSession(): void {
+    const current = this.activeSession();
+    if (current) {
+      this.persist(current);
+    }
     const id = 's-' + Date.now().toString(36);
     this.sessions.set(id, {
       id,
@@ -758,6 +804,25 @@ class MiniMaxController {
       usage: []
     });
     this.activeSessionId = id;
+    this.store.setActiveId(id);
+    this.setState('idle');
+    void this.sendInit();
+  }
+
+  // The last chat is opened again after a restart, an empty panel would hide
+  // the work of the previous session.
+  restoreSession(): void {
+    const activeId = this.store.activeId();
+    const active = activeId ? this.store.get(activeId) : undefined;
+    const stored = active ?? this.store.list()[0];
+    if (!stored) {
+      this.startNewSession();
+      return;
+    }
+    const runtime = this.runtimeFrom(stored);
+    this.sessions.set(runtime.id, runtime);
+    this.activeSessionId = runtime.id;
+    this.store.setActiveId(runtime.id);
     this.setState('idle');
     void this.sendInit();
   }
@@ -767,26 +832,17 @@ class MiniMaxController {
     if (!stored) {
       return;
     }
+    const current = this.activeSession();
+    if (current && current.id !== id) {
+      this.persist(current);
+    }
     let runtime = this.sessions.get(id);
     if (!runtime) {
-      runtime = {
-        id,
-        title: stored.title,
-        updatedAt: stored.updatedAt,
-        history: [...stored.messages],
-        uiMessages: [...(stored.uiMessages ?? [])],
-        agent: undefined,
-        busy: false,
-        errorReported: false,
-        usage: (stored.usage ?? []).map((turn) => ({
-          input: turn.input,
-          output: turn.output,
-          cache: turn.cache ?? 0
-        }))
-      };
+      runtime = this.runtimeFrom(stored);
       this.sessions.set(id, runtime);
     }
     this.activeSessionId = id;
+    this.store.setActiveId(id);
     this.panel.post({ type: 'session_loaded', messages: runtime.uiMessages });
     void this.sendInit();
   }
@@ -795,6 +851,7 @@ class MiniMaxController {
     this.store.remove(id);
     this.sessions.delete(id);
     if (this.activeSessionId === id) {
+      this.activeSessionId = undefined;
       this.startNewSession();
       return;
     }
@@ -986,10 +1043,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   context.subscriptions.push(channel);
   controller = new MiniMaxController(context, channel);
   controller.register(context);
-  controller.startNewSession();
+  controller.restoreSession();
   void controller.refreshQuota();
 }
 
 export function deactivate(): void {
+  controller?.persistActive();
   controller = undefined;
 }

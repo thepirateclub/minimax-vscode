@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
+import type { EffortLevel } from '../../../api/types';
 import type { UiSettings, UiSettingsValues } from '../../protocol';
+import { currentReasoning, reasoningControl, reasoningOptions } from '../reasoning';
 import { STRINGS } from '../strings';
 
 function toValues(settings: UiSettings): UiSettingsValues {
@@ -112,19 +114,33 @@ export function SettingsView({
           ))}
         </select>
         <label className="field">
-          <span>{STRINGS.effort}</span>
+          <span>{STRINGS.reasoning}</span>
           <select
-            value={values.effort}
-            onChange={(event) =>
-              patch({ effort: event.target.value as UiSettingsValues['effort'] })
-            }
+            value={currentReasoning(values.model, values.effort, values.thinking)}
+            onChange={(event) => {
+              const next = event.target.value;
+              if (next === 'off' || next === 'adaptive') {
+                patch({ thinking: next === 'adaptive' });
+                return;
+              }
+              patch({ effort: next as EffortLevel });
+            }}
           >
-            {(['low', 'medium', 'high', 'xhigh', 'max'] as const).map((level) => (
-              <option key={level} value={level}>
-                {level}
+            {reasoningOptions(values.model).map((option) => (
+              <option key={option} value={option}>
+                {option === 'off'
+                  ? STRINGS.reasoningOff
+                  : option === 'adaptive'
+                    ? STRINGS.reasoningAdaptive
+                    : option}
               </option>
             ))}
           </select>
+          <span className="hint">
+            {reasoningControl(values.model) === 'variants'
+              ? STRINGS.reasoningVariantsHint
+              : STRINGS.reasoningDepthHint}
+          </span>
         </label>
         <label className="field">
           <span>{STRINGS.mode}</span>
@@ -144,15 +160,6 @@ export function SettingsView({
             {values.mode === 'plan' ? STRINGS.modePlanHint : STRINGS.modeCodeHint}
           </span>
         </label>
-        <label className="checkbox">
-          <input
-            type="checkbox"
-            checked={values.thinking}
-            onChange={(event) => patch({ thinking: event.target.checked })}
-          />
-          <span>{STRINGS.thinking}</span>
-        </label>
-        <p className="hint">{STRINGS.thinkingHint}</p>
       </section>
 
       <section className="settings-section">

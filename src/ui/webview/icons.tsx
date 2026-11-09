@@ -5,16 +5,25 @@ interface IconProps {
   size?: number;
 }
 
-function Svg({ size = 14, children }: IconProps & { children: ReactNode }): ReactNode {
+function Svg({
+  size = 14,
+  viewBox = '0 0 16 16',
+  strokeWidth = 1.4,
+  children
+}: IconProps & {
+  viewBox?: string;
+  strokeWidth?: number;
+  children: ReactNode;
+}): ReactNode {
   return (
     <svg
       className="icon"
       width={size}
       height={size}
-      viewBox="0 0 16 16"
+      viewBox={viewBox}
       fill="none"
       stroke="currentColor"
-      strokeWidth={1.4}
+      strokeWidth={strokeWidth}
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
@@ -67,8 +76,8 @@ export function IconThinking(): ReactNode {
 // A paperclip, it attaches files to the request.
 export function IconAttach(): ReactNode {
   return (
-    <Svg>
-      <path d="M12.3 7.6 7.7 12.2a2.2 2.2 0 0 1-3.1-3.1l5.2-5.2a3.4 3.4 0 1 1 4.8 4.8l-5.2 5.2a1.5 1.5 0 0 1-2.1-2.1L11 8.1" />
+    <Svg viewBox="0 0 24 24" strokeWidth={2}>
+      <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" />
     </Svg>
   );
 }
@@ -88,6 +97,89 @@ export function IconGraph(): ReactNode {
     <Svg>
       <path d="M3 12.5h10" />
       <path d="M5 10.5V7.5M8 10.5V4.5M11 10.5V8.5" />
+    </Svg>
+  );
+}
+
+// A page, the agent reads a file.
+export function IconRead(): ReactNode {
+  return (
+    <Svg>
+      <path d="M4 2.5h5l3 3v8H4z" />
+      <path d="M9 2.5v3h3" />
+      <path d="M6 8.5h4M6 11h3" />
+    </Svg>
+  );
+}
+
+// A page with a pencil, the agent creates a file.
+export function IconWrite(): ReactNode {
+  return (
+    <Svg>
+      <path d="M4 2.5h5l3 3v8H4z" />
+      <path d="M9 2.5v3h3" />
+      <path d="M6 11.2l.4-1.7 2.6-2.6 1.3 1.3-2.6 2.6z" />
+    </Svg>
+  );
+}
+
+// A pencil, the agent changes a file.
+export function IconEdit(): ReactNode {
+  return (
+    <Svg>
+      <path d="M11.2 2.9 13.1 4.8l-6.6 6.6-2.6.7.7-2.6z" />
+      <path d="M9.9 4.2 11.8 6.1" />
+    </Svg>
+  );
+}
+
+// A magnifier, the agent searches the code.
+export function IconSearch(): ReactNode {
+  return (
+    <Svg>
+      <circle cx="7" cy="7" r="4" />
+      <path d="M10 10l3.5 3.5" />
+    </Svg>
+  );
+}
+
+// Lines, the agent lists the files.
+export function IconList(): ReactNode {
+  return (
+    <Svg>
+      <path d="M6.5 4.5h6.5M6.5 8h6.5M6.5 11.5h6.5" />
+      <path d="M3.5 4.5h.01M3.5 8h.01M3.5 11.5h.01" />
+    </Svg>
+  );
+}
+
+// A terminal, the agent runs a command.
+export function IconTerminal(): ReactNode {
+  return (
+    <Svg>
+      <rect x="2" y="3" width="12" height="10" rx="1.5" />
+      <path d="M5 7l2 1.5L5 10M8.5 10.5H11" />
+    </Svg>
+  );
+}
+
+// A clock, the list of the saved chats.
+export function IconHistory(): ReactNode {
+  return (
+    <Svg viewBox="0 0 24 24" strokeWidth={2}>
+      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+      <path d="M3 3v5h5" />
+      <path d="M12 7v5l4 2" />
+    </Svg>
+  );
+}
+
+// Two sheets, the copy button.
+export function IconCopy(): ReactNode {
+  return (
+    <Svg>
+      <rect x="5.5" y="5.5" width="8" height="8" rx="1.2" />
+      <path d="M10.5 5.5v-1a1.2 1.2 0 0 0-1.2-1.2H3.7A1.2 1.2 0 0 0 2.5 4.5v5.6a1.2 1.2 0 0 0 1.2 1.2h1.3" />
     </Svg>
   );
 }
