@@ -471,62 +471,60 @@ export function Composer({
         >
           <IconAttach />
         </button>
+        {busy ? (
+          <button
+            className="composer-send stop"
+            title={STRINGS.stop}
+            aria-label={STRINGS.stop}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={onStop}
+          >
+            <IconStop />
+          </button>
+        ) : (
+          <button
+            className="composer-send"
+            title={STRINGS.send}
+            aria-label={STRINGS.send}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={submit}
+          >
+            <IconSend />
+          </button>
+        )}
       </div>
-      <div className="composer-bottom">
-        <div className="composer-selects">
+      <div className="composer-selects">
+        <IconSelect
+          value={mode}
+          options={MODE_OPTIONS}
+          icon={mode === 'plan' ? <IconPlan /> : <IconCode />}
+          title={mode === 'plan' ? STRINGS.modePlanHint : STRINGS.modeCodeHint}
+          onChange={onMode}
+        />
+        <IconSelect
+          value={model}
+          options={modelOptions}
+          icon={<IconModel />}
+          title={STRINGS.model}
+          onChange={onModel}
+        />
+        {currentModel?.reasoning === 'variants' ? (
           <IconSelect
-            value={mode}
-            options={MODE_OPTIONS}
-            icon={mode === 'plan' ? <IconPlan /> : <IconCode />}
-            title={mode === 'plan' ? STRINGS.modePlanHint : STRINGS.modeCodeHint}
-            onChange={onMode}
+            value={thinking ? 'adaptive' : 'off'}
+            options={REASONING_VARIANT_OPTIONS}
+            icon={<IconThinking />}
+            title={STRINGS.reasoningVariantsHint}
+            onChange={(value) => onThinking(value === 'adaptive')}
           />
+        ) : (
           <IconSelect
-            value={model}
-            options={modelOptions}
-            icon={<IconModel />}
-            title={STRINGS.model}
-            onChange={onModel}
+            value={effort}
+            options={EFFORT_OPTIONS}
+            icon={<IconThinking />}
+            title={STRINGS.reasoningDepthHint}
+            onChange={onEffort}
           />
-          {currentModel?.reasoning === 'variants' ? (
-            <IconSelect
-              value={thinking ? 'adaptive' : 'off'}
-              options={REASONING_VARIANT_OPTIONS}
-              icon={<IconThinking />}
-              title={STRINGS.reasoningVariantsHint}
-              onChange={(value) => onThinking(value === 'adaptive')}
-            />
-          ) : (
-            <IconSelect
-              value={effort}
-              options={EFFORT_OPTIONS}
-              icon={<IconThinking />}
-              title={STRINGS.reasoningDepthHint}
-              onChange={onEffort}
-            />
-          )}
-        </div>
-        <div className="composer-actions">
-          {busy ? (
-            <button
-              className="composer-send stop"
-              title={STRINGS.stop}
-              aria-label={STRINGS.stop}
-              onClick={onStop}
-            >
-              <IconStop />
-            </button>
-          ) : (
-            <button
-              className="composer-send"
-              title={STRINGS.send}
-              aria-label={STRINGS.send}
-              onClick={submit}
-            >
-              <IconSend />
-            </button>
-          )}
-        </div>
+        )}
       </div>
     </div>
   );

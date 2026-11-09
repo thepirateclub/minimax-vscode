@@ -184,12 +184,13 @@ export function IconCopy(): ReactNode {
   );
 }
 
-// A paper plane, it sends the request.
+// A paper plane with a right angle at the tip. The sharp corner of the
+// classic glyph reads as a knife at the size of the button.
 export function IconSend(): ReactNode {
   return (
     <Svg viewBox="0 0 24 24" strokeWidth={2} size={15}>
-      <path d="m22 2-7 20-4-9-9-4Z" />
-      <path d="M22 2 11 13" />
+      <path d="M20 8 L14 23 L11 11 L5 2 Z" />
+      <path d="M20 8 L11 11" />
     </Svg>
   );
 }

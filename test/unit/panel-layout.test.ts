@@ -69,22 +69,36 @@ describe('panel layout', () => {
     expect(markup).not.toContain('>Stop<');
   });
 
-  it('keeps the send icon in the bottom right corner of the composer', () => {
+  it('puts the send icon into the bottom right corner of the input field', () => {
     const markup = renderComposer(false);
-    const bottom = markup.slice(markup.indexOf('composer-bottom'));
-    expect(bottom.indexOf('composer-selects')).toBeGreaterThan(-1);
-    expect(bottom.indexOf('composer-send')).toBeGreaterThan(
-      bottom.indexOf('composer-selects')
-    );
-    expect(rule('.composer-bottom')).toMatch(/justify-content:\s*space-between/);
-    expect(rule('.composer-actions')).toMatch(/flex:\s*0 0 auto/);
+    const wrapAt = markup.indexOf('composer-input-wrap');
+    const sendAt = markup.indexOf('composer-send');
+    const selectsAt = markup.indexOf('composer-selects');
+    expect(wrapAt).toBeGreaterThan(-1);
+    expect(sendAt).toBeGreaterThan(wrapAt);
+    expect(sendAt).toBeLessThan(selectsAt);
+    const style = rule('.composer-send');
+    expect(style).toMatch(/position:\s*absolute/);
+    expect(style).toMatch(/bottom:\s*\d+px/);
+    expect(style).toMatch(/right:\s*\d+px/);
+    expect(style).toMatch(/background:\s*transparent/);
+    expect(style).not.toMatch(/border-radius:\s*50%/);
   });
 
-  it('stretches the usage graph over the width of the header', () => {
+  it('stretches the graph but keeps the width of the steps', () => {
     const graph = rule('.usage-graph');
     expect(graph).toMatch(/flex:\s*1/);
     expect(graph).not.toMatch(/max-width/);
-    expect(rule('.usage-column')).toMatch(/flex:\s*1 1 0/);
+    const column = rule('.usage-column');
+    expect(column).toMatch(/width:\s*\d+px/);
+    expect(column).not.toMatch(/flex:\s*1 1 0/);
+  });
+
+  it('gives the prompt field more room', () => {
+    const style = rule('.composer-input');
+    const height = /min-height:\s*(\d+)px/.exec(style);
+    expect(height).not.toBeNull();
+    expect(Number(height?.[1] ?? 0)).toBeGreaterThanOrEqual(64);
   });
 
   it('draws one column per action of the session', () => {

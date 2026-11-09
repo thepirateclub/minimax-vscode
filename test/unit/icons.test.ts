@@ -50,6 +50,34 @@ function renderIcon(render: () => ReactNode): { markup: string; viewBox: number[
   return { markup, viewBox };
 }
 
+// The tip of the plane is the point with the largest x, the two edges
+// that meet there have to form a right angle.
+function tipAngle(markup: string): number {
+  const outline = /<path d="([^"]+)"/.exec(markup)?.[1] ?? '';
+  const numbers = (outline.match(/-?\d*\.?\d+/g) ?? []).map(Number);
+  const points: Array<[number, number]> = [];
+  for (let i = 0; i + 1 < numbers.length; i += 2) {
+    points.push([numbers[i] ?? 0, numbers[i + 1] ?? 0]);
+  }
+  if (points.length < 3) {
+    return Number.NaN;
+  }
+  let tip = 0;
+  for (let i = 1; i < points.length; i++) {
+    if ((points[i]?.[0] ?? 0) > (points[tip]?.[0] ?? 0)) {
+      tip = i;
+    }
+  }
+  const head = points[tip]!;
+  const previous = points[(tip - 1 + points.length) % points.length]!;
+  const next = points[(tip + 1) % points.length]!;
+  const a = [previous[0] - head[0], previous[1] - head[1]];
+  const b = [next[0] - head[0], next[1] - head[1]];
+  const dot = (a[0] ?? 0) * (b[0] ?? 0) + (a[1] ?? 0) * (b[1] ?? 0);
+  const len = Math.hypot(a[0] ?? 0, a[1] ?? 0) * Math.hypot(b[0] ?? 0, b[1] ?? 0);
+  return (Math.acos(Math.min(1, Math.max(-1, dot / len))) * 180) / Math.PI;
+}
+
 // The panel draws the icons in a tiny square, a glyph that hangs to one side
 // looks broken even when the path itself is correct.
 describe('panel icons', () => {
@@ -78,6 +106,13 @@ describe('panel icons', () => {
       expect(Math.abs(centerY - expectedY)).toBeLessThan(0.9);
     });
   }
+
+  it('keeps a right angle at the tip of the send icon', () => {
+    const { markup } = renderIcon(IconSend);
+    const angle = tipAngle(markup);
+    expect(Number.isFinite(angle)).toBe(true);
+    expect(Math.abs(angle - 90)).toBeLessThan(0.5);
+  });
 
   it('centers the icon inside the square button of the header', () => {
     const css = readFileSync(

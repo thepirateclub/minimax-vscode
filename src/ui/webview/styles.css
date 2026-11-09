@@ -701,7 +701,7 @@ input:focus {
 }
 
 .composer-input {
-  min-height: 58px;
+  min-height: 68px;
   max-height: 180px;
   overflow-y: auto;
   font-family: inherit;
@@ -769,8 +769,6 @@ input:focus {
   align-items: center;
   flex-wrap: wrap;
   gap: 4px;
-  flex: 1 1 auto;
-  min-width: 0;
 }
 
 /* the paperclip lives in the corner of the input field */
@@ -895,10 +893,10 @@ input:focus {
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  /* The columns divide the width of the graph, they do not grow with the
-     number of the steps. */
-  flex: 1 1 0;
-  min-width: 0;
+  /* The steps keep their own width, the graph around them stretches. */
+  flex: 0 0 auto;
+  width: 5px;
+  min-width: 3px;
   height: 100%;
   overflow: hidden;
 }
@@ -920,33 +918,32 @@ input:focus {
   border-color: var(--vscode-focusBorder, #007fd4);
 }
 
-/* The selectors and the send icon share the bottom row, the icon keeps the
-   bottom right corner of the composer. */
-.composer-bottom {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.composer-actions {
-  display: flex;
-  gap: 6px;
-  flex: 0 0 auto;
-}
-
-/* The send action is an icon, the word stays in the tooltip. */
+/* The send icon lives in the bottom right corner of the input field, it has
+   no fill, the word stays in the tooltip. */
 .composer-send {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: 22px;
+  height: 22px;
   padding: 0;
   border: none;
-  border-radius: 50%;
-  background: var(--vscode-button-background, #0078d4);
-  color: var(--vscode-button-foreground, #fff);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--vscode-foreground);
+  cursor: pointer;
+}
+
+.composer-send.stop {
+  background: transparent;
+  color: var(--vscode-inputValidation-errorForeground, #f14c4c);
+}
+
+.composer-send:hover {
+  background: var(--vscode-toolbar-hoverBackground, rgba(90, 90, 90, 0.2));
 }
 
 /* selections */
