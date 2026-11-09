@@ -537,7 +537,8 @@ input:focus {
   white-space: nowrap;
 }
 
-/* The result of an action is a dot: green for done, red for a failure. */
+/* The result of an action is a dot: green for done, red for a failure.
+   The dot blinks only while the action runs, a finished result burns steady. */
 .tool-dot {
   flex: 0 0 auto;
   width: 8px;
@@ -546,18 +547,16 @@ input:focus {
   background: var(--muted);
 }
 
-.tool-dot.done {
+.tool-dot.tool-dot-done {
   background: var(--vscode-testing-iconPassed, #3fb950);
-  animation: mm-pulse 2.4s ease-in-out infinite;
 }
 
-.tool-dot.failed {
+.tool-dot.tool-dot-failed {
   background: var(--vscode-testing-iconFailed, #f14c4c);
-  animation: mm-pulse 1.6s ease-in-out infinite;
 }
 
-.tool-dot.running {
-  background: var(--accent);
+.tool-dot.tool-dot-running {
+  background: var(--muted);
   animation: mm-pulse 1s ease-in-out infinite;
 }
 
