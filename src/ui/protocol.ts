@@ -3,6 +3,9 @@ import type { AgentMode, BaseUrlPreset, ModelInfo } from '../config/models';
 
 export type AgentState = 'idle' | 'thinking' | 'streaming' | 'tool' | 'error';
 
+// The kind of the theme of the host, it picks the palette of the code blocks.
+export type ThemeKind = 'light' | 'dark' | 'high-contrast' | 'high-contrast-light';
+
 export interface UiDiffLine {
   type: 'context' | 'add' | 'remove';
   oldLine?: number;
@@ -103,6 +106,7 @@ export interface UiState {
   tokens: number;
   usage: UiUsageTurn[];
   hasApiKey: boolean;
+  theme: ThemeKind;
 }
 
 export type ExtToWeb =
@@ -123,6 +127,7 @@ export type ExtToWeb =
   | { type: 'approval_request'; approval: UiApproval }
   | { type: 'approval_resolved'; id: string; approved: boolean }
   | { type: 'status'; state: AgentState; tokens?: number }
+  | { type: 'theme'; kind: ThemeKind }
   | { type: 'usage'; turns: UiUsageTurn[] }
   | { type: 'error'; message: string }
   | { type: 'session_loaded'; messages: UiMessage[] }

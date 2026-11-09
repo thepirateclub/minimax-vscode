@@ -21,7 +21,9 @@ const state = vi.hoisted(() => ({
   documents: [] as Array<{ uri: { fsPath: string } }>,
   files: [] as string[],
   failState: false,
-  statusBar: undefined as undefined | { text: string; tooltip: string }
+  statusBar: undefined as undefined | { text: string; tooltip: string },
+  theme: 2,
+  themeListener: undefined as undefined | (() => void)
 }));
 
 vi.mock('vscode', () => {
@@ -57,6 +59,13 @@ vi.mock('vscode', () => {
       visibleTextEditors: [],
       get activeTextEditor() {
         return state.editor;
+      },
+      get activeColorTheme() {
+        return { kind: state.theme };
+      },
+      onDidChangeActiveColorTheme: (listener: () => void) => {
+        state.themeListener = listener;
+        return { dispose: () => undefined };
       },
       showInputBox: async () => undefined,
       showQuickPick: async () => undefined,
@@ -100,6 +109,7 @@ vi.mock('vscode', () => {
         fsPath: [base.fsPath, ...parts].join('/')
       })
     },
+    ThemeKind: { Light: 1, Dark: 2, HighContrast: 3, HighContrastLight: 4 },
     ProgressLocation: { Window: 10 },
     ConfigurationTarget: { Global: 1 },
     StatusBarAlignment: { Right: 2 }
@@ -222,6 +232,8 @@ describe('extension activation', () => {
     state.files.length = 0;
     state.failState = false;
     state.receive = undefined;
+    state.theme = 2;
+    state.themeListener = undefined;
     vi.stubGlobal(
       'fetch',
       vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
@@ -277,6 +289,18 @@ describe('extension activation', () => {
     expect(init.state.hasApiKey).toBe(false);
     expect(init.state.model).toBe('MiniMax-M3.1-Flash');
     expect(init.state.models.length).toBeGreaterThan(0);
+  });
+
+  it('sends the kind of the theme and follows its change', async () => {
+    await boot();
+    const init = ofType('init')[0]!;
+    expect(init.state.theme).toBe('dark');
+
+    state.theme = 1;
+    state.themeListener?.();
+    const themes = ofType('theme');
+    expect(themes.length).toBe(1);
+    expect(themes[0]!.kind).toBe('light');
   });
 
   it('reports a missing key instead of calling the API', async () => {

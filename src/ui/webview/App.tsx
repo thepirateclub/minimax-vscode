@@ -30,7 +30,8 @@ const EMPTY_STATE: UiState = {
   state: 'idle',
   tokens: 0,
   usage: [],
-  hasApiKey: false
+  hasApiKey: false,
+  theme: 'dark'
 };
 
 export function App({ vscode }: { vscode: VsCodeApi }) {
@@ -113,6 +114,10 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
         }));
         return;
       }
+      if (message.type === 'theme') {
+        setState((prev) => ({ ...prev, theme: message.kind }));
+        return;
+      }
       if (message.type === 'usage') {
         setState((prev) => ({ ...prev, usage: message.turns }));
         return;
@@ -167,6 +172,15 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
     vscode.postMessage({ type: 'ready' });
     return () => window.removeEventListener('message', onMessage);
   }, [vscode]);
+
+  // The palette of the code blocks follows the theme of the host.
+  useEffect(() => {
+    const body = document.body;
+    for (const kind of ['light', 'dark', 'high-contrast', 'high-contrast-light']) {
+      body.classList.remove('mm-theme-' + kind);
+    }
+    body.classList.add('mm-theme-' + state.theme);
+  }, [state.theme]);
 
   const busy = state.state !== 'idle' && state.state !== 'error';
 

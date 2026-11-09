@@ -11,7 +11,8 @@ describe('renderMarkdown', () => {
     expect(html).toContain('class="code-block"');
     expect(html).toContain('class="code-lang">ts<');
     expect(html).toContain('class="code-copy"');
-    expect(html).toContain('const a = 1;');
+    expect(html).toContain('<span class="tok-keyword">const</span>');
+    expect(html.replace(/<[^>]+>/g, '')).toContain('const a = 1;');
   });
 
   it('renders a checklist item with a box', () => {

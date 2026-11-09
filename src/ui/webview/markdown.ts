@@ -1,4 +1,5 @@
 import MarkdownIt from 'markdown-it';
+import { highlight } from './highlight';
 
 // The same text is rendered again when the panel is reopened, the cache keeps
 // the stream cheap. The limit stops the cache from growing with the chat.
@@ -17,7 +18,7 @@ md.renderer.rules.fence = (tokens, idx): string => {
   const token = tokens[idx]!;
   const info = token.info.trim();
   const language = info.split(/\s+/)[0] ?? '';
-  const code = md.utils.escapeHtml(token.content);
+  const code = highlight(token.content, language);
   return (
     '<div class="code-block">' +
     '<div class="code-head">' +

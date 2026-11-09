@@ -24,6 +24,7 @@ import { createFileTools } from './tools/fs';
 import { ToolRegistry } from './tools/registry';
 import { createTerminalTools } from './tools/terminal';
 import { AgentPanelProvider } from './ui/panel';
+import { themeKind } from './ui/theme';
 import type {
   AgentState,
   UiMessage,
@@ -145,6 +146,11 @@ class MiniMaxController {
       onSettingsChanged(() => {
         this.applySettings();
         void this.sendInit();
+      })
+    );
+    context.subscriptions.push(
+      vscode.window.onDidChangeActiveColorTheme(() => {
+        this.panel.post({ type: 'theme', kind: themeKind() });
       })
     );
     context.subscriptions.push(this.statusBar);
@@ -876,7 +882,8 @@ class MiniMaxController {
         state: this.agentState,
         tokens: this.usageTotal(runtime),
         usage: runtime ? [...runtime.usage] : [],
-        hasApiKey: Boolean(key)
+        hasApiKey: Boolean(key),
+        theme: themeKind()
       }
     });
   }

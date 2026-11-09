@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import type { ExtToWeb, WebToExt } from './protocol';
+import { themeKind } from './theme';
 
 export function postToWebview(view: vscode.Webview, message: ExtToWeb): void {
   void view.postMessage(message);
@@ -60,7 +61,7 @@ export class AgentPanelProvider implements vscode.WebviewViewProvider {
         ' data:;" />',
       '<title>MiniMax Agent</title>',
       '</head>',
-      '<body>',
+      '<body class="mm-theme-' + themeKind() + '">',
       '<div id="root"></div>',
       '<script nonce="' + nonce + '" src="' + scriptUri + '"></script>',
       '</body>',
