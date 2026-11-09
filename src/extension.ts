@@ -1,9 +1,11 @@
 import { unlink, writeFile } from 'node:fs/promises';
+import { isAbsolute } from 'node:path';
 import * as vscode from 'vscode';
 import { HttpMiniMaxClient } from './api/client';
 import type { AnthropicMessage, EffortLevel } from './api/types';
 import type { AgentEvent } from './agent/agent';
 import { buildWorkspaceSnapshot, renderSnapshot } from './agent/context';
+import { readMentionedFiles } from './agent/mentions';
 import { buildSystemPrompt } from './agent/prompt';
 import { AgentSession } from './agent/session';
 import { MODELS, resolveBaseUrl } from './config/models';
@@ -16,12 +18,20 @@ import { getSettings, onSettingsChanged } from './config/settings';
 import { createLogger, type Logger } from './logger';
 import { InMemoryBackupStore } from './storage/backups';
 import { SessionStore, type StoredSession } from './storage/sessions';
-import { createExploreTools } from './tools/explore';
+import { createExploreTools, isTextFile } from './tools/explore';
 import { createFileTools } from './tools/fs';
 import { ToolRegistry } from './tools/registry';
 import { createTerminalTools } from './tools/terminal';
 import { AgentPanelProvider } from './ui/panel';
-import type { AgentState, UiMessage, WebToExt } from './ui/protocol';
+import type {
+  AgentState,
+  UiMessage,
+  UiSelection,
+  UiSettings,
+  UiSettingsValues,
+  UiSuggestion,
+  WebToExt
+} from './ui/protocol';
 import { StatusBarController } from './ui/statusbar';
 
 interface RuntimeSession {
@@ -51,6 +61,7 @@ class MiniMaxController {
   private agentState: AgentState = 'idle';
   private tokens = 0;
   private counter = 0;
+  private fileCache: { files: string[]; at: number } | undefined;
 
   constructor(context: vscode.ExtensionContext, channel: vscode.OutputChannel) {
     this.context = context;
@@ -109,6 +120,14 @@ class MiniMaxController {
     );
     context.subscriptions.push(
       vscode.commands.registerCommand('minimax.clearApiKey', () => void this.clearApiKey())
+    );
+    context.subscriptions.push(
+      vscode.commands.registerCommand('minimax.addSelection', () => this.addSelectionToChat())
+    );
+    context.subscriptions.push(
+      vscode.commands.registerCommand('minimax.addFile', (uri?: vscode.Uri) =>
+        this.addFileToChat(uri)
+      )
     );
 
     context.subscriptions.push(
@@ -291,7 +310,7 @@ class MiniMaxController {
       return;
     }
     if (message.type === 'send') {
-      await this.handleSend(message.text, message.mentions);
+      await this.handleSend(message.text, message.selections);
       return;
     }
     if (message.type === 'stop') {
@@ -339,9 +358,29 @@ class MiniMaxController {
     if (message.type === 'files_picked') {
       return;
     }
+    if (message.type === 'request_suggestions') {
+      await this.sendSuggestions(message.requestId, message.prefix);
+      return;
+    }
+    if (message.type === 'request_settings') {
+      await this.postSettings();
+      return;
+    }
+    if (message.type === 'save_settings') {
+      await this.saveSettings(message.values);
+      return;
+    }
+    if (message.type === 'set_api_key') {
+      await this.storeApiKey(message.key);
+      return;
+    }
+    if (message.type === 'clear_api_key') {
+      await this.clearApiKey();
+      return;
+    }
   }
 
-  private async handleSend(text: string, mentions: string[]): Promise<void> {
+  private async handleSend(text: string, selections: UiSelection[]): Promise<void> {
     let runtime = this.activeSession();
     if (!runtime) {
       this.startNewSession();
@@ -382,7 +421,7 @@ class MiniMaxController {
         },
         async (_progress, token) => {
           token.onCancellationRequested(() => agent.stop());
-          await agent.send(text, mentions);
+          await agent.send(await this.buildPromptText(text, selections));
         }
       );
     } catch (error) {
@@ -397,6 +436,197 @@ class MiniMaxController {
       runtime.history = agent.getHistory();
       this.persist(runtime);
     }
+  }
+
+  private async buildPromptText(text: string, selections: UiSelection[]): Promise<string> {
+    const blocks: string[] = [];
+    const files = await readMentionedFiles(this.workspaceRoot(), text);
+    if (files.length > 0) {
+      this.logger.info('attached ' + files.length + ' file(s) mentioned in the request');
+    }
+    for (const file of files) {
+      blocks.push('Attached file: ' + file.path + '\n' + file.content);
+    }
+    for (const selection of selections) {
+      const header =
+        'Selected code from ' +
+        selection.path +
+        (selection.detail ? ' (' + selection.detail + ')' : '');
+      blocks.push(header + ':\n' + (selection.content ?? ''));
+    }
+    if (blocks.length === 0) {
+      return text;
+    }
+    return text + '\n\n' + blocks.join('\n\n');
+  }
+
+  private addSelectionToChat(): void {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) {
+      void vscode.window.showInformationMessage('MiniMax: open a file to send a selection.');
+      return;
+    }
+    const selection = editor.selection;
+    if (selection.isEmpty) {
+      void vscode.window.showInformationMessage('MiniMax: select the code you want to send.');
+      return;
+    }
+    const path = vscode.workspace.asRelativePath(editor.document.uri, false);
+    const startLine = selection.start.line + 1;
+    const endLine = selection.end.line + 1;
+    const selected: UiSelection = {
+      id: this.nextId('sel'),
+      path,
+      label: path.split(/[\\/]/).pop() ?? path,
+      detail: 'lines ' + startLine + '-' + endLine,
+      content: editor.document.getText(selection)
+    };
+    this.panel.post({ type: 'selection', selection: selected });
+    this.panel.reveal();
+  }
+
+  private addFileToChat(uri?: vscode.Uri): void {
+    const target = uri ?? vscode.window.activeTextEditor?.document.uri;
+    if (!target) {
+      return;
+    }
+    const path = vscode.workspace.asRelativePath(target, false);
+    this.panel.post({ type: 'mention', path });
+    this.panel.reveal();
+  }
+
+  private async sendSuggestions(requestId: string, prefix: string): Promise<void> {
+    const items = await this.collectSuggestions(prefix);
+    this.panel.post({ type: 'suggestions', requestId, items });
+  }
+
+  private async collectSuggestions(prefix: string): Promise<UiSuggestion[]> {
+    const query = prefix.trim().toLowerCase();
+    const items: UiSuggestion[] = [];
+    const seen = new Set<string>();
+
+    for (const path of this.openFilePaths()) {
+      if (seen.has(path)) {
+        continue;
+      }
+      if (query.length === 0 || path.toLowerCase().includes(query)) {
+        seen.add(path);
+        items.push({ id: 'open:' + path, path, label: path, source: 'open' });
+      }
+    }
+
+    for (const path of await this.workspaceFiles()) {
+      if (items.length >= 60) {
+        break;
+      }
+      if (seen.has(path)) {
+        continue;
+      }
+      if (query.length > 0 && !path.toLowerCase().includes(query)) {
+        continue;
+      }
+      seen.add(path);
+      items.push({ id: 'file:' + path, path, label: path, source: 'workspace' });
+    }
+
+    return items;
+  }
+
+  private openFilePaths(): string[] {
+    const paths: string[] = [];
+    for (const document of vscode.workspace.textDocuments) {
+      const path = vscode.workspace.asRelativePath(document.uri, false);
+      if (path.length === 0 || path.startsWith('..')) {
+        continue;
+      }
+      // Virtual documents, for example the git history, live outside the
+      // workspace and come back as an absolute path.
+      if (isAbsolute(path)) {
+        continue;
+      }
+      paths.push(path);
+    }
+    return paths;
+  }
+
+  private async workspaceFiles(): Promise<string[]> {
+    const now = Date.now();
+    if (this.fileCache && now - this.fileCache.at < 60_000) {
+      return this.fileCache.files;
+    }
+    let files: string[] = [];
+    try {
+      const uris = await vscode.workspace.findFiles(
+        '**/*',
+        '**/{node_modules,.git,dist,out,coverage,.next,build}/**',
+        1000
+      );
+      files = uris
+        .map((uri) => vscode.workspace.asRelativePath(uri, false))
+        .filter(
+          (path) =>
+            path.length > 0 &&
+            !path.startsWith('..') &&
+            !isAbsolute(path) &&
+            isTextFile(path)
+        );
+    } catch (error) {
+      this.logger.error('the workspace file search failed', error);
+    }
+    this.fileCache = { files, at: now };
+    return files;
+  }
+
+  private async postSettings(): Promise<void> {
+    const settings = getSettings();
+    const key = await getApiKey(this.context.secrets);
+    const payload: UiSettings = {
+      baseUrl: settings.baseUrl,
+      customBaseUrl: settings.customBaseUrl,
+      model: settings.model,
+      models: MODELS,
+      effort: settings.effort,
+      maxTokens: settings.maxTokens,
+      maxIterations: settings.maxIterations,
+      autoApprove: settings.autoApprove,
+      rulesEnabled: settings.rulesEnabled,
+      enableWebSearch: settings.enableWebSearch,
+      hasApiKey: Boolean(key),
+      tools: this.registry.list().map((tool) => tool.name)
+    };
+    this.panel.post({ type: 'settings', settings: payload });
+  }
+
+  private async saveSettings(values: UiSettingsValues): Promise<void> {
+    const config = vscode.workspace.getConfiguration('minimax');
+    const updates: Array<[string, unknown]> = [
+      ['baseUrl', values.baseUrl],
+      ['customBaseUrl', values.customBaseUrl],
+      ['model', values.model],
+      ['effort', values.effort],
+      ['maxTokens', values.maxTokens],
+      ['maxIterations', values.maxIterations],
+      ['autoApprove', values.autoApprove],
+      ['rulesEnabled', values.rulesEnabled],
+      ['enableWebSearch', values.enableWebSearch]
+    ];
+    for (const [key, value] of updates) {
+      await config.update(key, value, vscode.ConfigurationTarget.Global);
+    }
+    this.applySettings();
+    await this.sendInit();
+    await this.postSettings();
+  }
+
+  private async storeApiKey(key: string): Promise<void> {
+    const trimmed = key.trim();
+    if (trimmed.length === 0) {
+      this.panel.post({ type: 'error', message: 'The API key is empty.' });
+      return;
+    }
+    await setApiKey(this.context.secrets, trimmed);
+    await this.sendInit();
+    await this.postSettings();
   }
 
   private persist(runtime: RuntimeSession): void {
@@ -563,6 +793,7 @@ class MiniMaxController {
   private async clearApiKey(): Promise<void> {
     await clearStoredApiKey(this.context.secrets);
     await this.sendInit();
+    await this.postSettings();
     void vscode.window.showInformationMessage('MiniMax: the API key is removed.');
   }
 

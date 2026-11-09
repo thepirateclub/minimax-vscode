@@ -17,6 +17,12 @@ function isIgnored(name: string): boolean {
   return IGNORED_DIRS.includes(name) || name.startsWith('.');
 }
 
+export function isTextFile(path: string): boolean {
+  const dot = path.lastIndexOf('.');
+  const extension = dot === -1 ? '' : path.slice(dot).toLowerCase();
+  return TEXT_EXTENSIONS.has(extension);
+}
+
 export function createExploreTools(): ToolEntry[] {
   const listFiles: ToolEntry = {
     name: 'list_files',

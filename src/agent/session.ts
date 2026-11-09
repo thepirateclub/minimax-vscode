@@ -77,10 +77,7 @@ export class AgentSession {
     }
   }
 
-  async send(text: string, mentions: string[]): Promise<void> {
-    const prompt =
-      mentions.length > 0 ? text + '\n\nAttached files:\n' + mentions.join('\n') : text;
-
+  async send(prompt: string): Promise<void> {
     this.agent = new Agent({
       client: this.options.client,
       registry: this.options.registry,

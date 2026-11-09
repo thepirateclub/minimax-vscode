@@ -1,4 +1,4 @@
-import { mkdtemp, readFile } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -15,7 +15,11 @@ const state = vi.hoisted(() => ({
   receive: undefined as undefined | ((message: WebToExt) => void),
   fetched: [] as string[],
   headers: [] as Array<Record<string, string>>,
-  responses: [] as string[]
+  bodies: [] as string[],
+  responses: [] as string[],
+  editor: undefined as unknown,
+  documents: [] as Array<{ uri: { fsPath: string } }>,
+  files: [] as string[]
 }));
 
 vi.mock('vscode', () => {
@@ -45,6 +49,9 @@ vi.mock('vscode', () => {
         return { dispose: () => undefined };
       },
       visibleTextEditors: [],
+      get activeTextEditor() {
+        return state.editor;
+      },
       showInputBox: async () => undefined,
       showQuickPick: async () => undefined,
       showOpenDialog: async () => undefined,
@@ -76,7 +83,11 @@ vi.mock('vscode', () => {
           ? [{ uri: { fsPath: root } }]
           : undefined;
       },
-      asRelativePath: (uri: { fsPath: string }) => uri.fsPath
+      asRelativePath: (uri: { fsPath: string }) => uri.fsPath,
+      get textDocuments() {
+        return state.documents;
+      },
+      findFiles: async () => state.files.map((path) => ({ fsPath: path }))
     },
     Uri: {
       joinPath: (base: { fsPath: string }, ...parts: string[]) => ({
@@ -181,13 +192,18 @@ describe('extension activation', () => {
     state.posted.length = 0;
     state.fetched.length = 0;
     state.headers.length = 0;
+    state.bodies.length = 0;
     state.responses.length = 0;
+    state.editor = undefined;
+    state.documents.length = 0;
+    state.files.length = 0;
     state.receive = undefined;
     vi.stubGlobal(
       'fetch',
       vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
         state.fetched.push(String(url));
         state.headers.push((init?.headers ?? {}) as Record<string, string>);
+        state.bodies.push(typeof init?.body === 'string' ? init.body : '');
         const body = state.responses.shift() ?? TEXT_SSE;
         return new Response(body, {
           status: 200,
@@ -234,7 +250,7 @@ describe('extension activation', () => {
     state.config.set('root', root);
     await boot();
     state.posted.length = 0;
-    state.receive?.({ type: 'send', text: 'hello', mentions: [] });
+    state.receive?.({ type: 'send', text: 'hello', selections: [] });
     await vi.waitFor(() => {
       expect(types()).toContain('error');
     });
@@ -249,7 +265,7 @@ describe('extension activation', () => {
     await boot();
 
     state.posted.length = 0;
-    state.receive?.({ type: 'send', text: 'hello', mentions: [] });
+    state.receive?.({ type: 'send', text: 'hello', selections: [] });
 
     await vi.waitFor(() => {
       expect(ofType('text_delta').map((message) => message.text).join('')).toBe('hi from the model');
@@ -274,7 +290,7 @@ describe('extension activation', () => {
     await boot();
 
     state.posted.length = 0;
-    state.receive?.({ type: 'send', text: 'write a note', mentions: [] });
+    state.receive?.({ type: 'send', text: 'write a note', selections: [] });
 
     await vi.waitFor(() => {
       expect(ofType('approval_request').length).toBe(1);
@@ -301,7 +317,7 @@ describe('extension activation', () => {
     await boot();
 
     state.posted.length = 0;
-    state.receive?.({ type: 'send', text: 'write a note', mentions: [] });
+    state.receive?.({ type: 'send', text: 'write a note', selections: [] });
 
     await vi.waitFor(() => {
       expect(ofType('approval_request').length).toBe(1);
@@ -323,12 +339,12 @@ describe('extension activation', () => {
     state.responses.push(TEXT_SSE, TEXT_SSE);
     await boot();
 
-    state.receive?.({ type: 'send', text: 'first question', mentions: [] });
+    state.receive?.({ type: 'send', text: 'first question', selections: [] });
     await vi.waitFor(() => {
       expect(ofType('text_delta').length).toBeGreaterThan(0);
     });
     state.posted.length = 0;
-    state.receive?.({ type: 'send', text: 'second question', mentions: [] });
+    state.receive?.({ type: 'send', text: 'second question', selections: [] });
     await vi.waitFor(() => {
       expect(ofType('text_delta').length).toBeGreaterThan(0);
     });
@@ -336,5 +352,163 @@ describe('extension activation', () => {
     const stored = state.globalState.get('minimax.sessions') as Array<{ messages: unknown[] }>;
     expect(stored.length).toBe(1);
     expect(stored[0]?.messages.length).toBe(4);
+  });
+
+  it('turns the editor selection into a chip', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.editor = {
+      document: {
+        uri: { fsPath: 'src/app.ts' },
+        getText: () => 'const answer = 42;'
+      },
+      selection: {
+        isEmpty: false,
+        start: { line: 10, character: 0 },
+        end: { line: 12, character: 5 }
+      }
+    };
+    await boot();
+    state.posted.length = 0;
+    state.commands.get('minimax.addSelection')?.();
+    await vi.waitFor(() => {
+      expect(ofType('selection').length).toBe(1);
+    });
+    const selected = ofType('selection')[0]!.selection;
+    expect(selected.path).toBe('src/app.ts');
+    expect(selected.detail).toBe('lines 11-13');
+    expect(selected.content).toBe('const answer = 42;');
+  });
+
+  it('suggests open tabs and workspace files', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.documents.push({ uri: { fsPath: 'src/open.ts' } });
+    state.files = ['src/open.ts', 'src/other.ts'];
+    await boot();
+    state.posted.length = 0;
+    state.receive?.({ type: 'request_suggestions', requestId: 'r1', prefix: 'open' });
+    await vi.waitFor(() => {
+      expect(ofType('suggestions').length).toBe(1);
+    });
+    const items = ofType('suggestions')[0]!.items;
+    expect(items).toHaveLength(1);
+    expect(items[0]?.path).toBe('src/open.ts');
+    expect(items[0]?.source).toBe('open');
+  });
+
+  it('hides a document that lives outside the workspace', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.documents.push({ uri: { fsPath: join(root, '..', 'outside.ts') } });
+    await boot();
+    state.posted.length = 0;
+    state.receive?.({ type: 'request_suggestions', requestId: 'r1', prefix: 'outside' });
+    await vi.waitFor(() => {
+      expect(ofType('suggestions').length).toBe(1);
+    });
+    expect(ofType('suggestions')[0]!.items).toHaveLength(0);
+  });
+
+  it('returns the settings and saves the changes', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    await boot();
+    state.posted.length = 0;
+    state.receive?.({ type: 'request_settings' });
+    await vi.waitFor(() => {
+      expect(ofType('settings').length).toBe(1);
+    });
+    const settings = ofType('settings')[0]!.settings;
+    expect(settings.model).toBe('MiniMax-M3.1-Flash');
+    expect(settings.tools).toContain('write_file');
+    expect(settings.hasApiKey).toBe(false);
+
+    state.receive?.({
+      type: 'save_settings',
+      values: {
+        baseUrl: 'china',
+        customBaseUrl: '',
+        model: 'MiniMax-M3',
+        effort: 'high',
+        maxTokens: 16384,
+        maxIterations: 12,
+        autoApprove: ['run_terminal'],
+        rulesEnabled: false,
+        enableWebSearch: false
+      }
+    });
+    await vi.waitFor(() => {
+      expect(state.config.get('model')).toBe('MiniMax-M3');
+    });
+    expect(state.config.get('baseUrl')).toBe('china');
+    expect(state.config.get('effort')).toBe('high');
+    expect(state.config.get('maxTokens')).toBe(16384);
+    expect(state.config.get('autoApprove')).toEqual(['run_terminal']);
+    expect(state.config.get('rulesEnabled')).toBe(false);
+  });
+
+  it('adds the selection to the prompt sent to the model', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.secrets.set('minimax.apiKey', 'test-key');
+    state.responses.push(TEXT_SSE);
+    await boot();
+    state.receive?.({
+      type: 'send',
+      text: 'explain this',
+      selections: [
+        {
+          id: 'sel-1',
+          path: 'src/app.ts',
+          label: 'app.ts',
+          detail: 'lines 11-13',
+          content: 'const answer = 42;'
+        }
+      ]
+    });
+    await vi.waitFor(() => {
+      expect(ofType('text_delta').length).toBeGreaterThan(0);
+    });
+    const body = JSON.parse(state.bodies[0]!) as {
+      messages: Array<{ content: Array<{ text: string }> }>;
+    };
+    const prompt = body.messages[0]?.content[0]?.text ?? '';
+    expect(prompt).toContain('explain this');
+    expect(prompt).toContain('Selected code from src/app.ts');
+    expect(prompt).toContain('const answer = 42;');
+  });
+
+  it('turns a file into an inline mention', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    await boot();
+    state.posted.length = 0;
+    state.commands.get('minimax.addFile')?.({ fsPath: 'src/app.ts' });
+    await vi.waitFor(() => {
+      expect(ofType('mention').length).toBe(1);
+    });
+    expect(ofType('mention')[0]!.path).toBe('src/app.ts');
+  });
+
+  it('attaches the file mentioned in the request', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.secrets.set('minimax.apiKey', 'test-key');
+    state.responses.push(TEXT_SSE);
+    await writeFile(join(root, 'context.md'), '# Title\nbody line\n', 'utf8');
+    await boot();
+
+    state.receive?.({ type: 'send', text: 'read @context.md please', selections: [] });
+    await vi.waitFor(() => {
+      expect(ofType('text_delta').length).toBeGreaterThan(0);
+    });
+    const body = JSON.parse(state.bodies[0]!) as {
+      messages: Array<{ content: Array<{ text: string }> }>;
+    };
+    const prompt = body.messages[0]?.content[0]?.text ?? '';
+    expect(prompt).toContain('read @context.md please');
+    expect(prompt).toContain('Attached file: context.md');
+    expect(prompt).toContain('body line');
   });
 });

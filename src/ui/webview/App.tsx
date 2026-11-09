@@ -1,8 +1,17 @@
-import { useEffect, useState } from 'react';
-import type { ExtToWeb, UiMessage, UiState, WebToExt } from '../protocol';
-import { Composer } from './components/Composer';
-import { Header } from './components/Header';
+import { useEffect, useRef, useState } from 'react';
+import type {
+  ExtToWeb,
+  UiMessage,
+  UiSelection,
+  UiSettings,
+  UiState,
+  UiSuggestion,
+  WebToExt
+} from '../protocol';
+import { Composer, type InsertRequest } from './components/Composer';
+import { Header, type PanelTab } from './components/Header';
 import { MessageList } from './components/MessageList';
+import { SettingsView } from './components/SettingsView';
 import { STRINGS } from './strings';
 
 interface VsCodeApi {
@@ -24,7 +33,14 @@ const EMPTY_STATE: UiState = {
 export function App({ vscode }: { vscode: VsCodeApi }) {
   const [state, setState] = useState<UiState>(EMPTY_STATE);
   const [messages, setMessages] = useState<UiMessage[]>([]);
-  const [mentions, setMentions] = useState<string[]>([]);
+  const [text, setText] = useState('');
+  const [selections, setSelections] = useState<UiSelection[]>([]);
+  const [suggestions, setSuggestions] = useState<UiSuggestion[]>([]);
+  const [settings, setSettings] = useState<UiSettings | undefined>(undefined);
+  const [tab, setTab] = useState<PanelTab>('chat');
+  const [focusToken, setFocusToken] = useState(0);
+  const [insert, setInsert] = useState<InsertRequest | undefined>(undefined);
+  const insertToken = useRef(0);
 
   useEffect(() => {
     const onMessage = (event: MessageEvent<ExtToWeb>): void => {
@@ -107,7 +123,29 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
         return;
       }
       if (message.type === 'files') {
-        setMentions((prev) => [...prev, ...message.files.map((file) => file.path)]);
+        requestInsert(message.files.map((file) => file.path));
+        return;
+      }
+      if (message.type === 'mention') {
+        requestInsert([message.path]);
+        return;
+      }
+      if (message.type === 'selection') {
+        setSelections((prev) =>
+          prev.some((item) => item.id === message.selection.id)
+            ? prev
+            : [...prev, message.selection]
+        );
+        setTab('chat');
+        setFocusToken((value) => value + 1);
+        return;
+      }
+      if (message.type === 'suggestions') {
+        setSuggestions(message.items);
+        return;
+      }
+      if (message.type === 'settings') {
+        setSettings(message.settings);
         return;
       }
       if (message.type === 'error') {
@@ -125,9 +163,38 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
 
   const busy = state.state !== 'idle' && state.state !== 'error';
 
+  const openTab = (next: PanelTab): void => {
+    setTab(next);
+    if (next === 'settings') {
+      vscode.postMessage({ type: 'request_settings' });
+    }
+  };
+
+  const suggest = (prefix: string | undefined): void => {
+    if (prefix === undefined) {
+      setSuggestions([]);
+      return;
+    }
+    vscode.postMessage({ type: 'request_suggestions', requestId: 'suggestions', prefix });
+  };
+
+  // A file reference lives in the input field as "@path", so the user can
+  // point at the file in the middle of the sentence.
+  function requestInsert(paths: string[]): void {
+    if (paths.length === 0) {
+      return;
+    }
+    insertToken.current += 1;
+    setInsert({ paths, token: insertToken.current });
+    setTab('chat');
+    setFocusToken((value) => value + 1);
+  }
+
   return (
     <div className="app">
       <Header
+        tab={tab}
+        onTab={openTab}
         models={state.models}
         model={state.model}
         effort={state.effort}
@@ -138,23 +205,51 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
         onEffort={(effort) => vscode.postMessage({ type: 'set_effort', effort })}
         onNewChat={() => vscode.postMessage({ type: 'new_session' })}
       />
-      {messages.length === 0 ? (
-        <div className="empty">{STRINGS.empty}</div>
-      ) : (
-        <MessageList
-          messages={messages}
-          onApprove={(id, allowForSession) => vscode.postMessage({ type: 'approve', id, allowForSession })}
-          onReject={(id) => vscode.postMessage({ type: 'reject', id })}
+      {tab === 'chat' ? (
+        <>
+          {messages.length === 0 ? (
+            <div className="empty">{STRINGS.empty}</div>
+          ) : (
+            <MessageList
+              messages={messages}
+              onApprove={(id, allowForSession) =>
+                vscode.postMessage({ type: 'approve', id, allowForSession })
+              }
+              onReject={(id) => vscode.postMessage({ type: 'reject', id })}
+            />
+          )}
+          <Composer
+            busy={busy}
+            text={text}
+            onTextChange={(updater) => setText((previous) => updater(previous))}
+            selections={selections}
+            focusToken={focusToken}
+            suggestions={suggestions}
+            insert={insert}
+            onInsertHandled={() => setInsert(undefined)}
+            onSend={(sent, sentSelections) => {
+              vscode.postMessage({ type: 'send', text: sent, selections: sentSelections });
+              setText('');
+              setSelections([]);
+            }}
+            onStop={() => vscode.postMessage({ type: 'stop' })}
+            onPickFiles={() => vscode.postMessage({ type: 'pick_files', requestId: 'attach' })}
+            onRemoveSelection={(id) =>
+              setSelections((prev) => prev.filter((item) => item.id !== id))
+            }
+            onSuggest={suggest}
+          />
+        </>
+      ) : settings ? (
+        <SettingsView
+          settings={settings}
+          onSave={(values) => vscode.postMessage({ type: 'save_settings', values })}
+          onSetApiKey={(key) => vscode.postMessage({ type: 'set_api_key', key })}
+          onClearApiKey={() => vscode.postMessage({ type: 'clear_api_key' })}
         />
+      ) : (
+        <div className="empty">{STRINGS.loading}</div>
       )}
-      <Composer
-        busy={busy}
-        mentions={mentions}
-        onSend={(text, attached) => vscode.postMessage({ type: 'send', text, mentions: attached })}
-        onStop={() => vscode.postMessage({ type: 'stop' })}
-        onPickFiles={() => vscode.postMessage({ type: 'pick_files', requestId: 'attach' })}
-        onRemoveMention={(path) => setMentions((prev) => prev.filter((item) => item !== path))}
-      />
     </div>
   );
 }

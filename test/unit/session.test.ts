@@ -81,19 +81,18 @@ function makeSession(
 describe('AgentSession', () => {
   it('appends the user message and the assistant answer to the history', async () => {
     const { session } = makeSession();
-    await session.send('hello', []);
+    await session.send('hello');
     const history = session.getHistory();
     expect(history).toHaveLength(2);
     expect(history[0]?.role).toBe('user');
     expect(history[1]?.role).toBe('assistant');
   });
 
-  it('attaches mentioned files as extra context', async () => {
-    const { session } = makeSession();
-    await session.send('look at src', ['src/a.ts']);
-    const history = session.getHistory();
-    const block = history[0]?.content[0];
-    expect(block?.type === 'text' && block.text).toContain('src/a.ts');
+  it('sends the prompt to the model unchanged', async () => {
+    const { session, client } = makeSession();
+    await session.send('look at src/a.ts');
+    const block = client.requests[0]?.messages[0]?.content[0];
+    expect(block?.type === 'text' && block.text).toBe('look at src/a.ts');
   });
 
   it('continues a restored history', async () => {
@@ -102,7 +101,7 @@ describe('AgentSession', () => {
       { role: 'user', content: [{ type: 'text', text: 'old question' }] },
       { role: 'assistant', content: [{ type: 'text', text: 'old answer' }] }
     ]);
-    await session.send('next question', []);
+    await session.send('next question');
     expect(session.getHistory()).toHaveLength(4);
     const sent = client.requests[0]?.messages ?? [];
     expect(sent[0]?.role).toBe('user');
@@ -135,7 +134,7 @@ describe('AgentSession', () => {
       onApproval: (approval) => approvals.push(approval)
     });
 
-    const running = session.send('write it', []);
+    const running = session.send('write it');
     await vi.waitFor(() => expect(approvals).toHaveLength(1));
     expect(approvals[0]?.name).toBe('write_file');
     session.approve(approvals[0]!.id, false);
@@ -173,7 +172,7 @@ describe('AgentSession', () => {
       onApproval: (approval) => approvals.push(approval)
     });
 
-    await session.send('write it', []);
+    await session.send('write it');
     expect(approvals).toHaveLength(0);
   });
 
@@ -203,7 +202,7 @@ describe('AgentSession', () => {
     });
 
     session.setAutoApprove(['write_file']);
-    await session.send('write it', []);
+    await session.send('write it');
     expect(approvals).toHaveLength(0);
   });
 });

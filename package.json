@@ -18,7 +18,7 @@
   "activationEvents": [],
   "contributes": {
     "viewsContainers": {
-      "activitybar": [
+      "secondarySidebar": [
         {
           "id": "minimax",
           "title": "MiniMax",
@@ -85,6 +85,16 @@
         "command": "minimax.clearApiKey",
         "title": "Clear API Key",
         "category": "MiniMax"
+      },
+      {
+        "command": "minimax.addSelection",
+        "title": "Add Selection to Chat",
+        "category": "MiniMax"
+      },
+      {
+        "command": "minimax.addFile",
+        "title": "Add File to Chat",
+        "category": "MiniMax"
       }
     ],
     "configuration": {
@@ -149,7 +159,29 @@
           "default": true
         }
       }
-    }
+    },
+    "menus": {
+      "editor/context": [
+        {
+          "command": "minimax.addSelection",
+          "when": "editorHasSelection",
+          "group": "0_minimax@1"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "minimax.addFile",
+          "group": "0_minimax@1"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "minimax.addSelection",
+        "key": "ctrl+alt+m",
+        "when": "editorTextFocus && editorHasSelection"
+      }
+    ]
   },
   "scripts": {
     "compile": "node esbuild.mjs",

@@ -1,5 +1,5 @@
 import type { EffortLevel } from '../api/types';
-import type { ModelInfo } from '../config/models';
+import type { BaseUrlPreset, ModelInfo } from '../config/models';
 
 export type AgentState = 'idle' | 'thinking' | 'streaming' | 'tool' | 'error';
 
@@ -46,6 +46,39 @@ export interface UiFile {
   label: string;
 }
 
+export interface UiSelection {
+  id: string;
+  path: string;
+  label: string;
+  detail?: string;
+  content?: string;
+}
+
+export interface UiSuggestion {
+  id: string;
+  path: string;
+  label: string;
+  source: 'open' | 'workspace';
+}
+
+export interface UiSettingsValues {
+  baseUrl: BaseUrlPreset;
+  customBaseUrl: string;
+  model: string;
+  effort: EffortLevel;
+  maxTokens: number;
+  maxIterations: number;
+  autoApprove: string[];
+  rulesEnabled: boolean;
+  enableWebSearch: boolean;
+}
+
+export interface UiSettings extends UiSettingsValues {
+  hasApiKey: boolean;
+  models: ModelInfo[];
+  tools: string[];
+}
+
 export interface UiState {
   sessions: UiSessionSummary[];
   activeSessionId: string | undefined;
@@ -73,11 +106,15 @@ export type ExtToWeb =
   | { type: 'session_loaded'; messages: UiMessage[] }
   | { type: 'sessions'; sessions: UiSessionSummary[] }
   | { type: 'models'; models: ModelInfo[]; selected: string }
-  | { type: 'files'; requestId: string; files: UiFile[] };
+  | { type: 'files'; requestId: string; files: UiFile[] }
+  | { type: 'selection'; selection: UiSelection }
+  | { type: 'mention'; path: string }
+  | { type: 'suggestions'; requestId: string; items: UiSuggestion[] }
+  | { type: 'settings'; settings: UiSettings };
 
 export type WebToExt =
   | { type: 'ready' }
-  | { type: 'send'; text: string; mentions: string[] }
+  | { type: 'send'; text: string; selections: UiSelection[] }
   | { type: 'stop' }
   | { type: 'approve'; id: string; allowForSession: boolean }
   | { type: 'reject'; id: string }
@@ -88,4 +125,9 @@ export type WebToExt =
   | { type: 'set_effort'; effort: EffortLevel }
   | { type: 'pick_files'; requestId: string }
   | { type: 'files_picked'; requestId: string; files: string[] }
-  | { type: 'undo_last_change' };
+  | { type: 'undo_last_change' }
+  | { type: 'request_suggestions'; requestId: string; prefix: string }
+  | { type: 'request_settings' }
+  | { type: 'save_settings'; values: UiSettingsValues }
+  | { type: 'set_api_key'; key: string }
+  | { type: 'clear_api_key' };
