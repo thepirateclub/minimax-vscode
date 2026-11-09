@@ -120,6 +120,9 @@ const MessageRow = memo(function MessageRow({
           ) : null}
         </div>
       ) : null}
+      {message.role === 'notice' ? (
+        <div className="notice-text">{message.text}</div>
+      ) : null}
       {message.role === 'tool' && message.tool ? (
         <ToolCard tool={message.tool} collapsed={collapseTools} />
       ) : null}

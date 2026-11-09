@@ -492,6 +492,16 @@ input:focus {
   overflow: hidden;
 }
 
+/* a failure of the panel is a notice, it is not a part of the answer */
+.message-notice {
+  border-left: 2px solid var(--vscode-testing-iconFailed, #f14c4c);
+  padding: 1px 0 1px 8px;
+  color: var(--muted);
+  font-size: calc(var(--mm-font-base) * 0.9);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
 /* A failed action is marked with a straight bar in the color of the failed
    dot. A rounded border drew a bracket, it looked like a decoration, and the
    color of the theme turned the mark gray. */
@@ -799,6 +809,60 @@ input:focus {
 }
 
 .file-read:hover .tool-copy {
+  opacity: 1;
+}
+
+/* the output of a command */
+.term {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.term-command {
+  display: flex;
+  gap: 8px;
+  padding: 4px 8px;
+  background: var(--code-bg);
+  border-bottom: 1px solid var(--border);
+  font-family: var(--mono);
+  font-size: calc(var(--mm-font-base) * 0.85);
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.term-prompt {
+  flex: 0 0 auto;
+  color: var(--accent);
+}
+
+.term-cmd-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.term-body {
+  max-height: 300px;
+  overflow: auto;
+  padding: 6px 8px;
+  font-family: var(--mono);
+  font-size: calc(var(--mm-font-base) * 0.85);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.term-line-error {
+  color: var(--vscode-testing-iconFailed, #f14c4c);
+}
+
+.term-line-note {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.term:hover .tool-copy {
   opacity: 1;
 }
 

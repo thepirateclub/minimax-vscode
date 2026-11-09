@@ -278,6 +278,38 @@ describe('the dot of an action', () => {
     expect(markup).not.toContain('path: demo.txt');
   });
 
+  it('shows the output of a command as a terminal', () => {
+    const markup = card({
+      name: 'run_terminal',
+      input: { command: 'dir tmp-demo.txt' },
+      content: 'Volume in drive H has no label.'
+    });
+    expect(markup).toContain('term-command');
+    expect(markup).toContain('dir tmp-demo.txt');
+    // The command stands on its own line, it is not echoed as an argument.
+    expect(markup).not.toContain('command: dir tmp-demo.txt');
+  });
+
+  it('marks the failure of a command', () => {
+    const markup = card({
+      name: 'run_terminal',
+      input: { command: 'bad' },
+      content: 'Command failed with exit code 255\n[stderr] not recognized',
+      isError: true
+    });
+    expect(markup).toContain('term-line-error');
+    expect(markup).toContain('not recognized');
+  });
+
+  it('keeps the summary of a finished command empty', () => {
+    const markup = card({
+      name: 'run_terminal',
+      input: { command: 'dir' },
+      content: 'Volume in drive H has no label.'
+    });
+    expect(summaryOf(markup)).toBe('');
+  });
+
   it('shows the range of a read in the title', () => {
     const markup = card({
       name: 'read_file',

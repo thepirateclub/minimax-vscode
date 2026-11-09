@@ -12,6 +12,7 @@ import { Composer, type InsertRequest } from './components/Composer';
 import { Header, type PanelTab } from './components/Header';
 import { MessageList } from './components/MessageList';
 import { SettingsView } from './components/SettingsView';
+import { appendNotice } from './notices';
 import { STRINGS } from './strings';
 
 interface VsCodeApi {
@@ -170,10 +171,7 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
         return;
       }
       if (message.type === 'error') {
-        setMessages((prev) => [
-          ...prev,
-          { id: 'error-' + Date.now(), role: 'assistant', text: message.message }
-        ]);
+        setMessages((prev) => appendNotice(prev, message.message, 'error-' + Date.now()));
       }
     };
 

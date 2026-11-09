@@ -35,7 +35,9 @@ export interface UiApproval {
 
 export interface UiMessage {
   id: string;
-  role: 'user' | 'assistant' | 'tool';
+  // A notice is a failure of the panel itself, it is not the answer of the
+  // model.
+  role: 'user' | 'assistant' | 'tool' | 'notice';
   text?: string;
   thinking?: string;
   tool?: UiToolCall;

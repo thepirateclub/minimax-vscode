@@ -381,6 +381,10 @@ describe('extension activation', () => {
       expect(state.posted.some((message) => message.type === 'error')).toBe(true);
     });
     expect(state.opened.length).toBe(0);
+    // The panel shows a sentence, not the text of the exception.
+    const error = state.posted.find((message) => message.type === 'error');
+    expect(error?.message).toContain('outside the workspace');
+    expect(error?.message).not.toContain('escapes the workspace root');
   });
 
   it('reports a missing key instead of calling the API', async () => {

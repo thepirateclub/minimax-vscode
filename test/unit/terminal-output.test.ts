@@ -1,0 +1,32 @@
+import { describe, expect, it } from 'vitest';
+import { parseTerminalOutput } from '../../src/ui/webview/terminalOutput';
+
+describe('the output of a command', () => {
+  it('puts the command on the first line', () => {
+    const lines = parseTerminalOutput('dir tmp-demo.txt', 'Volume in drive H has no label.');
+    expect(lines[0]).toEqual({ kind: 'command', text: 'dir tmp-demo.txt' });
+    expect(lines[1]).toEqual({ kind: 'output', text: 'Volume in drive H has no label.' });
+  });
+
+  it('marks the failure of a command', () => {
+    const lines = parseTerminalOutput(
+      'bad',
+      'Command failed with exit code 255\n[stderr] not recognized'
+    );
+    expect(lines[1]?.kind).toBe('error');
+    expect(lines[1]?.text).toBe('Command failed with exit code 255');
+    expect(lines[2]?.kind).toBe('error');
+    expect(lines[2]?.text).toBe('not recognized');
+  });
+
+  it('marks the stderr of a command', () => {
+    const lines = parseTerminalOutput('bad', '[stderr] something went wrong');
+    expect(lines[1]?.kind).toBe('error');
+    expect(lines[1]?.text).toBe('something went wrong');
+  });
+
+  it('keeps a note of the tool', () => {
+    const lines = parseTerminalOutput('bad', '[no output]');
+    expect(lines[1]?.kind).toBe('note');
+  });
+});

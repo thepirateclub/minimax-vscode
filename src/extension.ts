@@ -28,6 +28,7 @@ import { createExploreTools, isTextFile } from './tools/explore';
 import { createFileTools, resolveWorkspacePath } from './tools/fs';
 import { ToolRegistry } from './tools/registry';
 import { createTerminalTools } from './tools/terminal';
+import { fileErrorMessage } from './ui/fileError';
 import { AgentPanelProvider } from './ui/panel';
 import { themeKind } from './ui/theme';
 import type {
@@ -599,7 +600,7 @@ class MiniMaxController {
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
       this.logger.error('cannot open ' + path + ': ' + reason);
-      this.panel.post({ type: 'error', message: 'Cannot open ' + path + ': ' + reason });
+      this.panel.post({ type: 'error', message: fileErrorMessage(path, reason) });
     }
   }
 

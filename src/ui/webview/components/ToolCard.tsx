@@ -15,6 +15,7 @@ import { cardOpen } from '../toolCardState';
 import { diffStats } from '../diffStats';
 import { DiffView } from './DiffView';
 import { FileReadView } from './FileReadView';
+import { TerminalView } from './TerminalView';
 
 interface ToolView {
   icon: ReactNode;
@@ -149,9 +150,8 @@ function describeTool(tool: UiToolCall): ToolView {
     return {
       icon: <IconTerminal />,
       title: STRINGS.toolTerminal + ' ' + command,
-      summary: failed
-        ? STRINGS.toolExitCode + ' ' + failed[1]
-        : firstLine(content)
+      // The output speaks for itself, the summary keeps only the failure.
+      summary: failed ? STRINGS.toolExitCode + ' ' + failed[1] : ''
     };
   }
   return {
@@ -247,6 +247,11 @@ export function ToolCard({
             <DiffView path={diff.path} lines={diff.lines} showPath={false} />
           ) : tool.name === 'read_file' && tool.content ? (
             <FileReadView content={tool.content} path={filePaths(tool.input)[0] ?? ''} />
+          ) : tool.name === 'run_terminal' && tool.content ? (
+            <TerminalView
+              command={String(tool.input['command'] ?? '')}
+              content={tool.content}
+            />
           ) : (
             <>
               <pre className="tool-input">{formatInput(tool.input)}</pre>
