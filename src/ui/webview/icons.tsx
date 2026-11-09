@@ -183,3 +183,22 @@ export function IconCopy(): ReactNode {
     </Svg>
   );
 }
+
+// A paper plane, it sends the request.
+export function IconSend(): ReactNode {
+  return (
+    <Svg viewBox="0 0 24 24" strokeWidth={2} size={15}>
+      <path d="m22 2-7 20-4-9-9-4Z" />
+      <path d="M22 2 11 13" />
+    </Svg>
+  );
+}
+
+// A square, it stops the current turn.
+export function IconStop(): ReactNode {
+  return (
+    <Svg viewBox="0 0 24 24" strokeWidth={2} size={15}>
+      <rect x="7" y="7" width="10" height="10" rx="1.5" />
+    </Svg>
+  );
+}

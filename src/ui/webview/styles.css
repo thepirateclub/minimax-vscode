@@ -769,6 +769,8 @@ input:focus {
   align-items: center;
   flex-wrap: wrap;
   gap: 4px;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 /* the paperclip lives in the corner of the input field */
@@ -873,9 +875,10 @@ input:focus {
   display: flex;
   align-items: flex-end;
   gap: 2px;
-  flex: 0 1 auto;
+  /* The graph takes the whole width of the header, the columns share it. */
+  flex: 1 1 auto;
+  min-width: 0;
   height: 22px;
-  max-width: 60%;
   overflow: hidden;
   border-radius: 3px;
   background-color: var(--vscode-editorWidget-background, rgba(128, 128, 128, 0.08));
@@ -892,8 +895,10 @@ input:focus {
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  width: 5px;
-  min-width: 3px;
+  /* The columns divide the width of the graph, they do not grow with the
+     number of the steps. */
+  flex: 1 1 0;
+  min-width: 0;
   height: 100%;
   overflow: hidden;
 }
@@ -915,10 +920,33 @@ input:focus {
   border-color: var(--vscode-focusBorder, #007fd4);
 }
 
+/* The selectors and the send icon share the bottom row, the icon keeps the
+   bottom right corner of the composer. */
+.composer-bottom {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .composer-actions {
   display: flex;
   gap: 6px;
-  justify-content: flex-end;
+  flex: 0 0 auto;
+}
+
+/* The send action is an icon, the word stays in the tooltip. */
+.composer-send {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--vscode-button-background, #0078d4);
+  color: var(--vscode-button-foreground, #fff);
 }
 
 /* selections */

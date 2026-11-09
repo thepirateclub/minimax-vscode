@@ -15,6 +15,8 @@ import {
   IconPlan,
   IconRead,
   IconSearch,
+  IconSend,
+  IconStop,
   IconTerminal,
   IconThinking,
   IconWrite
@@ -34,6 +36,8 @@ const ICONS: Array<[string, () => ReactNode]> = [
   ['IconPlan', IconPlan],
   ['IconRead', IconRead],
   ['IconSearch', IconSearch],
+  ['IconSend', IconSend],
+  ['IconStop', IconStop],
   ['IconTerminal', IconTerminal],
   ['IconThinking', IconThinking],
   ['IconWrite', IconWrite]
