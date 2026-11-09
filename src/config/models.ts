@@ -1,6 +1,11 @@
 export type EffortLevel = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 export type BaseUrlPreset = 'auto' | 'global' | 'china';
 
+// Plan mode is read-only: the agent investigates and answers with a plan.
+export type AgentMode = 'plan' | 'code';
+
+export const AGENT_MODES: AgentMode[] = ['plan', 'code'];
+
 export interface ModelInfo {
   id: string;
   label: string;

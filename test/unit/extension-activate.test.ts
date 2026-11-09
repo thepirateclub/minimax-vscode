@@ -461,6 +461,7 @@ describe('extension activation', () => {
         customBaseUrl: '',
         model: 'MiniMax-M3',
         effort: 'high',
+        mode: 'plan',
         maxTokens: 16384,
         maxIterations: 12,
         autoApprove: ['run_terminal'],
@@ -473,6 +474,7 @@ describe('extension activation', () => {
     });
     expect(state.config.get('baseUrl')).toBe('china');
     expect(state.config.get('effort')).toBe('high');
+    expect(state.config.get('mode')).toBe('plan');
     expect(state.config.get('maxTokens')).toBe(16384);
     expect(state.config.get('autoApprove')).toEqual(['run_terminal']);
     expect(state.config.get('rulesEnabled')).toBe(false);
@@ -520,6 +522,46 @@ describe('extension activation', () => {
       expect(ofType('mention').length).toBe(1);
     });
     expect(ofType('mention')[0]!.path).toBe('src/app.ts');
+  });
+
+  it('switches the agent mode from the webview', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    await boot();
+    expect(ofType('init')[0]!.state.mode).toBe('code');
+    state.receive?.({ type: 'set_mode', mode: 'plan' });
+    await vi.waitFor(() => {
+      expect(state.config.get('mode')).toBe('plan');
+    });
+    await vi.waitFor(() => {
+      const inits = ofType('init');
+      expect(inits.length).toBeGreaterThan(0);
+      expect(inits[inits.length - 1]!.state.mode).toBe('plan');
+    });
+  });
+
+  it('sends only the read tools in plan mode', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.secrets.set('minimax.apiKey', 'test-key');
+    state.config.set('mode', 'plan');
+    state.responses.push(TEXT_SSE);
+    await boot();
+
+    state.receive?.({ type: 'send', text: 'plan this', mentions: [], selections: [] });
+    await vi.waitFor(() => {
+      expect(ofType('text_delta').length).toBeGreaterThan(0);
+    });
+    const body = JSON.parse(state.bodies[0]!) as {
+      system: string;
+      tools: Array<{ name: string }>;
+    };
+    const names = body.tools.map((tool) => tool.name);
+    expect(names).toContain('read_file');
+    expect(names).not.toContain('write_file');
+    expect(names).not.toContain('run_terminal');
+    expect(body.system).toContain('Mode: PLAN');
+    expect(body.system).not.toContain('write_file');
   });
 
   it('shows the remaining 5-hour quota in the status bar', async () => {

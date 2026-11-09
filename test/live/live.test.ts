@@ -4,9 +4,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { Agent, type AgentEvent } from '../../src/agent/agent';
+import { buildSystemPrompt } from '../../src/agent/prompt';
 import { HttpMiniMaxClient } from '../../src/api/client';
 import type { StreamEvent } from '../../src/api/types';
 import { InMemoryBackupStore } from '../../src/storage/backups';
+import { createExploreTools } from '../../src/tools/explore';
 import { createFileTools } from '../../src/tools/fs';
 import { ToolRegistry } from '../../src/tools/registry';
 import { ApprovalGate } from '../../src/ui/approvals';
@@ -77,6 +79,7 @@ describe.skipIf(!key)('live MiniMax API', () => {
       maxTokens: 4096,
       maxIterations: 5,
       effort: 'low',
+      mode: 'code',
       systemPrompt: 'You are a test helper. Use read_file to read files, then answer.',
       workspaceRoot: root,
       logger: { info: () => undefined, error: () => undefined },
@@ -94,4 +97,90 @@ describe.skipIf(!key)('live MiniMax API', () => {
     expect(toolEnd?.type === 'tool_end' && toolEnd.content).toContain('live check');
     expect(result.stopReason).toBe('end_turn');
   }, 180000);
+
+  it('sends a plan mode request without the write tools', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-live-plan-'));
+    await writeFile(join(root, 'hello.txt'), 'live check\n', 'utf8');
+
+    const registry = new ToolRegistry();
+    for (const tool of [
+      ...createFileTools({ backups: new InMemoryBackupStore() }),
+      ...createExploreTools()
+    ]) {
+      registry.register(tool);
+    }
+
+    // The real request is captured on the way to the API, so the test proves
+    // what the server actually receives and not only what the client built.
+    const bodies: string[] = [];
+    const captureFetch: typeof fetch = async (input, init) => {
+      if (typeof init?.body === 'string') {
+        bodies.push(init.body);
+      }
+      return await fetch(input, init);
+    };
+
+    const allowed = registry
+      .list()
+      .filter((tool) => registry.isAllowed(tool, 'plan'))
+      .map((tool) => tool.name);
+    const systemPrompt = buildSystemPrompt({
+      workspaceRoot: root,
+      os: process.platform,
+      shell: 'powershell',
+      mode: 'plan',
+      tools: allowed,
+      rulesText: '',
+      treeText: '',
+      stackText: '',
+      openFilesText: ''
+    });
+
+    let approvalRequested = false;
+    const events: AgentEvent[] = [];
+    const agent = new Agent({
+      client: new HttpMiniMaxClient({ baseUrl, apiKey: key as string, fetchImpl: captureFetch }),
+      registry,
+      approval: new ApprovalGate({
+        autoApprove: [],
+        request: async () => {
+          approvalRequested = true;
+          return { approved: true, allowForSession: false };
+        }
+      }),
+      model: 'MiniMax-M3.1-Flash',
+      maxTokens: 8192,
+      maxIterations: 5,
+      effort: 'low',
+      mode: 'plan',
+      systemPrompt,
+      workspaceRoot: root,
+      logger: { info: () => undefined, error: () => undefined },
+      onEvent: (event) => events.push(event)
+    });
+
+    const result = await agent.run(
+      'Create a file notes.txt in the workspace with the word hello. Then tell me what you did.',
+      []
+    );
+
+    const sent = JSON.parse(bodies[0] ?? '{}') as {
+      tools?: Array<{ name: string }>;
+      system?: string;
+    };
+    const answer = events
+      .filter((event) => event.type === 'assistant_text')
+      .map((event) => event.text)
+      .join('');
+    console.log('[live] plan tools: ' + JSON.stringify(sent.tools?.map((tool) => tool.name)));
+    console.log('[live] plan answer: ' + answer.trim());
+
+    expect(sent.tools?.map((tool) => tool.name)).toEqual(['read_file', 'list_files', 'search_code']);
+    expect(sent.system).toContain('Mode: PLAN');
+    expect(approvalRequested).toBe(false);
+    expect(events.some((event) => event.type === 'tool_end' && event.name === 'write_file')).toBe(false);
+    expect(existsSync(join(root, 'notes.txt'))).toBe(false);
+    expect(answer.length).toBeGreaterThan(0);
+    expect(result.stopReason).toBe('end_turn');
+  }, 240000);
 });

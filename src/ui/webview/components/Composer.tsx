@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent, MouseEvent } from 'react';
 import type { EffortLevel } from '../../../api/types';
-import type { ModelInfo } from '../../../config/models';
+import type { AgentMode, ModelInfo } from '../../../config/models';
 import type { UiSelection, UiSuggestion } from '../../protocol';
 import { STRINGS } from '../strings';
 
@@ -182,8 +182,10 @@ export function Composer({
   models,
   model,
   effort,
+  mode,
   onModel,
   onEffort,
+  onMode,
   onSend,
   onStop,
   onPickFiles,
@@ -201,8 +203,10 @@ export function Composer({
   models: ModelInfo[];
   model: string;
   effort: EffortLevel;
+  mode: AgentMode;
   onModel: (model: string) => void;
   onEffort: (effort: EffortLevel) => void;
+  onMode: (mode: AgentMode) => void;
   onSend: (text: string, mentions: string[], selections: UiSelection[]) => void;
   onStop: () => void;
   onPickFiles: () => void;
@@ -396,6 +400,17 @@ export function Composer({
         onMouseDown={handleMouseDown}
       />
       <div className="composer-selects">
+        <select
+          value={mode}
+          title={mode === 'plan' ? STRINGS.modePlanHint : STRINGS.modeCodeHint}
+          onChange={(event) => onMode(event.target.value as AgentMode)}
+        >
+          {(['plan', 'code'] as const).map((value) => (
+            <option key={value} value={value}>
+              {STRINGS.mode}: {value}
+            </option>
+          ))}
+        </select>
         <select value={model} onChange={(event) => onModel(event.target.value)}>
           {models.map((item) => (
             <option key={item.id} value={item.id}>

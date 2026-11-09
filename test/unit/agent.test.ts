@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Agent, type AgentEvent } from '../../src/agent/agent';
 import type { MiniMaxClient } from '../../src/api/client';
 import type { ChatRequest, StreamEvent } from '../../src/api/types';
+import type { AgentMode } from '../../src/config/models';
 import { ToolRegistry } from '../../src/tools/registry';
 import { ApprovalGate, type ApprovalDecision, type ApprovalRequest } from '../../src/ui/approvals';
 
@@ -51,7 +52,8 @@ function toolResponse(name: string, input: Record<string, unknown>): StreamEvent
 
 function makeAgent(
   client: FakeClient,
-  decide: ApprovalDecision = { approved: true, allowForSession: false }
+  decide: ApprovalDecision = { approved: true, allowForSession: false },
+  mode: AgentMode = 'code'
 ): { agent: Agent; events: AgentEvent[]; requests: ApprovalRequest[] } {
   const events: AgentEvent[] = [];
   const requests: ApprovalRequest[] = [];
@@ -60,6 +62,7 @@ function makeAgent(
     name: 'read_file',
     description: 'read',
     approval: 'never',
+    sideEffect: false,
     inputSchema: { type: 'object', properties: {} },
     execute: async () => ({ content: 'file content' })
   });
@@ -67,6 +70,7 @@ function makeAgent(
     name: 'write_file',
     description: 'write',
     approval: 'always',
+    sideEffect: true,
     inputSchema: { type: 'object', properties: {} },
     execute: async () => ({ content: 'written' })
   });
@@ -84,6 +88,7 @@ function makeAgent(
     maxTokens: 32000,
     maxIterations: 5,
     effort: 'max',
+    mode,
     systemPrompt: 'system',
     workspaceRoot: '/tmp/root',
     logger: { info: () => undefined, error: () => undefined },
@@ -228,5 +233,34 @@ describe('Agent', () => {
     const names = client.requests[0]?.tools?.map((tool) => tool.name) ?? [];
     expect(names).toContain('read_file');
     expect(names).toContain('write_file');
+  });
+
+  it('hides the tools with a side effect in plan mode', async () => {
+    const client = new FakeClient([textResponse('ok')]);
+    const { agent } = makeAgent(client, { approved: true, allowForSession: false }, 'plan');
+    await agent.run('plan it', []);
+    const names = client.requests[0]?.tools?.map((tool) => tool.name) ?? [];
+    expect(names).toContain('read_file');
+    expect(names).not.toContain('write_file');
+  });
+
+  it('refuses to run a tool with a side effect in plan mode', async () => {
+    const client = new FakeClient([
+      toolResponse('write_file', { path: 'a.ts', content: 'x' }),
+      textResponse('done')
+    ]);
+    const { agent, events, requests } = makeAgent(
+      client,
+      { approved: true, allowForSession: false },
+      'plan'
+    );
+    await agent.run('write it', []);
+    expect(requests).toHaveLength(0);
+    const toolEnd = events.find((e) => e.type === 'tool_end');
+    expect(toolEnd?.type === 'tool_end' && toolEnd.content).toContain('plan mode');
+    const second = client.requests[1]!;
+    const last = second.messages[second.messages.length - 1]!;
+    const block = last.content[0]!;
+    expect(block.type === 'tool_result' && block.is_error).toBe(true);
   });
 });

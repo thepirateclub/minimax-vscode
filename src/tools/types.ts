@@ -20,5 +20,8 @@ export interface ToolEntry {
   description: string;
   inputSchema: JsonSchema;
   approval: ApprovalPolicy;
+  // A side effect tool changes the workspace or runs a command, plan mode
+  // hides those tools and refuses to run them.
+  sideEffect: boolean;
   execute(input: Record<string, unknown>, ctx: ToolContext): Promise<ToolExecutionResult>;
 }

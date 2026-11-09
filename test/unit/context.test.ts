@@ -45,6 +45,8 @@ describe('buildSystemPrompt', () => {
       workspaceRoot: '/tmp/demo',
       os: 'win32',
       shell: 'powershell',
+      mode: 'code',
+      tools: ['read_file', 'write_file', 'edit_file', 'list_files', 'search_code', 'run_terminal'],
       rulesText: 'rules here',
       treeText: 'src/',
       stackText: 'package.json',
@@ -53,5 +55,23 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('read_file');
     expect(prompt).toContain('/tmp/demo');
     expect(prompt).toContain('rules here');
+  });
+
+  it('asks for a plan and hides the write tools in plan mode', () => {
+    const prompt = buildSystemPrompt({
+      workspaceRoot: '/tmp/demo',
+      os: 'win32',
+      shell: 'powershell',
+      mode: 'plan',
+      tools: ['read_file', 'list_files', 'search_code'],
+      rulesText: '',
+      treeText: '',
+      stackText: '',
+      openFilesText: ''
+    });
+    expect(prompt).toContain('Mode: PLAN');
+    expect(prompt).toContain('read_file');
+    expect(prompt).not.toContain('write_file');
+    expect(prompt).not.toContain('run_terminal');
   });
 });

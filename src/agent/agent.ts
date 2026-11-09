@@ -8,6 +8,7 @@ import type {
   StreamEvent,
   Usage
 } from '../api/types';
+import type { AgentMode } from '../config/models';
 import type { Logger } from '../logger';
 import type { ToolRegistry } from '../tools/registry';
 import type { ApprovalGate } from '../ui/approvals';
@@ -37,6 +38,7 @@ export interface AgentOptions {
   maxIterations: number;
   effort?: EffortLevel;
   thinking?: 'adaptive';
+  mode: AgentMode;
   systemPrompt: string;
   workspaceRoot: string;
   logger: Logger;
@@ -126,6 +128,33 @@ export class Agent {
             type: 'tool_result',
             tool_use_id: toolUse.id,
             content: 'Unknown tool: ' + toolUse.name,
+            is_error: true
+          });
+          continue;
+        }
+
+        // The model should not even see this tool in plan mode, but a tool
+        // call that slipped through is refused instead of executed.
+        if (!this.options.registry.isAllowed(entry, this.options.mode)) {
+          const message =
+            'This tool is disabled in plan mode. The user has to switch the agent to code mode first.';
+          this.options.onEvent({
+            type: 'tool_start',
+            id: toolUse.id,
+            name: toolUse.name,
+            input: toolUse.input
+          });
+          this.options.onEvent({
+            type: 'tool_end',
+            id: toolUse.id,
+            name: toolUse.name,
+            content: message,
+            isError: true
+          });
+          results.push({
+            type: 'tool_result',
+            tool_use_id: toolUse.id,
+            content: message,
             is_error: true
           });
           continue;
@@ -221,7 +250,7 @@ export class Agent {
             maxTokens: this.options.maxTokens,
             system: this.options.systemPrompt,
             messages: [...messages],
-            tools: this.options.registry.toAnthropicTools(),
+            tools: this.options.registry.toAnthropicTools(this.options.mode),
             effort: this.options.effort,
             thinking: this.options.thinking,
             signal: this.controller.signal

@@ -1,5 +1,6 @@
 import type { MiniMaxClient } from '../api/client';
 import type { AnthropicMessage, EffortLevel } from '../api/types';
+import type { AgentMode } from '../config/models';
 import { Agent, type AgentEvent } from './agent';
 import type { Logger } from '../logger';
 import { buildPreview } from '../tools/preview';
@@ -15,6 +16,7 @@ export interface SessionOptions {
   maxIterations: number;
   effort: EffortLevel;
   thinking?: 'adaptive';
+  mode: AgentMode;
   systemPrompt: string;
   workspaceRoot: string;
   logger: Logger;
@@ -87,6 +89,7 @@ export class AgentSession {
       maxIterations: this.options.maxIterations,
       effort: this.options.effort,
       thinking: this.options.thinking,
+      mode: this.options.mode,
       systemPrompt: this.systemPrompt,
       workspaceRoot: this.options.workspaceRoot,
       logger: this.options.logger,

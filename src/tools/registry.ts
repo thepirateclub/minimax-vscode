@@ -1,4 +1,5 @@
 import type { ToolDefinition } from '../api/types';
+import type { AgentMode } from '../config/models';
 import type { ToolEntry } from './types';
 
 export class ToolRegistry {
@@ -16,11 +17,18 @@ export class ToolRegistry {
     return this.entries.get(name);
   }
 
-  toAnthropicTools(): ToolDefinition[] {
-    return this.list().map((entry) => ({
-      name: entry.name,
-      description: entry.description,
-      input_schema: entry.inputSchema
-    }));
+  // Plan mode is read-only, only code mode may use the tools with a side effect.
+  isAllowed(entry: ToolEntry, mode: AgentMode): boolean {
+    return mode === 'code' || !entry.sideEffect;
+  }
+
+  toAnthropicTools(mode: AgentMode = 'code'): ToolDefinition[] {
+    return this.list()
+      .filter((entry) => this.isAllowed(entry, mode))
+      .map((entry) => ({
+        name: entry.name,
+        description: entry.description,
+        input_schema: entry.inputSchema
+      }));
   }
 }

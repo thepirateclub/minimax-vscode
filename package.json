@@ -6,7 +6,7 @@
   "publisher": "local",
   "license": "MIT",
   "engines": {
-    "vscode": "^1.90.0"
+    "vscode": "^1.106.0"
   },
   "main": "./dist/extension.js",
   "icon": "media/icon.png",
@@ -64,6 +64,11 @@
       {
         "command": "minimax.setEffort",
         "title": "Set Thinking Effort",
+        "category": "MiniMax"
+      },
+      {
+        "command": "minimax.setMode",
+        "title": "Set Agent Mode",
         "category": "MiniMax"
       },
       {
@@ -129,6 +134,15 @@
             "xhigh",
             "max"
           ]
+        },
+        "minimax.mode": {
+          "type": "string",
+          "default": "code",
+          "enum": [
+            "plan",
+            "code"
+          ],
+          "description": "Agent mode. Plan is read-only, the agent investigates and answers with a plan. Code lets the agent change files and run commands."
         },
         "minimax.maxTokens": {
           "type": "number",

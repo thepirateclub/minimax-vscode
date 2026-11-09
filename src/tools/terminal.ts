@@ -24,6 +24,7 @@ export function createTerminalTools(): ToolEntry[] {
     description:
       'Run a shell command in the workspace root and return its output. Use it for build, test and git commands.',
     approval: 'always',
+    sideEffect: true,
     inputSchema: {
       type: 'object',
       properties: {

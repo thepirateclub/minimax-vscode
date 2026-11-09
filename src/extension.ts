@@ -9,7 +9,7 @@ import { buildWorkspaceSnapshot, renderSnapshot } from './agent/context';
 import { readMentionedFiles } from './agent/mentions';
 import { buildSystemPrompt } from './agent/prompt';
 import { AgentSession } from './agent/session';
-import { MODELS, resolveBaseUrl } from './config/models';
+import { AGENT_MODES, MODELS, resolveBaseUrl } from './config/models';
 import {
   clearApiKey as clearStoredApiKey,
   getApiKey,
@@ -112,6 +112,9 @@ class MiniMaxController {
       vscode.commands.registerCommand('minimax.setEffort', () => void this.selectEffort())
     );
     context.subscriptions.push(
+      vscode.commands.registerCommand('minimax.setMode', () => void this.selectMode())
+    );
+    context.subscriptions.push(
       vscode.commands.registerCommand('minimax.undoLastChange', () => void this.undoLastChange())
     );
     context.subscriptions.push(
@@ -180,10 +183,17 @@ class MiniMaxController {
       openFiles: openFiles.map((path) => ({ path }))
     });
 
+    const tools = this.registry
+      .list()
+      .filter((tool) => this.registry.isAllowed(tool, settings.mode))
+      .map((tool) => tool.name);
+
     return buildSystemPrompt({
       workspaceRoot: root,
       os: process.platform,
       shell: process.platform === 'win32' ? 'powershell' : 'bash',
+      mode: settings.mode,
+      tools,
       rulesText: settings.rulesEnabled ? renderSnapshot(snapshot) : '',
       treeText: snapshot.tree.join('\n'),
       stackText: snapshot.stack.join(', '),
@@ -215,6 +225,7 @@ class MiniMaxController {
       maxTokens: settings.maxTokens,
       maxIterations: settings.maxIterations,
       effort: settings.effort,
+      mode: settings.mode,
       systemPrompt: await this.buildPrompt(),
       workspaceRoot: this.workspaceRoot(),
       logger: this.logger,
@@ -373,6 +384,10 @@ class MiniMaxController {
     }
     if (message.type === 'set_effort') {
       await this.updateSetting('effort', message.effort);
+      return;
+    }
+    if (message.type === 'set_mode') {
+      await this.updateSetting('mode', message.mode);
       return;
     }
     if (message.type === 'pick_files') {
@@ -623,6 +638,7 @@ class MiniMaxController {
       model: settings.model,
       models: MODELS,
       effort: settings.effort,
+      mode: settings.mode,
       maxTokens: settings.maxTokens,
       maxIterations: settings.maxIterations,
       autoApprove: settings.autoApprove,
@@ -641,6 +657,7 @@ class MiniMaxController {
       ['customBaseUrl', values.customBaseUrl],
       ['model', values.model],
       ['effort', values.effort],
+      ['mode', values.mode],
       ['maxTokens', values.maxTokens],
       ['maxIterations', values.maxIterations],
       ['autoApprove', values.autoApprove],
@@ -743,6 +760,7 @@ class MiniMaxController {
         model: settings.model,
         models: MODELS,
         effort: settings.effort,
+        mode: settings.mode,
         state: this.agentState,
         tokens: this.tokens,
         hasApiKey: Boolean(key)
@@ -873,6 +891,21 @@ class MiniMaxController {
       return;
     }
     await this.updateSetting('model', choice.value);
+  }
+
+  private async selectMode(): Promise<void> {
+    const choice = await vscode.window.showQuickPick(
+      AGENT_MODES.map((mode) => ({
+        label: mode,
+        description: mode === 'plan' ? 'read-only, the agent answers with a plan' : 'the agent can change files',
+        value: mode
+      })),
+      { title: 'MiniMax agent mode' }
+    );
+    if (!choice) {
+      return;
+    }
+    await this.updateSetting('mode', choice.value);
   }
 
   private async selectEffort(): Promise<void> {

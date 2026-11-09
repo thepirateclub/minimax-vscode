@@ -3,11 +3,16 @@ import { ApprovalGate } from '../../src/ui/approvals';
 import { ToolRegistry } from '../../src/tools/registry';
 import type { ToolEntry } from '../../src/tools/types';
 
-function makeTool(name: string, approval: 'never' | 'always'): ToolEntry {
+function makeTool(
+  name: string,
+  approval: 'never' | 'always',
+  sideEffect = false
+): ToolEntry {
   return {
     name,
     description: 'desc',
     approval,
+    sideEffect,
     inputSchema: { type: 'object', properties: {} },
     execute: async () => ({ content: 'ok' })
   };
@@ -29,6 +34,26 @@ describe('ToolRegistry', () => {
       description: 'desc',
       input_schema: { type: 'object', properties: {} }
     });
+  });
+
+  it('hides the tools with a side effect in plan mode', () => {
+    const registry = new ToolRegistry();
+    registry.register(makeTool('read_file', 'never'));
+    registry.register(makeTool('write_file', 'always', true));
+    expect(registry.toAnthropicTools('plan').map((tool) => tool.name)).toEqual(['read_file']);
+    expect(registry.toAnthropicTools('code').map((tool) => tool.name)).toEqual([
+      'read_file',
+      'write_file'
+    ]);
+  });
+
+  it('refuses a tool with a side effect in plan mode', () => {
+    const registry = new ToolRegistry();
+    const entry = makeTool('write_file', 'always', true);
+    registry.register(entry);
+    expect(registry.isAllowed(entry, 'plan')).toBe(false);
+    expect(registry.isAllowed(entry, 'code')).toBe(true);
+    expect(registry.isAllowed(makeTool('read_file', 'never'), 'plan')).toBe(true);
   });
 });
 

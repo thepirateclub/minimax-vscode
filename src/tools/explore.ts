@@ -29,6 +29,7 @@ export function createExploreTools(): ToolEntry[] {
     description:
       'List files and folders of the workspace. Use it to understand the project layout before reading files.',
     approval: 'never',
+    sideEffect: false,
     inputSchema: {
       type: 'object',
       properties: {
@@ -78,6 +79,7 @@ export function createExploreTools(): ToolEntry[] {
     description:
       'Search the workspace for a literal string. Returns matching file paths with line numbers and the matching line.',
     approval: 'never',
+    sideEffect: false,
     inputSchema: {
       type: 'object',
       properties: {

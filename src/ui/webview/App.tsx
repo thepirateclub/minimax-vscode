@@ -25,6 +25,7 @@ const EMPTY_STATE: UiState = {
   model: 'MiniMax-M3.1-Flash',
   models: [],
   effort: 'max',
+  mode: 'code',
   state: 'idle',
   tokens: 0,
   hasApiKey: false
@@ -223,8 +224,10 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
           models={state.models}
           model={state.model}
           effort={state.effort}
+          mode={state.mode}
           onModel={(model) => vscode.postMessage({ type: 'set_model', model })}
           onEffort={(effort) => vscode.postMessage({ type: 'set_effort', effort })}
+          onMode={(mode) => vscode.postMessage({ type: 'set_mode', mode })}
           onSend={(sent, mentions, sentSelections) => {
             vscode.postMessage({
               type: 'send',

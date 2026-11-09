@@ -8,6 +8,7 @@ function toValues(settings: UiSettings): UiSettingsValues {
     customBaseUrl: settings.customBaseUrl,
     model: settings.model,
     effort: settings.effort,
+    mode: settings.mode,
     maxTokens: settings.maxTokens,
     maxIterations: settings.maxIterations,
     autoApprove: settings.autoApprove,
@@ -123,6 +124,24 @@ export function SettingsView({
               </option>
             ))}
           </select>
+        </label>
+        <label className="field">
+          <span>{STRINGS.mode}</span>
+          <select
+            value={values.mode}
+            onChange={(event) =>
+              patch({ mode: event.target.value as UiSettingsValues['mode'] })
+            }
+          >
+            {(['plan', 'code'] as const).map((value) => (
+              <option key={value} value={value}>
+                {value}
+              </option>
+            ))}
+          </select>
+          <span className="hint">
+            {values.mode === 'plan' ? STRINGS.modePlanHint : STRINGS.modeCodeHint}
+          </span>
         </label>
       </section>
 

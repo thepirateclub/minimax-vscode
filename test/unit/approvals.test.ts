@@ -7,6 +7,7 @@ function tool(name: string, approval: 'never' | 'always'): ToolEntry {
     name,
     description: name,
     approval,
+    sideEffect: false,
     inputSchema: { type: 'object', properties: {} },
     execute: async () => ({ content: 'ok' })
   };

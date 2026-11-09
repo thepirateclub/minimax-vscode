@@ -68,6 +68,7 @@ function makeSession(
     maxTokens: 32000,
     maxIterations: 5,
     effort: 'max',
+    mode: 'code',
     systemPrompt: 'system',
     workspaceRoot: '/tmp/root',
     logger: { info: () => undefined, error: () => undefined },
@@ -114,6 +115,7 @@ describe('AgentSession', () => {
       name: 'write_file',
       description: 'write',
       approval: 'always',
+      sideEffect: true,
       inputSchema: { type: 'object', properties: {} },
       execute: async () => ({ content: 'written' })
     });
@@ -126,6 +128,7 @@ describe('AgentSession', () => {
       maxTokens: 32000,
       maxIterations: 5,
       effort: 'max',
+      mode: 'code',
       systemPrompt: 'system',
       workspaceRoot: '/tmp/root',
       logger: { info: () => undefined, error: () => undefined },
@@ -153,6 +156,7 @@ describe('AgentSession', () => {
       name: 'write_file',
       description: 'write',
       approval: 'always',
+      sideEffect: true,
       inputSchema: { type: 'object', properties: {} },
       execute: async () => ({ content: 'written' })
     });
@@ -164,6 +168,7 @@ describe('AgentSession', () => {
       maxTokens: 32000,
       maxIterations: 5,
       effort: 'max',
+      mode: 'code',
       systemPrompt: 'system',
       workspaceRoot: '/tmp/root',
       logger: { info: () => undefined, error: () => undefined },
@@ -182,6 +187,7 @@ describe('AgentSession', () => {
       name: 'write_file',
       description: 'write',
       approval: 'always',
+      sideEffect: true,
       inputSchema: { type: 'object', properties: {} },
       execute: async () => ({ content: 'written' })
     });
@@ -193,6 +199,7 @@ describe('AgentSession', () => {
       maxTokens: 32000,
       maxIterations: 5,
       effort: 'max',
+      mode: 'code',
       systemPrompt: 'system',
       workspaceRoot: '/tmp/root',
       logger: { info: () => undefined, error: () => undefined },

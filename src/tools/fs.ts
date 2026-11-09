@@ -35,6 +35,7 @@ export function createFileTools(deps: { backups: BackupStore }): ToolEntry[] {
     description:
       'Read a UTF-8 text file from the workspace. Returns content with line numbers. Use start_line and end_line for a range.',
     approval: 'never',
+    sideEffect: false,
     inputSchema: {
       type: 'object',
       properties: {
@@ -71,6 +72,7 @@ export function createFileTools(deps: { backups: BackupStore }): ToolEntry[] {
     description:
       'Create a file or replace its whole content. Prefer edit_file for targeted changes. The user reviews a diff before the write is applied.',
     approval: 'always',
+    sideEffect: true,
     inputSchema: {
       type: 'object',
       properties: {
@@ -108,6 +110,7 @@ export function createFileTools(deps: { backups: BackupStore }): ToolEntry[] {
     description:
       'Replace an exact string in a file. old_string must appear exactly once unless replace_all is true.',
     approval: 'always',
+    sideEffect: true,
     inputSchema: {
       type: 'object',
       properties: {

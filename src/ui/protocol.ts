@@ -1,5 +1,5 @@
 import type { EffortLevel } from '../api/types';
-import type { BaseUrlPreset, ModelInfo } from '../config/models';
+import type { AgentMode, BaseUrlPreset, ModelInfo } from '../config/models';
 
 export type AgentState = 'idle' | 'thinking' | 'streaming' | 'tool' | 'error';
 
@@ -66,6 +66,7 @@ export interface UiSettingsValues {
   customBaseUrl: string;
   model: string;
   effort: EffortLevel;
+  mode: AgentMode;
   maxTokens: number;
   maxIterations: number;
   autoApprove: string[];
@@ -86,6 +87,7 @@ export interface UiState {
   model: string;
   models: ModelInfo[];
   effort: EffortLevel;
+  mode: AgentMode;
   state: AgentState;
   tokens: number;
   hasApiKey: boolean;
@@ -123,6 +125,7 @@ export type WebToExt =
   | { type: 'delete_session'; id: string }
   | { type: 'set_model'; model: string }
   | { type: 'set_effort'; effort: EffortLevel }
+  | { type: 'set_mode'; mode: AgentMode }
   | { type: 'pick_files'; requestId: string }
   | { type: 'files_picked'; requestId: string; files: string[] }
   | { type: 'undo_last_change' }
