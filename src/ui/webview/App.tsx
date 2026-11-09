@@ -193,6 +193,13 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
     [vscode]
   );
 
+  const openFile = useCallback(
+    (path: string, line?: number) => {
+      vscode.postMessage({ type: 'open_file', path, line });
+    },
+    [vscode]
+  );
+
   const reject = useCallback(
     (id: string) => {
       vscode.postMessage({ type: 'reject', id });
@@ -250,6 +257,7 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
             messages={messages}
             onApprove={approve}
             onReject={reject}
+            onOpenFile={openFile}
           />
         )}
         <Composer

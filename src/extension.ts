@@ -20,7 +20,7 @@ import { createLogger, type Logger } from './logger';
 import { InMemoryBackupStore } from './storage/backups';
 import { SessionStore, type StoredSession } from './storage/sessions';
 import { createExploreTools, isTextFile } from './tools/explore';
-import { createFileTools } from './tools/fs';
+import { createFileTools, resolveWorkspacePath } from './tools/fs';
 import { ToolRegistry } from './tools/registry';
 import { createTerminalTools } from './tools/terminal';
 import { AgentPanelProvider } from './ui/panel';
@@ -401,6 +401,28 @@ class MiniMaxController {
     }
   }
 
+  // A snippet of a file opens that file in the editor.
+  private async openFile(path: string, line?: number): Promise<void> {
+    try {
+      const target = resolveWorkspacePath(this.workspaceRoot(), path);
+      const document = await vscode.workspace.openTextDocument(vscode.Uri.file(target));
+      const editor = await vscode.window.showTextDocument(document, { preview: true });
+      if (line !== undefined && line > 0) {
+        const row = Math.min(line - 1, Math.max(0, document.lineCount - 1));
+        const position = new vscode.Position(row, 0);
+        editor.selection = new vscode.Selection(position, position);
+        editor.revealRange(
+          new vscode.Range(position, position),
+          vscode.TextEditorRevealType.InCenter
+        );
+      }
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      this.logger.error('cannot open ' + path + ': ' + reason);
+      this.panel.post({ type: 'error', message: 'Cannot open ' + path + ': ' + reason });
+    }
+  }
+
   private async handleWebviewMessage(message: WebToExt): Promise<void> {
     if (message.type === 'ready') {
       await this.sendInit();
@@ -408,6 +430,10 @@ class MiniMaxController {
     }
     if (message.type === 'send') {
       await this.handleSend(message.text, message.mentions, message.selections);
+      return;
+    }
+    if (message.type === 'open_file') {
+      await this.openFile(message.path, message.line);
       return;
     }
     if (message.type === 'stop') {

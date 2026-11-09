@@ -154,6 +154,7 @@ export type WebToExt =
   | { type: 'set_thinking'; thinking: boolean }
   | { type: 'pick_files'; requestId: string }
   | { type: 'files_picked'; requestId: string; files: string[] }
+  | { type: 'open_file'; path: string; line?: number }
   | { type: 'undo_last_change' }
   | { type: 'request_suggestions'; requestId: string; prefix: string }
   | { type: 'request_settings' }

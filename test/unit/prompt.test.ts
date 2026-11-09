@@ -21,6 +21,12 @@ describe('system prompt', () => {
     expect(prompt).toMatch(/fenced code block/i);
   });
 
+  it('asks the model to name the file of a quoted snippet', () => {
+    const prompt = buildSystemPrompt(context);
+    expect(prompt).toMatch(/path of the file/i);
+    expect(prompt).toMatch(/only the language/i);
+  });
+
   it('lists only the tools of the current mode', () => {
     const prompt = buildSystemPrompt(context);
     expect(prompt).toContain('read_file');

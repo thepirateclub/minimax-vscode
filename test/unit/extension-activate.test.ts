@@ -23,7 +23,9 @@ const state = vi.hoisted(() => ({
   failState: false,
   statusBar: undefined as undefined | { text: string; tooltip: string },
   theme: 2,
-  themeListener: undefined as undefined | (() => void)
+  themeListener: undefined as undefined | (() => void),
+  opened: [] as string[],
+  shown: [] as string[]
 }));
 
 vi.mock('vscode', () => {
@@ -80,7 +82,14 @@ vi.mock('vscode', () => {
           { report: () => undefined },
           { onCancellationRequested: () => ({ dispose: () => undefined }) }
         ),
-      executeCommand: async () => undefined
+      executeCommand: async () => undefined,
+      showTextDocument: async (document: { uri: { fsPath: string } }) => {
+        state.shown.push(document.uri.fsPath);
+        return {
+          selection: undefined,
+          revealRange: () => undefined
+        };
+      }
     },
     commands: {
       registerCommand: (id: string, callback: (...args: unknown[]) => unknown) => {
@@ -102,13 +111,37 @@ vi.mock('vscode', () => {
       get textDocuments() {
         return state.documents;
       },
-      findFiles: async () => state.files.map((path) => ({ fsPath: path }))
+      findFiles: async () => state.files.map((path) => ({ fsPath: path })),
+      openTextDocument: async (uri: { fsPath: string }) => {
+        state.opened.push(uri.fsPath);
+        return { uri, lineCount: 500 };
+      }
     },
     Uri: {
       joinPath: (base: { fsPath: string }, ...parts: string[]) => ({
         fsPath: [base.fsPath, ...parts].join('/')
-      })
+      }),
+      file: (fsPath: string) => ({ fsPath })
     },
+    Position: class {
+      constructor(
+        public line: number,
+        public character: number
+      ) {}
+    },
+    Range: class {
+      constructor(
+        public start: unknown,
+        public end: unknown
+      ) {}
+    },
+    Selection: class {
+      constructor(
+        public anchor: unknown,
+        public active: unknown
+      ) {}
+    },
+    TextEditorRevealType: { InCenter: 2 },
     ThemeKind: { Light: 1, Dark: 2, HighContrast: 3, HighContrastLight: 4 },
     ProgressLocation: { Window: 10 },
     ConfigurationTarget: { Global: 1 },
@@ -234,6 +267,8 @@ describe('extension activation', () => {
     state.receive = undefined;
     state.theme = 2;
     state.themeListener = undefined;
+    state.opened.length = 0;
+    state.shown.length = 0;
     vi.stubGlobal(
       'fetch',
       vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
@@ -301,6 +336,25 @@ describe('extension activation', () => {
     const themes = ofType('theme');
     expect(themes.length).toBe(1);
     expect(themes[0]!.kind).toBe('light');
+  });
+
+  it('opens the file of a snippet in the editor', async () => {
+    await boot();
+    state.receive?.({ type: 'open_file', path: 'src/api/history.ts' });
+    await vi.waitFor(() => {
+      expect(state.shown.length).toBe(1);
+    });
+    expect(state.opened[0]).toContain('history.ts');
+    expect(state.shown[0]).toContain('history.ts');
+  });
+
+  it('refuses a path outside the workspace', async () => {
+    await boot();
+    state.receive?.({ type: 'open_file', path: '../outside.ts' });
+    await vi.waitFor(() => {
+      expect(state.posted.some((message) => message.type === 'error')).toBe(true);
+    });
+    expect(state.opened.length).toBe(0);
   });
 
   it('reports a missing key instead of calling the API', async () => {

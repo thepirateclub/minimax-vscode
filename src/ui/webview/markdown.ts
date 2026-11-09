@@ -1,10 +1,17 @@
 import MarkdownIt from 'markdown-it';
+import { describeCodeBlock, type CodeSource } from './codeBlock';
 import { highlight } from './highlight';
 
 // The same text is rendered again when the panel is reopened, the cache keeps
 // the stream cheap. The limit stops the cache from growing with the chat.
 const CACHE_LIMIT = 64;
 const cache = new Map<string, string>();
+
+// The sources of the snippets travel with the text, the renderer needs
+// them to find the file of a block.
+interface MarkdownEnv {
+  sources?: CodeSource[];
+}
 
 const md = new MarkdownIt({
   html: false,
@@ -13,18 +20,30 @@ const md = new MarkdownIt({
   typographer: false
 });
 
-// A code block gets a header with the language and a copy button.
-md.renderer.rules.fence = (tokens, idx): string => {
+// A code block gets a header with the language and a copy button. A snippet
+// of a file shows the name of the file instead, the click opens the file.
+md.renderer.rules.fence = (tokens, idx, _options, env): string => {
   const token = tokens[idx]!;
-  const info = token.info.trim();
-  const language = info.split(/\s+/)[0] ?? '';
-  const code = highlight(token.content, language);
+  const sources = (env as MarkdownEnv | undefined)?.sources;
+  const block = describeCodeBlock(token.info, { content: token.content, sources });
+  const code = highlight(token.content, block.language);
+  const label = block.file
+    ? '<button type="button" class="code-lang code-file" data-path="' +
+      md.utils.escapeHtml(block.file) +
+      '" data-line="' +
+      block.line +
+      '" title="' +
+      md.utils.escapeHtml(block.file) +
+      '">' +
+      md.utils.escapeHtml(block.title) +
+      '</button>'
+    : '<span class="code-lang">' +
+      md.utils.escapeHtml(block.title) +
+      '</span>';
   return (
     '<div class="code-block">' +
     '<div class="code-head">' +
-    '<span class="code-lang">' +
-    md.utils.escapeHtml(language) +
-    '</span>' +
+    label +
     '<button type="button" class="code-copy">Copy</button>' +
     '</div>' +
     '<pre><code>' +
@@ -82,18 +101,25 @@ md.renderer.rules.list_item_open = (tokens, idx, options, _env, self): string =>
   return html.replace(/^<li([^>]*)>/, '<li$1>' + box);
 };
 
-export function renderMarkdown(text: string): string {
-  const cached = cache.get(text);
+// The sources are part of the key, the same text can get the name of a
+// file when the agent reads the file of the snippet.
+function sourceSignature(sources: CodeSource[]): string {
+  return sources.map((source) => source.path + '@' + source.lines.length).join('|');
+}
+
+export function renderMarkdown(text: string, sources: CodeSource[] = []): string {
+  const key = sources.length > 0 ? text + '\u0000' + sourceSignature(sources) : text;
+  const cached = cache.get(key);
   if (cached !== undefined) {
     return cached;
   }
-  const html = md.render(text);
+  const html = md.render(text, { sources });
   if (cache.size >= CACHE_LIMIT) {
     const oldest = cache.keys().next().value;
     if (oldest !== undefined) {
       cache.delete(oldest);
     }
   }
-  cache.set(text, html);
+  cache.set(key, html);
   return html;
 }

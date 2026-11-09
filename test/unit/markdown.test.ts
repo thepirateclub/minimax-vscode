@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { parseReadFileContent } from '../../src/ui/webview/codeBlock';
 import { renderMarkdown } from '../../src/ui/webview/markdown';
 
 describe('renderMarkdown', () => {
@@ -13,6 +14,23 @@ describe('renderMarkdown', () => {
     expect(html).toContain('class="code-copy"');
     expect(html).toContain('<span class="tok-keyword">const</span>');
     expect(html.replace(/<[^>]+>/g, '')).toContain('const a = 1;');
+  });
+
+  it('names a code block that comes from a file', () => {
+    const html = renderMarkdown('```src/api/history.ts\nexport const a = 1;\n```');
+    expect(html).toContain('class="code-lang code-file"');
+    expect(html).toContain('data-path="src/api/history.ts"');
+    expect(html).toContain('history.ts');
+    expect(html).toContain('<span class="tok-keyword">export</span>');
+  });
+
+  it('names a code block by the file the agent has read', () => {
+    const sources = parseReadFileContent(['src/api/history.ts'], '1: export const a = 1;');
+    const html = renderMarkdown('```ts\nexport const a = 1;\n```', sources);
+    expect(html).toContain('class="code-lang code-file"');
+    expect(html).toContain('data-path="src/api/history.ts"');
+    expect(html).toContain('data-line="1"');
+    expect(html).toContain('history.ts:1');
   });
 
   it('renders a checklist item with a box', () => {

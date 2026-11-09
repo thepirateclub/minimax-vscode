@@ -1,6 +1,7 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import type { MouseEvent } from 'react';
 import type { UiMessage } from '../../protocol';
+import { collectFileSources, type CodeSource } from '../codeBlock';
 import { contentChanged, isAtBottom, measure, shouldFollow } from '../listScroll';
 import { renderMarkdown } from '../markdown';
 import { STRINGS } from '../strings';
@@ -25,6 +26,23 @@ async function writeToClipboard(text: string): Promise<void> {
   }
 }
 
+function handleMarkdownClick(
+  event: MouseEvent<HTMLDivElement>,
+  onOpenFile: (path: string, line?: number) => void
+): void {
+  const target = event.target as HTMLElement;
+  const file = target.closest('.code-file');
+  if (file instanceof HTMLElement) {
+    const path = file.dataset['path'] ?? '';
+    if (path.length > 0) {
+      const line = Number(file.dataset['line'] ?? '0');
+      onOpenFile(path, line > 0 ? line : undefined);
+    }
+    return;
+  }
+  copyCode(event);
+}
+
 function copyCode(event: MouseEvent<HTMLDivElement>): void {
   const target = event.target as HTMLElement;
   const button = target.closest('.code-copy');
@@ -42,12 +60,16 @@ function copyCode(event: MouseEvent<HTMLDivElement>): void {
 
 const MessageRow = memo(function MessageRow({
   message,
+  sources,
   onApprove,
-  onReject
+  onReject,
+  onOpenFile
 }: {
   message: UiMessage;
+  sources: CodeSource[];
   onApprove: (id: string, allowForSession: boolean) => void;
   onReject: (id: string) => void;
+  onOpenFile: (path: string, line?: number) => void;
 }) {
   return (
     <div className={'message message-' + message.role}>
@@ -60,8 +82,8 @@ const MessageRow = memo(function MessageRow({
           {message.text ? (
             <div
               className="markdown"
-              onClick={copyCode}
-              dangerouslySetInnerHTML={{ __html: renderMarkdown(message.text) }}
+              onClick={(event) => handleMarkdownClick(event, onOpenFile)}
+              dangerouslySetInnerHTML={{ __html: renderMarkdown(message.text, sources) }}
             />
           ) : null}
         </div>
@@ -81,11 +103,13 @@ const MessageRow = memo(function MessageRow({
 export function MessageList({
   messages,
   onApprove,
-  onReject
+  onReject,
+  onOpenFile
 }: {
   messages: UiMessage[];
   onApprove: (id: string, allowForSession: boolean) => void;
   onReject: (id: string) => void;
+  onOpenFile: (path: string, line?: number) => void;
 }) {
   const listRef = useRef<HTMLDivElement>(null);
   const atBottomRef = useRef(true);
@@ -160,6 +184,10 @@ export function MessageList({
     });
   }, []);
 
+  // The files the agent has read, a snippet of one of them gets the name
+  // of the file in its header.
+  const sources = collectFileSources(messages);
+
   const shown = messages.length > visible ? messages.slice(-visible) : messages;
   const hidden = messages.length - shown.length;
 
@@ -175,8 +203,10 @@ export function MessageList({
           <MessageRow
             key={message.id}
             message={message}
+            sources={sources}
             onApprove={onApprove}
             onReject={onReject}
+            onOpenFile={onOpenFile}
           />
         ))}
       </div>
