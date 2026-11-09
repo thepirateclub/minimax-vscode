@@ -32,7 +32,26 @@ const TYPES = [
   'style'
 ];
 
-const CONVENTIONAL = new RegExp('^(' + TYPES.join('|') + ')(\\([^)]*\\))?!?:');
+const CONVENTIONAL = new RegExp('^(' + TYPES.join('|') + ')(\\([^)]*\\))?!?:', 'i');
+
+// The model sometimes writes another word for the type, the commit message
+// has to stay conventional.
+const SYNONYMS: Record<string, string> = {
+  feature: 'feat',
+  features: 'feat',
+  bugfix: 'fix',
+  hotfix: 'fix',
+  doc: 'docs',
+  documentation: 'docs',
+  tests: 'test',
+  testing: 'test',
+  refactoring: 'refactor',
+  performance: 'perf',
+  chores: 'chore',
+  styling: 'style'
+};
+
+const TYPE_LINE = /^([A-Za-z]+)(\([^)]*\))?!?:/;
 
 export function buildCommitPrompt(context: CommitContext): string {
   const files = context.files.map((file) => file.status + ' ' + file.path).join('\n');
@@ -62,10 +81,60 @@ export function cleanCommitMessage(text: string): string {
     .filter((line) => line.length > 0);
   const conventional = lines.find((line) => CONVENTIONAL.test(line));
   const chosen = conventional ?? lines[0] ?? '';
-  return chosen
-    .replace(/^["'`]+|["'`]+$/g, '')
-    .replace(/\.$/, '')
-    .trim();
+  return normalizeType(
+    chosen
+      .replace(/^["'`]+|["'`]+$/g, '')
+      .replace(/\.$/, '')
+      .trim()
+  );
+}
+
+// The type of the commit is repaired, a wrong word is worse than a chore.
+export function normalizeType(line: string): string {
+  const match = TYPE_LINE.exec(line);
+  const raw = match?.[1];
+  if (!raw) {
+    return line;
+  }
+  const type = raw.toLowerCase();
+  const known = TYPES.includes(type) ? type : SYNONYMS[type];
+  const fixed = known ?? closestType(type);
+  return fixed + line.slice(raw.length);
+}
+
+function closestType(type: string): string {
+  let best = 'chore';
+  let bestDistance = Number.POSITIVE_INFINITY;
+  for (const candidate of TYPES) {
+    const distance = editDistance(type, candidate);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      best = candidate;
+    }
+  }
+  return bestDistance <= 2 ? best : 'chore';
+}
+
+// The distance between two words, the count of the changed letters.
+function editDistance(a: string, b: string): number {
+  const rows = a.length + 1;
+  const cols = b.length + 1;
+  let previous: number[] = [];
+  for (let j = 0; j < cols; j++) {
+    previous.push(j);
+  }
+  for (let i = 1; i < rows; i++) {
+    const current: number[] = [i];
+    for (let j = 1; j < cols; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      const diagonal = (previous[j - 1] ?? 0) + cost;
+      const left = (current[j - 1] ?? 0) + 1;
+      const up = (previous[j] ?? 0) + 1;
+      current.push(Math.min(diagonal, left, up));
+    }
+    previous = current;
+  }
+  return previous[cols - 1] ?? 0;
 }
 
 export async function generateCommitMessage(options: {

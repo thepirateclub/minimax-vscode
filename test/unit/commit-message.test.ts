@@ -53,6 +53,13 @@ describe('commit message', () => {
     expect(cleanCommitMessage('fix: the crash.')).toBe('fix: the crash');
   });
 
+  it('repairs a misspelled type of the commit', () => {
+    expect(cleanCommitMessage('choge: добавить файл')).toBe('chore: добавить файл');
+    expect(cleanCommitMessage('feature: новая кнопка')).toBe('feat: новая кнопка');
+    expect(cleanCommitMessage('Feat: новая кнопка')).toBe('feat: новая кнопка');
+    expect(cleanCommitMessage('docs: текст')).toBe('docs: текст');
+  });
+
   it('asks the model without the tools', async () => {
     const { client, requests } = fakeClient('feat: the panel of the agent');
     const result = await generateCommitMessage({
