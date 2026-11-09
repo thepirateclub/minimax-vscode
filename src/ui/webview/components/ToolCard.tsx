@@ -11,6 +11,9 @@ import {
   IconWrite
 } from '../icons';
 import { STRINGS } from '../strings';
+import { cardOpen } from '../toolCardState';
+import { diffStats } from '../diffStats';
+import { DiffView } from './DiffView';
 
 interface ToolView {
   icon: ReactNode;
@@ -62,6 +65,18 @@ function firstLine(value: string | undefined): string {
 
 // The card shows what the agent did, not the name of the tool.
 function describe(tool: UiToolCall): ToolView {
+  const view = describeTool(tool);
+  const path = filePaths(tool.input)[0] ?? '';
+  const result = (tool.content ?? '').split('\n')[0] ?? '';
+  // The tool names the file in its result, the title of the card names it
+  // already. The summary drops the echo and keeps the text of a failure.
+  if (path.length > 0 && result.endsWith(path)) {
+    return { ...view, summary: '' };
+  }
+  return view;
+}
+
+function describeTool(tool: UiToolCall): ToolView {
   const input = tool.input;
   const paths = filePaths(input);
   const content = tool.content;
@@ -138,9 +153,30 @@ function formatInput(input: Record<string, unknown>): string {
   return lines.join('\n');
 }
 
-export function ToolCard({ tool }: { tool: UiToolCall }) {
+export function ToolCard({
+  tool,
+  collapsed
+}: {
+  tool: UiToolCall;
+  // The setting folds the card, only the title stays until a click.
+  collapsed: boolean;
+}) {
   const verbose = (tool.content?.length ?? 0) > 400;
-  const [open, setOpen] = useState(!verbose);
+  // The state of the card follows the setting. A click of the reader is kept
+  // as an override, so the card does not fight with the hand of the reader.
+  const [override, setOverride] = useState<boolean | null>(null);
+  const open = cardOpen(collapsed, verbose, override);
+  // A write without a change has nothing to show, the plain result stays.
+  const diff = tool.diff && tool.diff.lines.length > 0 ? tool.diff : undefined;
+  // The header shows the size of the change, the body shows the change itself.
+  // An empty half stays out, a zero in red looks like a mistake.
+  const stats = diff ? diffStats(diff.lines) : { added: 0, removed: 0 };
+  const statsLabel = [
+    stats.added > 0 ? stats.added + ' ' + STRINGS.toolAdded : '',
+    stats.removed > 0 ? stats.removed + ' ' + STRINGS.toolRemoved : ''
+  ]
+    .filter((part) => part.length > 0)
+    .join(', ');
   const status = tool.running
     ? STRINGS.toolRunning
     : tool.isError
@@ -153,11 +189,21 @@ export function ToolCard({ tool }: { tool: UiToolCall }) {
         'tool-card' + (tool.isError ? ' tool-error' : '') + (tool.running ? ' tool-running' : '')
       }
     >
-      <button className="tool-head" onClick={() => setOpen((value) => !value)}>
+      <button className="tool-head" onClick={() => setOverride(!open)}>
         <span className="tool-caret">{open ? '▾' : '▸'}</span>
         <span className="tool-icon">{view.icon}</span>
         <span className="tool-title">{view.title}</span>
         <span className="tool-summary">{view.summary}</span>
+        {statsLabel.length > 0 ? (
+          <span className="tool-stats" title={statsLabel}>
+            {stats.added > 0 ? (
+              <span className="tool-stat tool-stat-add">+{stats.added}</span>
+            ) : null}
+            {stats.removed > 0 ? (
+              <span className="tool-stat tool-stat-remove">-{stats.removed}</span>
+            ) : null}
+          </span>
+        ) : null}
         {tool.durationMs !== undefined ? (
           <span className="tool-time">
             {tool.durationMs} {STRINGS.toolElapsed}
@@ -174,21 +220,27 @@ export function ToolCard({ tool }: { tool: UiToolCall }) {
       </button>
       {open ? (
         <div className="tool-body">
-          <pre className="tool-input">{formatInput(tool.input)}</pre>
-          {tool.content ? (
-            <div className="tool-output-wrap">
-              <button
-                className="tool-copy"
-                onClick={() => {
-                  void navigator.clipboard?.writeText(tool.content ?? '');
-                }}
-              >
-                <IconCopy />
-                {STRINGS.copy}
-              </button>
-              <pre className="tool-output">{tool.content}</pre>
-            </div>
-          ) : null}
+          {diff ? (
+            <DiffView path={diff.path} lines={diff.lines} showPath={false} />
+          ) : (
+            <>
+              <pre className="tool-input">{formatInput(tool.input)}</pre>
+              {tool.content ? (
+                <div className="tool-output-wrap">
+                  <button
+                    className="tool-copy"
+                    onClick={() => {
+                      void navigator.clipboard?.writeText(tool.content ?? '');
+                    }}
+                  >
+                    <IconCopy />
+                    {STRINGS.copy}
+                  </button>
+                  <pre className="tool-output">{tool.content}</pre>
+                </div>
+              ) : null}
+            </>
+          )}
         </div>
       ) : null}
     </div>

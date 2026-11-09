@@ -42,6 +42,8 @@ export const STRINGS = {
   toolEntries: 'entries',
   toolExitCode: 'exit code',
   toolElapsed: 'ms',
+  toolAdded: 'added',
+  toolRemoved: 'removed',
   attach: 'Attach',
   empty: 'Ask a question or describe a task. The agent reads files, runs commands and proposes edits.',
   noApiKey: 'No API key yet. Open the Settings tab and paste your MiniMax key.',
@@ -75,6 +77,14 @@ export const STRINGS = {
   semanticSearch: 'Semantic search',
   semanticSearchHint: 'Sends the code of the project to MiniMax to build embeddings. The lexical index always works offline.',
   appearance: 'Appearance',
+  collapseTools: 'Collapse action cards',
+  collapseToolsHint:
+    'The card of an action shows only its title, the details open on a click.',
+  collapseCode: 'Collapse code blocks',
+  collapseCodeHint:
+    'A code block shows only its header with the file name, the code opens on a click.',
+  codeShow: 'Show code',
+  codeHide: 'Hide code',
   search: 'Search',
   autoApprove: 'Approve without asking',
   autoApproveHint: 'Tools from this list run without a confirmation dialog.',

@@ -59,4 +59,25 @@ describe('renderMarkdown', () => {
     const text = 'the same **text**';
     expect(renderMarkdown(text)).toBe(renderMarkdown(text));
   });
+
+  it('collapses a code block when the setting asks for it', () => {
+    const html = renderMarkdown('```ts\nconst a = 1;\n```', [], { collapseCode: true });
+    expect(html).toContain('class="code-block collapsed"');
+    expect(html).toContain('class="code-toggle"');
+  });
+
+  it('keeps a code block open when the setting is off', () => {
+    const html = renderMarkdown('```ts\nconst a = 1;\n```');
+    expect(html).toContain('class="code-block"');
+    expect(html).not.toContain('code-toggle');
+  });
+
+  it('keeps the open and the collapsed block apart in the cache', () => {
+    const text = '```ts\nconst a = 1;\n```';
+    const open = renderMarkdown(text);
+    const closed = renderMarkdown(text, [], { collapseCode: true });
+    expect(open).not.toBe(closed);
+    expect(open).not.toContain('collapsed');
+    expect(closed).toContain('collapsed');
+  });
 });

@@ -446,6 +446,10 @@ describe('extension activation', () => {
     });
     expect(await readFile(join(root, 'note.txt'), 'utf8')).toBe('written by the agent');
     expect(ofType('approval_resolved')[0]?.approved).toBe(true);
+    // The card of the action shows the change of the file as a diff.
+    const end = ofType('tool_end').pop();
+    expect(end?.diff?.path).toBe('note.txt');
+    expect(end?.diff?.lines.filter((line) => line.type === 'add').length).toBe(1);
   });
 
   it('does not write anything when the approval is rejected', async () => {
@@ -579,7 +583,9 @@ describe('extension activation', () => {
         semanticSearch: true,
         autoApprove: ['run_terminal'],
         rulesEnabled: false,
-        enableWebSearch: false
+        enableWebSearch: false,
+        collapseTools: true,
+        collapseCode: true
       }
     });
     await vi.waitFor(() => {
@@ -595,6 +601,8 @@ describe('extension activation', () => {
     expect(state.config.get('semanticSearch')).toBe(true);
     expect(state.config.get('autoApprove')).toEqual(['run_terminal']);
     expect(state.config.get('rulesEnabled')).toBe(false);
+    expect(state.config.get('collapseTools')).toBe(true);
+    expect(state.config.get('collapseCode')).toBe(true);
   });
 
   it('adds the selection to the prompt sent to the model', async () => {

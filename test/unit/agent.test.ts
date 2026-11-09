@@ -1,3 +1,6 @@
+import { mkdtemp, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { Agent, type AgentEvent } from '../../src/agent/agent';
 import type { MiniMaxClient } from '../../src/api/client';
@@ -53,7 +56,8 @@ function toolResponse(name: string, input: Record<string, unknown>): StreamEvent
 function makeAgent(
   client: FakeClient,
   decide: ApprovalDecision = { approved: true, allowForSession: false },
-  mode: AgentMode = 'code'
+  mode: AgentMode = 'code',
+  workspaceRoot = '/tmp/root'
 ): { agent: Agent; events: AgentEvent[]; requests: ApprovalRequest[] } {
   const events: AgentEvent[] = [];
   const requests: ApprovalRequest[] = [];
@@ -90,7 +94,7 @@ function makeAgent(
     effort: 'max',
     mode,
     systemPrompt: 'system',
-    workspaceRoot: '/tmp/root',
+    workspaceRoot,
     logger: { info: () => undefined, error: () => undefined },
     onEvent: (event) => events.push(event)
   });
@@ -175,6 +179,29 @@ describe('Agent', () => {
     expect(resolved?.type === 'approval_resolved' && resolved.approved).toBe(false);
     const toolEnd = events.find((e) => e.type === 'tool_end');
     expect(toolEnd?.type === 'tool_end' && toolEnd.isError).toBe(true);
+  });
+
+  it('carries the change of a written file in the result of the action', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-agent-'));
+    await writeFile(join(root, 'note.txt'), 'first line\n', 'utf8');
+    const client = new FakeClient([
+      toolResponse('write_file', { path: 'note.txt', content: 'first line\nsecond line\n' }),
+      textResponse('done')
+    ]);
+    const { agent, events } = makeAgent(
+      client,
+      { approved: true, allowForSession: false },
+      'code',
+      root
+    );
+    await agent.run('write it', []);
+    const end = events.find((event) => event.type === 'tool_end');
+    expect(end?.type === 'tool_end' && end.diff?.path).toBe('note.txt');
+    const added =
+      end?.type === 'tool_end'
+        ? end.diff?.lines.filter((line) => line.type === 'add').map((line) => line.text)
+        : [];
+    expect(added).toEqual(['second line']);
   });
 
   it('does not ask the gate for a tool that never needs approval', async () => {

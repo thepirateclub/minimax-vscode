@@ -1,6 +1,6 @@
 import { MAX_HISTORY_MESSAGES, trimHistory } from '../api/history';
 import type { AnthropicMessage } from '../api/types';
-import type { UiMessage, UiUsageTurn } from '../ui/protocol';
+import type { UiDiffLine, UiMessage, UiUsageTurn } from '../ui/protocol';
 
 export interface StoredSession {
   id: string;
@@ -23,6 +23,7 @@ export const MAX_STORED_SESSIONS = 50;
 export const MAX_STORED_MESSAGES = 400;
 export const MAX_STORED_HISTORY = MAX_HISTORY_MESSAGES;
 export const MAX_STORED_MESSAGE_CHARS = 200_000;
+export const MAX_STORED_DIFF_LINES = 600;
 export const MAX_STORED_USAGE_TURNS = 24;
 
 function capText(text: string | undefined): string | undefined {
@@ -34,13 +35,33 @@ function capText(text: string | undefined): string | undefined {
     : text;
 }
 
+// A long change would fill the state of the host, the middle of it is cut.
+function capDiff(diff: { path: string; lines: UiDiffLine[] }): { path: string; lines: UiDiffLine[] } {
+  if (diff.lines.length <= MAX_STORED_DIFF_LINES) {
+    return diff;
+  }
+  const half = Math.floor(MAX_STORED_DIFF_LINES / 2);
+  return {
+    path: diff.path,
+    lines: [
+      ...diff.lines.slice(0, half),
+      { type: 'context', text: '... the change is cut ...' },
+      ...diff.lines.slice(-half)
+    ]
+  };
+}
+
 function capMessage(message: UiMessage): UiMessage {
   return {
     ...message,
     text: capText(message.text),
     thinking: capText(message.thinking),
     tool: message.tool
-      ? { ...message.tool, content: capText(message.tool.content) }
+      ? {
+          ...message.tool,
+          content: capText(message.tool.content),
+          diff: message.tool.diff ? capDiff(message.tool.diff) : undefined
+        }
       : undefined
   };
 }

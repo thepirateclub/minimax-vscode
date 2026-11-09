@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { AnthropicMessage } from '../../src/api/types';
 import { trimHistory } from '../../src/api/history';
 import {
+  MAX_STORED_DIFF_LINES,
   MAX_STORED_MESSAGES,
   MAX_STORED_SESSIONS,
   SessionStore,
@@ -101,6 +102,32 @@ describe('capSession', () => {
       uiMessages: [{ id: 'm', role: 'assistant', text: 'x'.repeat(300_000) }]
     });
     expect(stored.uiMessages[0]?.text?.length).toBe(200_000);
+  });
+
+  it('cuts a long change of a file', () => {
+    const lines = Array.from({ length: 1200 }, (_, index) => ({
+      type: 'add' as const,
+      newLine: index + 1,
+      text: 'line ' + index
+    }));
+    const stored = capSession({
+      ...session('s', 1),
+      uiMessages: [
+        {
+          id: 'm',
+          role: 'tool',
+          tool: {
+            id: 'm',
+            name: 'write_file',
+            input: {},
+            diff: { path: 'note.txt', lines }
+          }
+        }
+      ]
+    });
+    const diff = stored.uiMessages[0]?.tool?.diff;
+    expect(diff?.lines.length).toBeLessThanOrEqual(MAX_STORED_DIFF_LINES + 1);
+    expect(diff?.lines.some((line) => line.text.includes('cut'))).toBe(true);
   });
 });
 

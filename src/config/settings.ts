@@ -17,6 +17,10 @@ export interface MiniMaxSettings {
   contextThreshold: number;
   // The semantic layer of the search sends the code of the project to the server.
   semanticSearch: boolean;
+  // The cards of the actions fold to their title.
+  collapseTools: boolean;
+  // The code blocks of the answers fold to their header.
+  collapseCode: boolean;
   autoApprove: string[];
   enableWebSearch: boolean;
   rulesEnabled: boolean;
@@ -36,6 +40,8 @@ export function getSettings(): MiniMaxSettings {
     historyMaxMessages: cfg.get<number>('historyMaxMessages', 120),
     contextThreshold: cfg.get<number>('contextThreshold', 50),
     semanticSearch: cfg.get<boolean>('semanticSearch', false),
+    collapseTools: cfg.get<boolean>('collapseTools', false),
+    collapseCode: cfg.get<boolean>('collapseCode', false),
     autoApprove: cfg.get<string[]>('autoApprove', []),
     enableWebSearch: cfg.get<boolean>('enableWebSearch', false),
     rulesEnabled: cfg.get<boolean>('rulesEnabled', true)

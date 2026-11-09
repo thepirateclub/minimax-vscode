@@ -14,10 +14,19 @@ interface ManifestMenuEntry {
   viewId?: string;
 }
 
+interface ManifestProperty {
+  type: string;
+  default?: unknown;
+  description?: string;
+}
+
 interface Manifest {
   contributes: {
     commands: ManifestCommand[];
     menus: Record<string, ManifestMenuEntry[]>;
+    configuration: {
+      properties: Record<string, ManifestProperty>;
+    };
   };
 }
 
@@ -47,5 +56,17 @@ describe('the manifest of the extension', () => {
     // The key scmProvider is not set in every window, a hidden button looks
     // like a broken feature.
     expect(entry?.when).toBeUndefined();
+  });
+
+  it('offers the switches that fold the panels of the chat', () => {
+    const properties = manifest.contributes.configuration.properties;
+    expect(properties['minimax.collapseTools']).toMatchObject({
+      type: 'boolean',
+      default: false
+    });
+    expect(properties['minimax.collapseCode']).toMatchObject({
+      type: 'boolean',
+      default: false
+    });
   });
 });

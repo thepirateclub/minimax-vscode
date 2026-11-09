@@ -19,7 +19,9 @@ function toValues(settings: UiSettings): UiSettingsValues {
     semanticSearch: settings.semanticSearch,
     autoApprove: settings.autoApprove,
     rulesEnabled: settings.rulesEnabled,
-    enableWebSearch: settings.enableWebSearch
+    enableWebSearch: settings.enableWebSearch,
+    collapseTools: settings.collapseTools,
+    collapseCode: settings.collapseCode
   };
 }
 
@@ -243,6 +245,24 @@ export function SettingsView({
           />
           <span className="hint">{STRINGS.fontSizeHint}</span>
         </label>
+        <label className="checkbox">
+          <input
+            type="checkbox"
+            checked={values.collapseTools}
+            onChange={(event) => patch({ collapseTools: event.target.checked })}
+          />
+          <span>{STRINGS.collapseTools}</span>
+        </label>
+        <p className="hint">{STRINGS.collapseToolsHint}</p>
+        <label className="checkbox">
+          <input
+            type="checkbox"
+            checked={values.collapseCode}
+            onChange={(event) => patch({ collapseCode: event.target.checked })}
+          />
+          <span>{STRINGS.collapseCode}</span>
+        </label>
+        <p className="hint">{STRINGS.collapseCodeHint}</p>
       </section>
 
       <section className="settings-section">

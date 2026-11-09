@@ -1,7 +1,12 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import type { MouseEvent } from 'react';
 import type { UiMessage } from '../../protocol';
-import { collectFileSources, type CodeSource } from '../codeBlock';
+import {
+  CODE_CARET_CLOSED,
+  CODE_CARET_OPEN,
+  collectFileSources,
+  type CodeSource
+} from '../codeBlock';
 import { contentChanged, isAtBottom, measure, shouldFollow } from '../listScroll';
 import { renderMarkdown } from '../markdown';
 import { STRINGS } from '../strings';
@@ -31,6 +36,10 @@ function handleMarkdownClick(
   onOpenFile: (path: string, line?: number) => void
 ): void {
   const target = event.target as HTMLElement;
+  if (target.closest('.code-toggle')) {
+    toggleCodeBlock(event);
+    return;
+  }
   const file = target.closest('.code-file');
   if (file instanceof HTMLElement) {
     const path = file.dataset['path'] ?? '';
@@ -41,6 +50,23 @@ function handleMarkdownClick(
     return;
   }
   copyCode(event);
+}
+
+// The toggle of a code block folds the code, the header stays.
+function toggleCodeBlock(event: MouseEvent<HTMLDivElement>): void {
+  const target = event.target as HTMLElement;
+  const toggle = target.closest('.code-toggle');
+  if (!toggle) {
+    return;
+  }
+  const block = toggle.closest('.code-block');
+  if (!(block instanceof HTMLElement)) {
+    return;
+  }
+  const collapsed = block.classList.toggle('collapsed');
+  toggle.textContent = collapsed ? CODE_CARET_CLOSED : CODE_CARET_OPEN;
+  toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+  toggle.setAttribute('aria-label', collapsed ? STRINGS.codeShow : STRINGS.codeHide);
 }
 
 function copyCode(event: MouseEvent<HTMLDivElement>): void {
@@ -61,12 +87,16 @@ function copyCode(event: MouseEvent<HTMLDivElement>): void {
 const MessageRow = memo(function MessageRow({
   message,
   sources,
+  collapseTools,
+  collapseCode,
   onApprove,
   onReject,
   onOpenFile
 }: {
   message: UiMessage;
   sources: CodeSource[];
+  collapseTools: boolean;
+  collapseCode: boolean;
   onApprove: (id: string, allowForSession: boolean) => void;
   onReject: (id: string) => void;
   onOpenFile: (path: string, line?: number) => void;
@@ -83,12 +113,16 @@ const MessageRow = memo(function MessageRow({
             <div
               className="markdown"
               onClick={(event) => handleMarkdownClick(event, onOpenFile)}
-              dangerouslySetInnerHTML={{ __html: renderMarkdown(message.text, sources) }}
+              dangerouslySetInnerHTML={{
+                __html: renderMarkdown(message.text, sources, { collapseCode })
+              }}
             />
           ) : null}
         </div>
       ) : null}
-      {message.role === 'tool' && message.tool ? <ToolCard tool={message.tool} /> : null}
+      {message.role === 'tool' && message.tool ? (
+        <ToolCard tool={message.tool} collapsed={collapseTools} />
+      ) : null}
       {message.approval ? (
         <ApprovalCard
           message={message}
@@ -102,11 +136,17 @@ const MessageRow = memo(function MessageRow({
 
 export function MessageList({
   messages,
+  collapseTools,
+  collapseCode,
   onApprove,
   onReject,
   onOpenFile
 }: {
   messages: UiMessage[];
+  // The cards of the actions fold to their title.
+  collapseTools: boolean;
+  // The code blocks of the answers fold to their header.
+  collapseCode: boolean;
   onApprove: (id: string, allowForSession: boolean) => void;
   onReject: (id: string) => void;
   onOpenFile: (path: string, line?: number) => void;
@@ -204,6 +244,8 @@ export function MessageList({
             key={message.id}
             message={message}
             sources={sources}
+            collapseTools={collapseTools}
+            collapseCode={collapseCode}
             onApprove={onApprove}
             onReject={onReject}
             onOpenFile={onOpenFile}

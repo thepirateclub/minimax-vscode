@@ -460,6 +460,9 @@ class MiniMaxController {
           message.tool.content = event.content;
           message.tool.isError = event.isError;
           message.tool.running = false;
+          if (event.diff) {
+            message.tool.diff = event.diff;
+          }
           if (durationMs !== undefined) {
             message.tool.durationMs = durationMs;
           }
@@ -471,7 +474,8 @@ class MiniMaxController {
         name: event.name,
         content: event.content,
         isError: event.isError,
-        durationMs
+        durationMs,
+        diff: event.diff
       });
       return;
     }
@@ -912,6 +916,8 @@ class MiniMaxController {
       autoApprove: settings.autoApprove,
       rulesEnabled: settings.rulesEnabled,
       enableWebSearch: settings.enableWebSearch,
+      collapseTools: settings.collapseTools,
+      collapseCode: settings.collapseCode,
       hasApiKey: Boolean(key),
       tools: this.registry.list().map((tool) => tool.name)
     };
@@ -934,7 +940,9 @@ class MiniMaxController {
       ['semanticSearch', values.semanticSearch],
       ['autoApprove', values.autoApprove],
       ['rulesEnabled', values.rulesEnabled],
-      ['enableWebSearch', values.enableWebSearch]
+      ['enableWebSearch', values.enableWebSearch],
+      ['collapseTools', values.collapseTools],
+      ['collapseCode', values.collapseCode]
     ];
     for (const [key, value] of updates) {
       await config.update(key, value, vscode.ConfigurationTarget.Global);
@@ -1092,7 +1100,9 @@ class MiniMaxController {
         usage: runtime ? [...runtime.usage] : [],
         hasApiKey: Boolean(key),
         theme: themeKind(),
-        fontSize: settings.fontSize
+        fontSize: settings.fontSize,
+        collapseTools: settings.collapseTools,
+        collapseCode: settings.collapseCode
       }
     });
   }

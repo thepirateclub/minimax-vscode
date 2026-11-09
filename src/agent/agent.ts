@@ -11,14 +11,23 @@ import type {
 import type { AgentMode } from '../config/models';
 import type { Logger } from '../logger';
 import type { ToolRegistry } from '../tools/registry';
-import type { ApprovalGate } from '../ui/approvals';
+import { buildPreview } from '../tools/preview';
+import type { ApprovalGate, DiffPreview } from '../ui/approvals';
 
 export type AgentEvent =
   | { type: 'assistant_start' }
   | { type: 'assistant_text'; text: string }
   | { type: 'assistant_thinking'; text: string }
   | { type: 'tool_start'; id: string; name: string; input: Record<string, unknown> }
-  | { type: 'tool_end'; id: string; name: string; content: string; isError: boolean }
+  | {
+      type: 'tool_end';
+      id: string;
+      name: string;
+      content: string;
+      isError: boolean;
+      // The change of a file, it is taken before the write.
+      diff?: DiffPreview;
+    }
   | { type: 'approval_resolved'; id: string; approved: boolean }
   | { type: 'done'; stopReason: StopReason; usage: Usage }
   | { type: 'error'; message: string };
@@ -208,6 +217,10 @@ export class Agent {
           input: toolUse.input
         });
 
+        // The change of a file is taken before the write. After the write the
+        // file on disk is already the new one and the change is gone.
+        const diff = await this.previewOf(toolUse.name, toolUse.input);
+
         let content: string;
         let isError = false;
         try {
@@ -228,7 +241,8 @@ export class Agent {
           id: toolUse.id,
           name: toolUse.name,
           content,
-          isError
+          isError,
+          diff
         });
         results.push({
           type: 'tool_result',
@@ -243,6 +257,19 @@ export class Agent {
 
     this.options.onEvent({ type: 'done', stopReason: 'max_iterations', usage });
     return { messages, stopReason: 'max_iterations', usage };
+  }
+
+  // The change of a file, it is taken before the write. A path outside of
+  // the workspace throws inside the preview, the action still runs.
+  private async previewOf(
+    name: string,
+    input: Record<string, unknown>
+  ): Promise<DiffPreview | undefined> {
+    try {
+      return await buildPreview(name, input, this.options.workspaceRoot);
+    } catch {
+      return undefined;
+    }
   }
 
   private async streamWithRetry(

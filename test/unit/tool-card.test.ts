@@ -50,7 +50,24 @@ function dotClasses(markup: string): string[] {
   return (match?.[1] ?? '').split(/\s+/).filter(Boolean);
 }
 
-function card(tool: Partial<UiToolCall>): string {
+// The summary is the short text next to the title of the card.
+function summaryOf(markup: string): string {
+  const match = /<span class="tool-summary">([^<]*)<\/span>/.exec(markup);
+  return match?.[1] ?? '';
+}
+
+// The size of the change sits in the header of the card.
+function addedOf(markup: string): string {
+  const match = /<span class="tool-stat tool-stat-add">([^<]*)<\/span>/.exec(markup);
+  return match?.[1] ?? '';
+}
+
+function removedOf(markup: string): string {
+  const match = /<span class="tool-stat tool-stat-remove">([^<]*)<\/span>/.exec(markup);
+  return match?.[1] ?? '';
+}
+
+function card(tool: Partial<UiToolCall>, collapsed = false): string {
   const full: UiToolCall = {
     id: 'tool-1',
     name: 'read_file',
@@ -58,7 +75,7 @@ function card(tool: Partial<UiToolCall>): string {
     content: '1: const a = 1;',
     ...tool
   };
-  return renderToStaticMarkup(createElement(ToolCard, { tool: full }));
+  return renderToStaticMarkup(createElement(ToolCard, { tool: full, collapsed }));
 }
 
 describe('the dot of an action', () => {
@@ -95,6 +112,71 @@ describe('the dot of an action', () => {
     }
   });
 
+  it('hides the body of an action when the setting asks for it', () => {
+    expect(card({}, true)).not.toContain('tool-body');
+    expect(card({}, false)).toContain('tool-body');
+  });
+
+  it('does not repeat the path of the file in the summary', () => {
+    const markup = card({
+      name: 'write_file',
+      input: { path: 'src/app.ts' },
+      content: 'Wrote src/app.ts'
+    });
+    expect(markup).toContain('Write src/app.ts');
+    expect(summaryOf(markup)).toBe('');
+  });
+
+  it('keeps the text of a failed write in the summary', () => {
+    const markup = card({
+      name: 'write_file',
+      input: { path: 'src/app.ts' },
+      content: 'write_file failed: the disk is full',
+      isError: true
+    });
+    expect(summaryOf(markup)).toContain('write_file failed: the disk is full');
+  });
+
+  it('keeps the card of an action quiet', () => {
+    // The card is a note under the answer, it must not compete with it.
+    const card = ruleFor(CSS, '.tool-card');
+    expect(property(card, 'border')).toBe('none');
+    expect(property(card, 'background')).toBe('transparent');
+    expect(property(ruleFor(CSS, '.tool-title'), 'font-weight')).toBe('400');
+    expect(property(ruleFor(CSS, '.tool-title'), 'color')).toBe('var(--muted)');
+    expect(property(ruleFor(CSS, '.tool-head:hover .tool-title'), 'color')).toBe(
+      'var(--vscode-foreground)'
+    );
+    expect(property(ruleFor(CSS, '.tool-head'), 'font-size')).toBe(
+      'calc(var(--mm-font-base) * 0.85)'
+    );
+  });
+
+  it('shows the change of a file as a diff', () => {
+    const markup = card({
+      name: 'write_file',
+      input: { path: 'src/app.ts', content: 'const a = 1;' },
+      content: 'Wrote src/app.ts',
+      diff: {
+        path: 'src/app.ts',
+        lines: [{ type: 'add', newLine: 1, text: 'const a = 1;' }]
+      }
+    });
+    expect(markup).toContain('diff-line');
+    expect(markup).toContain('const a = 1;');
+    // The title of the card names the file, the diff does not repeat it.
+    expect(markup).not.toContain('diff-path');
+  });
+
+  it('marks a failed action with a straight bar in the color of the failed dot', () => {
+    const error = ruleFor(CSS, '.tool-card.tool-error');
+    expect(property(error, 'border-left')).toBe(
+      '2px solid var(--vscode-testing-iconFailed, #f14c4c)'
+    );
+    // A rounded border draws a bracket, it looks like a decoration.
+    expect(property(error, 'border-radius')).toBe('0');
+  });
+
   it('paints only the base dot gray', () => {
     const base = ruleFor(CSS, '.tool-dot');
     expect(property(base, 'background')).toBe('var(--muted)');
@@ -102,5 +184,77 @@ describe('the dot of an action', () => {
       const body = ruleFor(CSS, '.tool-dot.tool-dot-' + state);
       expect(property(body, 'background')).not.toBe('var(--muted)');
     }
+  });
+
+  it('paints the change of a file in the colors of a diff', () => {
+    // A change has to be visible at a glance, a gray text hides it.
+    const added = ruleFor(CSS, '.diff-add');
+    expect(property(added, 'color')).toBe('var(--diff-add-fg)');
+    expect(property(added, 'background')).toBe('var(--diff-add-bg)');
+    const removed = ruleFor(CSS, '.diff-remove');
+    expect(property(removed, 'color')).toBe('var(--diff-remove-fg)');
+    expect(property(removed, 'background')).toBe('var(--diff-remove-bg)');
+    // The mark of the line carries the color as well.
+    expect(property(ruleFor(CSS, '.diff-add .diff-marker'), 'color')).toBe(
+      'var(--diff-add-fg)'
+    );
+    expect(property(ruleFor(CSS, '.diff-remove .diff-marker'), 'color')).toBe(
+      'var(--diff-remove-fg)'
+    );
+  });
+
+  it('shows the size of the change in the header of the card', () => {
+    const markup = card({
+      name: 'write_file',
+      input: { path: 'src/app.ts' },
+      content: 'Wrote src/app.ts',
+      diff: {
+        path: 'src/app.ts',
+        lines: [
+          { type: 'context', oldLine: 1, newLine: 1, text: 'keep' },
+          { type: 'remove', oldLine: 2, text: 'old' },
+          { type: 'add', newLine: 2, text: 'new' },
+          { type: 'add', newLine: 3, text: 'more' }
+        ]
+      }
+    });
+    expect(addedOf(markup)).toBe('+2');
+    expect(removedOf(markup)).toBe('-1');
+  });
+
+  it('keeps the size of the change visible in a folded card', () => {
+    const markup = card(
+      {
+        name: 'write_file',
+        input: { path: 'src/app.ts' },
+        content: 'Wrote src/app.ts',
+        diff: {
+          path: 'src/app.ts',
+          lines: [{ type: 'add', newLine: 1, text: 'const a = 1;' }]
+        }
+      },
+      true
+    );
+    expect(addedOf(markup)).toBe('+1');
+  });
+
+  it('hides the empty half of the size', () => {
+    const markup = card({
+      name: 'write_file',
+      input: { path: 'src/app.ts' },
+      content: 'Wrote src/app.ts',
+      diff: {
+        path: 'src/app.ts',
+        lines: [{ type: 'add', newLine: 1, text: 'const a = 1;' }]
+      }
+    });
+    // A new file removes nothing, a zero in red looks like a mistake.
+    expect(addedOf(markup)).toBe('+1');
+    expect(removedOf(markup)).toBe('');
+    expect(markup).not.toContain('-0');
+  });
+
+  it('shows no size for an action without a change', () => {
+    expect(card({})).not.toContain('tool-stats');
   });
 });

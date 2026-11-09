@@ -36,6 +36,10 @@ export interface CodeMatch {
   line: number;
 }
 
+// The caret of a folded code block, it points down when the code is open.
+export const CODE_CARET_OPEN = '▾';
+export const CODE_CARET_CLOSED = '▸';
+
 const EXTENSION_LANGUAGE: Record<string, string> = {
   ts: 'ts',
   tsx: 'tsx',

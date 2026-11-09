@@ -172,6 +172,16 @@
           "maximum": 65536,
           "deprecationMessage": "The limit of the answer comes from the model catalog now, this setting is ignored."
         },
+        "minimax.collapseTools": {
+          "type": "boolean",
+          "default": false,
+          "description": "Collapses the cards of the actions. The card keeps its title, the details open on a click."
+        },
+        "minimax.collapseCode": {
+          "type": "boolean",
+          "default": false,
+          "description": "Collapses the code blocks of the answers. The header with the file name stays, the code opens on a click."
+        },
         "minimax.fontSize": {
           "type": "number",
           "default": 13,

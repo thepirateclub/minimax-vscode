@@ -26,6 +26,11 @@
   --tok-tag: #569cd6;
   --tok-add: #6a9955;
   --tok-remove: #d16969;
+  /* a change has to be visible at a glance, the diff paints itself */
+  --diff-add-fg: #6fbf73;
+  --diff-remove-fg: #f97583;
+  --diff-add-bg: rgba(46, 160, 67, 0.16);
+  --diff-remove-bg: rgba(248, 81, 73, 0.16);
 }
 
 /* the light theme of the host paints the tokens in its own shades */
@@ -61,6 +66,15 @@ body.mm-theme-high-contrast-light {
   --tok-tag: #569cd6;
   --tok-add: #6a9955;
   --tok-remove: #f48771;
+}
+
+/* the light shades of the host need darker marks of a change */
+body.mm-theme-light,
+body.mm-theme-high-contrast-light {
+  --diff-add-fg: #0b6b2f;
+  --diff-remove-fg: #b31515;
+  --diff-add-bg: rgba(46, 160, 67, 0.14);
+  --diff-remove-bg: rgba(248, 81, 73, 0.12);
 }
 
 body {
@@ -469,16 +483,25 @@ input:focus {
   overflow: auto;
 }
 
-/* tool card */
+/* The card of an action is a quiet note under the answer, it must not
+   compete with the text of the chat. */
 .tool-card {
-  border: 1px solid var(--border);
+  border: none;
   border-radius: var(--radius);
-  background: var(--surface);
+  background: transparent;
   overflow: hidden;
 }
 
+/* A failed action is marked with a straight bar in the color of the failed
+   dot. A rounded border drew a bracket, it looked like a decoration, and the
+   color of the theme turned the mark gray. */
 .tool-card.tool-error {
-  border-color: var(--vscode-inputValidation-errorBorder, #be1100);
+  border-left: 2px solid var(--vscode-testing-iconFailed, #f14c4c);
+  border-radius: 0;
+}
+
+.tool-card.tool-error .tool-head {
+  padding-left: 8px;
 }
 
 .tool-head {
@@ -486,11 +509,11 @@ input:focus {
   align-items: center;
   gap: 6px;
   width: 100%;
-  padding: 6px 8px;
+  padding: 3px 6px;
   background: transparent;
   border: none;
   color: var(--vscode-foreground);
-  font-size: calc(var(--mm-font-base) * 0.92);
+  font-size: calc(var(--mm-font-base) * 0.85);
   text-align: left;
   cursor: pointer;
 }
@@ -516,7 +539,14 @@ input:focus {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-weight: 600;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+/* The title of an action is a note, not the headline of the chat. It takes
+   the full color when the reader points at it. */
+.tool-head:hover .tool-title {
+  color: var(--vscode-foreground);
 }
 
 .tool-summary {
@@ -535,6 +565,23 @@ input:focus {
   color: var(--muted);
   font-family: var(--mono);
   white-space: nowrap;
+}
+
+/* the size of the change sits in the header, it stays when the card folds */
+.tool-stats {
+  display: inline-flex;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: calc(var(--mm-font-base) * 0.77);
+  white-space: nowrap;
+}
+
+.tool-stat-add {
+  color: var(--diff-add-fg);
+}
+
+.tool-stat-remove {
+  color: var(--diff-remove-fg);
 }
 
 /* The result of an action is a dot: green for done, red for a failure.
@@ -670,17 +717,27 @@ input:focus {
 }
 
 .diff-add {
-  background: var(--vscode-diffEditor-insertedTextBackground);
+  background: var(--diff-add-bg);
+  color: var(--diff-add-fg);
 }
 
 .diff-remove {
-  background: var(--vscode-diffEditor-removedTextBackground);
+  background: var(--diff-remove-bg);
+  color: var(--diff-remove-fg);
 }
 
 .diff-marker {
   display: inline-block;
   width: 14px;
-  opacity: 0.7;
+  font-weight: 700;
+}
+
+.diff-add .diff-marker {
+  color: var(--diff-add-fg);
+}
+
+.diff-remove .diff-marker {
+  color: var(--diff-remove-fg);
 }
 
 /* inline icons of the panel */
@@ -1396,6 +1453,38 @@ input:focus {
 .markdown .code-copy:hover {
   background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.16));
   color: var(--vscode-foreground);
+}
+
+.markdown .code-tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.markdown .code-toggle {
+  appearance: none;
+  padding: 2px 4px;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: calc(var(--mm-font-base) * 0.77);
+  line-height: 1;
+}
+
+.markdown .code-toggle:hover {
+  background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.16));
+  color: var(--vscode-foreground);
+}
+
+/* A folded code block shows only its header. */
+.markdown .code-block.collapsed pre {
+  display: none;
+}
+
+.markdown .code-block.collapsed .code-head {
+  border-bottom: none;
 }
 
 .markdown .code-block pre {

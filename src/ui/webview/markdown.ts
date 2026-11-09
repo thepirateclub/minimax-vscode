@@ -1,6 +1,7 @@
 import MarkdownIt from 'markdown-it';
-import { describeCodeBlock, type CodeSource } from './codeBlock';
+import { CODE_CARET_CLOSED, describeCodeBlock, type CodeSource } from './codeBlock';
 import { highlight } from './highlight';
+import { STRINGS } from './strings';
 
 // The same text is rendered again when the panel is reopened, the cache keeps
 // the stream cheap. The limit stops the cache from growing with the chat.
@@ -11,6 +12,14 @@ const cache = new Map<string, string>();
 // them to find the file of a block.
 interface MarkdownEnv {
   sources?: CodeSource[];
+  // The code blocks start folded when the setting asks for it.
+  collapseCode?: boolean;
+}
+
+// The options of the renderer, they come from the settings of the host.
+export interface MarkdownOptions {
+  // The code blocks start folded, only their header stays.
+  collapseCode: boolean;
 }
 
 const md = new MarkdownIt({
@@ -24,7 +33,9 @@ const md = new MarkdownIt({
 // of a file shows the name of the file instead, the click opens the file.
 md.renderer.rules.fence = (tokens, idx, _options, env): string => {
   const token = tokens[idx]!;
-  const sources = (env as MarkdownEnv | undefined)?.sources;
+  const options = env as MarkdownEnv | undefined;
+  const sources = options?.sources;
+  const collapse = options?.collapseCode === true;
   const block = describeCodeBlock(token.info, { content: token.content, sources });
   const code = highlight(token.content, block.language);
   const label = block.file
@@ -40,11 +51,25 @@ md.renderer.rules.fence = (tokens, idx, _options, env): string => {
     : '<span class="code-lang">' +
       md.utils.escapeHtml(block.title) +
       '</span>';
+  // The toggle folds the code, the copy button stays next to it.
+  const tools =
+    '<div class="code-tools">' +
+    (collapse
+      ? '<button type="button" class="code-toggle" aria-expanded="false" aria-label="' +
+        md.utils.escapeHtml(STRINGS.codeShow) +
+        '">' +
+        CODE_CARET_CLOSED +
+        '</button>'
+      : '') +
+    '<button type="button" class="code-copy">Copy</button>' +
+    '</div>';
   return (
-    '<div class="code-block">' +
+    '<div class="' +
+    (collapse ? 'code-block collapsed' : 'code-block') +
+    '">' +
     '<div class="code-head">' +
     label +
-    '<button type="button" class="code-copy">Copy</button>' +
+    tools +
     '</div>' +
     '<pre><code>' +
     code +
@@ -107,13 +132,20 @@ function sourceSignature(sources: CodeSource[]): string {
   return sources.map((source) => source.path + '@' + source.lines.length).join('|');
 }
 
-export function renderMarkdown(text: string, sources: CodeSource[] = []): string {
-  const key = sources.length > 0 ? text + '\u0000' + sourceSignature(sources) : text;
+export function renderMarkdown(
+  text: string,
+  sources: CodeSource[] = [],
+  options: MarkdownOptions = { collapseCode: false }
+): string {
+  const collapse = options.collapseCode === true;
+  const key =
+    (sources.length > 0 ? text + '\u0000' + sourceSignature(sources) : text) +
+    (collapse ? '\u0001' : '');
   const cached = cache.get(key);
   if (cached !== undefined) {
     return cached;
   }
-  const html = md.render(text, { sources });
+  const html = md.render(text, { sources, collapseCode: collapse });
   if (cache.size >= CACHE_LIMIT) {
     const oldest = cache.keys().next().value;
     if (oldest !== undefined) {

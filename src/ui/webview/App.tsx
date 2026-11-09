@@ -32,7 +32,9 @@ const EMPTY_STATE: UiState = {
   usage: [],
   hasApiKey: false,
   theme: 'dark',
-  fontSize: 13
+  fontSize: 13,
+  collapseTools: false,
+  collapseCode: false
 };
 
 export function App({ vscode }: { vscode: VsCodeApi }) {
@@ -89,7 +91,13 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
             item.tool && item.tool.id === message.id
               ? {
                   ...item,
-                  tool: { ...item.tool, content: message.content, isError: message.isError, running: false }
+                  tool: {
+                    ...item.tool,
+                    content: message.content,
+                    isError: message.isError,
+                    running: false,
+                    diff: message.diff
+                  }
                 }
               : item
           )
@@ -261,6 +269,8 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
         ) : (
           <MessageList
             messages={messages}
+            collapseTools={state.collapseTools}
+            collapseCode={state.collapseCode}
             onApprove={approve}
             onReject={reject}
             onOpenFile={openFile}

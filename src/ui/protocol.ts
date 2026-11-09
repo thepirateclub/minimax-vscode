@@ -22,6 +22,8 @@ export interface UiToolCall {
   running?: boolean;
   // How long the action took, the host measures it.
   durationMs?: number;
+  // The change of a file, the host takes it before the write.
+  diff?: { path: string; lines: UiDiffLine[] };
 }
 
 export interface UiApproval {
@@ -81,6 +83,10 @@ export interface UiSettingsValues {
   autoApprove: string[];
   rulesEnabled: boolean;
   enableWebSearch: boolean;
+  // The cards of the actions fold to their title.
+  collapseTools: boolean;
+  // The code blocks of the answers fold to their header.
+  collapseCode: boolean;
 }
 
 export interface UiSettings extends UiSettingsValues {
@@ -112,6 +118,10 @@ export interface UiState {
   theme: ThemeKind;
   // The size of the font of the panel in pixels.
   fontSize: number;
+  // The cards of the actions fold to their title.
+  collapseTools: boolean;
+  // The code blocks of the answers fold to their header.
+  collapseCode: boolean;
 }
 
 export type ExtToWeb =
@@ -128,6 +138,7 @@ export type ExtToWeb =
       content: string;
       isError: boolean;
       durationMs?: number;
+      diff?: { path: string; lines: UiDiffLine[] };
     }
   | { type: 'approval_request'; approval: UiApproval }
   | { type: 'approval_resolved'; id: string; approved: boolean }
