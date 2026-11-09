@@ -1,4 +1,5 @@
 import type { AgentState, UiSessionSummary, UiUsageTurn } from '../../protocol';
+import { formatCount } from '../format';
 import { UsageGraph } from './UsageGraph';
 import { SessionMenu } from './SessionMenu';
 import { STRINGS } from '../strings';
@@ -45,7 +46,11 @@ export function Header({
         >
           {STRINGS.settingsTab}
         </button>
-        <span className={'state-chip state-' + state}>{state}</span>
+        <span
+          className={'state-dot state-' + state}
+          title={state}
+          aria-label={state}
+        />
         <SessionMenu
           sessions={sessions}
           activeSessionId={activeSessionId}
@@ -61,7 +66,7 @@ export function Header({
         <div className="header-row">
           <UsageGraph turns={usage} />
           <span className="tokens">
-            {tokens} {STRINGS.tokens}
+            {formatCount(tokens)} {STRINGS.tokens}
           </span>
         </div>
       ) : null}

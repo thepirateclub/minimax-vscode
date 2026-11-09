@@ -112,6 +112,12 @@ vi.mock('vscode', () => {
         return state.documents;
       },
       findFiles: async () => state.files.map((path) => ({ fsPath: path })),
+      createFileSystemWatcher: () => ({
+        onDidChange: () => ({ dispose: () => undefined }),
+        onDidCreate: () => ({ dispose: () => undefined }),
+        onDidDelete: () => ({ dispose: () => undefined }),
+        dispose: () => undefined
+      }),
       openTextDocument: async (uri: { fsPath: string }) => {
         state.opened.push(uri.fsPath);
         return { uri, lineCount: 500 };
@@ -546,8 +552,11 @@ describe('extension activation', () => {
         effort: 'high',
         mode: 'plan',
         thinking: true,
-        maxTokens: 16384,
         maxIterations: 12,
+        fontSize: 15,
+        historyMaxMessages: 40,
+        contextThreshold: 60,
+        semanticSearch: true,
         autoApprove: ['run_terminal'],
         rulesEnabled: false,
         enableWebSearch: false
@@ -560,7 +569,10 @@ describe('extension activation', () => {
     expect(state.config.get('effort')).toBe('high');
     expect(state.config.get('mode')).toBe('plan');
     expect(state.config.get('thinking')).toBe(true);
-    expect(state.config.get('maxTokens')).toBe(16384);
+    expect(state.config.get('fontSize')).toBe(15);
+    expect(state.config.get('historyMaxMessages')).toBe(40);
+    expect(state.config.get('contextThreshold')).toBe(60);
+    expect(state.config.get('semanticSearch')).toBe(true);
     expect(state.config.get('autoApprove')).toEqual(['run_terminal']);
     expect(state.config.get('rulesEnabled')).toBe(false);
   });

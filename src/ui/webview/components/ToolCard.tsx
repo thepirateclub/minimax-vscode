@@ -163,7 +163,14 @@ export function ToolCard({ tool }: { tool: UiToolCall }) {
             {tool.durationMs} {STRINGS.toolElapsed}
           </span>
         ) : null}
-        <span className={'tool-status' + (tool.isError ? ' failed' : '')}>{status}</span>
+        <span
+          className={
+            'tool-dot tool-dot-' +
+            (tool.running ? 'running' : tool.isError ? 'failed' : 'done')
+          }
+          title={status}
+          aria-label={status}
+        />
       </button>
       {open ? (
         <div className="tool-body">

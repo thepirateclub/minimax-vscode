@@ -3,6 +3,9 @@ import type { AnthropicMessage } from './types';
 // A long chat must not grow without a bound, the oldest turns are cut.
 export const MAX_HISTORY_MESSAGES = 120;
 
+// The default share of the context window the history may take.
+export const DEFAULT_CONTEXT_THRESHOLD = 50;
+
 // The first message of a cut history must not refer to a tool call that is
 // gone, otherwise the next request is invalid.
 function isUnbalanced(message: AnthropicMessage): boolean {
@@ -43,14 +46,17 @@ export function estimateTokens(messages: AnthropicMessage[]): number {
   return Math.ceil(chars / 4);
 }
 
-// The history has to fit into the context window of the model, half of the
-// window stays free for the answer of the model.
+// The history has to fit into the context window of the model, the threshold
+// is the share of the window the history may take, the rest stays free for
+// the answer of the model.
 export function fitHistory(
   messages: AnthropicMessage[],
   limit: number,
-  contextWindow: number
+  contextWindow: number,
+  threshold: number = DEFAULT_CONTEXT_THRESHOLD
 ): AnthropicMessage[] {
-  const budget = Math.floor((contextWindow * 0.5) / 4);
+  const share = Math.max(1, Math.min(100, threshold)) / 100;
+  const budget = Math.floor((contextWindow * share) / 4);
   let kept = trimHistory(messages, limit);
   while (kept.length > 2 && estimateTokens(kept) > budget) {
     const next = kept.slice(1);

@@ -1,4 +1,5 @@
 import type { UiUsageTurn } from '../../protocol';
+import { formatCount } from '../format';
 import { STRINGS } from '../strings';
 
 // One bar per action, the height is the token spend of that action.
@@ -21,12 +22,12 @@ export function UsageGraph({ turns }: { turns: UiUsageTurn[] }) {
             ' ' +
             (index + 1) +
             ': in ' +
-            (turn.input + (turn.cache ?? 0)) +
+            formatCount(turn.input + (turn.cache ?? 0)) +
             ((turn.cache ?? 0) > 0
-              ? ' (' + (turn.cache ?? 0) + ' ' + STRINGS.usageCached + ')'
+              ? ' (' + formatCount(turn.cache ?? 0) + ' ' + STRINGS.usageCached + ')'
               : '') +
             ', out ' +
-            turn.output
+            formatCount(turn.output)
           }
         >
           <span

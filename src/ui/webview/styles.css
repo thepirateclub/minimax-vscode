@@ -3,6 +3,7 @@
 }
 
 :root {
+  --mm-font-base: 13px;
   --gap: 8px;
   --radius: 6px;
   --muted: var(--vscode-descriptionForeground, #9d9d9d);
@@ -66,7 +67,7 @@ body {
   margin: 0;
   padding: 0;
   font-family: var(--vscode-font-family);
-  font-size: var(--vscode-font-size);
+  font-size: var(--mm-font-base);
   color: var(--vscode-foreground);
   background: var(--vscode-sideBar-background);
   overflow: hidden;
@@ -81,7 +82,7 @@ body {
 button {
   appearance: none;
   font-family: inherit;
-  font-size: 12px;
+  font-size: calc(var(--mm-font-base) * 0.92);
   padding: 4px 10px;
   border-radius: 4px;
   border: 1px solid transparent;
@@ -120,7 +121,7 @@ input[type='number'] {
   flex: 1;
   min-width: 0;
   font-family: inherit;
-  font-size: 12px;
+  font-size: calc(var(--mm-font-base) * 0.92);
   color: var(--vscode-input-foreground, var(--vscode-foreground));
   background: var(--vscode-dropdown-background, var(--vscode-input-background, #3c3c3c));
   border: 1px solid var(--vscode-input-border, var(--border));
@@ -153,32 +154,49 @@ input:focus {
 .title {
   flex: 1;
   font-weight: 600;
-  font-size: 13px;
+  font-size: calc(var(--mm-font-base) * 1);
   letter-spacing: 0.2px;
 }
 
-.state-chip {
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  color: var(--muted);
-  border: 1px solid var(--border);
+/* The state of the agent is a dot, the word stays in the tooltip. */
+.state-dot {
+  flex: 0 0 auto;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--muted);
+  opacity: 0.7;
 }
 
-.state-chip.state-thinking,
-.state-chip.state-streaming,
-.state-chip.state-tool {
-  background: var(--vscode-badge-background, #4d4d4d);
-  color: var(--vscode-badge-foreground, #fff);
-  border-color: transparent;
+.state-dot.state-idle {
+  background: var(--vscode-testing-iconPassed, #3fb950);
+  opacity: 1;
 }
 
-.state-chip.state-error {
-  color: var(--vscode-inputValidation-errorForeground, #f14c4c);
-  border-color: var(--vscode-inputValidation-errorBorder, #be1100);
-  background: var(--vscode-inputValidation-errorBackground, rgba(190, 17, 0, 0.1));
+.state-dot.state-thinking,
+.state-dot.state-streaming,
+.state-dot.state-tool {
+  background: var(--accent);
+  opacity: 1;
+  animation: mm-pulse 1.2s ease-in-out infinite;
+}
+
+.state-dot.state-error {
+  background: var(--vscode-inputValidation-errorForeground, #f14c4c);
+  opacity: 1;
+  animation: mm-pulse 0.8s ease-in-out infinite;
+}
+
+@keyframes mm-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.3;
+    transform: scale(0.8);
+  }
 }
 
 .tabs {
@@ -196,7 +214,7 @@ input:focus {
   background: transparent;
   border: none;
   color: var(--muted);
-  font-size: 12px;
+  font-size: calc(var(--mm-font-base) * 0.92);
   padding: 4px 10px 8px;
 }
 
@@ -223,12 +241,12 @@ input:focus {
 .tokens {
   margin-left: auto;
   padding-left: 6px;
-  font-size: 11px;
+  font-size: calc(var(--mm-font-base) * 0.85);
   color: var(--muted);
   white-space: nowrap;
 }
 
-.tabs .state-chip {
+.tabs .state-dot {
   margin-left: auto;
 }
 
@@ -248,7 +266,7 @@ input:focus {
   background: transparent;
   color: var(--vscode-foreground);
   cursor: pointer;
-  font-size: 14px;
+  font-size: calc(var(--mm-font-base) * 1.08);
   line-height: 1;
   padding: 0;
 }
@@ -258,7 +276,7 @@ input:focus {
 }
 
 .warning {
-  font-size: 11px;
+  font-size: calc(var(--mm-font-base) * 0.85);
   padding: 6px 8px;
   border-radius: 4px;
   color: var(--vscode-inputValidation-warningForeground, #cca700);
@@ -304,7 +322,7 @@ input:focus {
   border: 1px solid var(--border);
   background: transparent;
   color: var(--muted);
-  font-size: 11px;
+  font-size: calc(var(--mm-font-base) * 0.85);
 }
 
 .load-earlier:hover {
@@ -323,7 +341,7 @@ input:focus {
   border: 1px solid var(--border);
   background: var(--vscode-editorWidget-background, #252526);
   color: var(--vscode-foreground);
-  font-size: 11px;
+  font-size: calc(var(--mm-font-base) * 0.85);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
@@ -428,7 +446,7 @@ input:focus {
   border: none;
   color: var(--muted);
   cursor: pointer;
-  font-size: 11px;
+  font-size: calc(var(--mm-font-base) * 0.85);
   padding: 0;
 }
 
@@ -441,7 +459,7 @@ input:focus {
   margin: 6px 0 0;
   padding: 8px;
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: calc(var(--mm-font-base) * 0.85);
   line-height: 1.5;
   white-space: pre-wrap;
   color: var(--muted);
@@ -472,7 +490,7 @@ input:focus {
   background: transparent;
   border: none;
   color: var(--vscode-foreground);
-  font-size: 12px;
+  font-size: calc(var(--mm-font-base) * 0.92);
   text-align: left;
   cursor: pointer;
 }
@@ -483,7 +501,7 @@ input:focus {
 
 .tool-caret {
   color: var(--muted);
-  font-size: 10px;
+  font-size: calc(var(--mm-font-base) * 0.77);
 }
 
 .tool-icon {
@@ -509,25 +527,38 @@ input:focus {
   white-space: nowrap;
   color: var(--muted);
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: calc(var(--mm-font-base) * 0.85);
 }
 
 .tool-time {
-  font-size: 10px;
+  font-size: calc(var(--mm-font-base) * 0.77);
   color: var(--muted);
   font-family: var(--mono);
   white-space: nowrap;
 }
 
-.tool-status {
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-  color: var(--muted);
+/* The result of an action is a dot: green for done, red for a failure. */
+.tool-dot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
 }
 
-.tool-status.failed {
-  color: var(--vscode-inputValidation-errorForeground, #f14c4c);
+.tool-dot.done {
+  background: var(--vscode-testing-iconPassed, #3fb950);
+  animation: mm-pulse 2.4s ease-in-out infinite;
+}
+
+.tool-dot.failed {
+  background: var(--vscode-testing-iconFailed, #f14c4c);
+  animation: mm-pulse 1.6s ease-in-out infinite;
+}
+
+.tool-dot.running {
+  background: var(--accent);
+  animation: mm-pulse 1s ease-in-out infinite;
 }
 
 .tool-body {
@@ -539,7 +570,7 @@ input:focus {
   margin: 0;
   padding: 6px 8px;
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: calc(var(--mm-font-base) * 0.85);
   line-height: 1.45;
   white-space: pre-wrap;
   word-break: break-word;
@@ -571,7 +602,7 @@ input:focus {
   border: 1px solid var(--border);
   background: var(--vscode-editorWidget-background, #252526);
   color: var(--muted);
-  font-size: 10px;
+  font-size: calc(var(--mm-font-base) * 0.77);
   opacity: 0;
 }
 
@@ -597,7 +628,7 @@ input:focus {
 
 .approval-title {
   font-weight: 600;
-  font-size: 12px;
+  font-size: calc(var(--mm-font-base) * 0.92);
 }
 
 .approval-actions {
@@ -621,7 +652,7 @@ input:focus {
   padding: 5px 8px;
   background: var(--code-bg);
   font-weight: 600;
-  font-size: 11px;
+  font-size: calc(var(--mm-font-base) * 0.85);
   font-family: var(--mono);
 }
 
@@ -635,7 +666,7 @@ input:focus {
 .diff-line {
   white-space: pre;
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: calc(var(--mm-font-base) * 0.85);
   line-height: 1.5;
 }
 
@@ -674,7 +705,7 @@ input:focus {
   max-height: 180px;
   overflow-y: auto;
   font-family: inherit;
-  font-size: 12px;
+  font-size: calc(var(--mm-font-base) * 0.92);
   line-height: 1.5;
   color: var(--vscode-input-foreground, var(--vscode-foreground));
   background: var(--vscode-input-background, #2b2b2b);
@@ -704,7 +735,7 @@ input:focus {
   border: 1px solid var(--border);
   background: var(--vscode-textBlockQuote-background, rgba(128, 128, 128, 0.16));
   color: var(--vscode-foreground);
-  font-size: 11px;
+  font-size: calc(var(--mm-font-base) * 0.85);
   line-height: 1.5;
   vertical-align: baseline;
   user-select: none;
@@ -724,7 +755,7 @@ input:focus {
   color: var(--muted);
   cursor: pointer;
   padding: 0 2px;
-  font-size: 12px;
+  font-size: calc(var(--mm-font-base) * 0.92);
   line-height: 1;
 }
 
@@ -784,7 +815,7 @@ input:focus {
   border-radius: 4px;
   background: var(--surface);
   color: var(--vscode-foreground);
-  font-size: 11px;
+  font-size: calc(var(--mm-font-base) * 0.85);
   white-space: nowrap;
 }
 
@@ -822,7 +853,7 @@ input:focus {
   border-radius: 3px;
   background: transparent;
   color: var(--vscode-foreground);
-  font-size: 11px;
+  font-size: calc(var(--mm-font-base) * 0.85);
   text-align: left;
   white-space: nowrap;
 }
@@ -837,6 +868,7 @@ input:focus {
 }
 
 /* the spend of every action, the input tokens are muted, the output is accent */
+/* The grid under the columns shows how tall a bar is. */
 .usage-graph {
   display: flex;
   align-items: flex-end;
@@ -845,6 +877,15 @@ input:focus {
   height: 22px;
   max-width: 60%;
   overflow: hidden;
+  border-radius: 3px;
+  background-color: var(--vscode-editorWidget-background, rgba(128, 128, 128, 0.08));
+  background-image: repeating-linear-gradient(
+    to top,
+    var(--border) 0,
+    var(--border) 1px,
+    transparent 1px,
+    transparent 25%
+  );
 }
 
 .usage-column {
@@ -894,13 +935,13 @@ input:focus {
   max-width: 100%;
   padding: 2px 4px 2px 6px;
   border-radius: 4px;
-  font-size: 11px;
+  font-size: calc(var(--mm-font-base) * 0.85);
   background: var(--vscode-textBlockQuote-background, rgba(128, 128, 128, 0.14));
   border: 1px solid var(--border);
 }
 
 .selection-kind {
-  font-size: 9px;
+  font-size: calc(var(--mm-font-base) * 0.69);
   text-transform: uppercase;
   letter-spacing: 0.4px;
   color: var(--accent);
@@ -915,7 +956,7 @@ input:focus {
 
 .selection-detail {
   color: var(--muted);
-  font-size: 10px;
+  font-size: calc(var(--mm-font-base) * 0.77);
 }
 
 .selection-remove {
@@ -925,7 +966,7 @@ input:focus {
   color: var(--muted);
   cursor: pointer;
   padding: 0 3px;
-  font-size: 13px;
+  font-size: calc(var(--mm-font-base) * 1);
   line-height: 1;
 }
 
@@ -961,7 +1002,7 @@ input:focus {
   border: none;
   border-radius: 0;
   padding: 5px 8px;
-  font-size: 12px;
+  font-size: calc(var(--mm-font-base) * 0.92);
 }
 
 .suggestion:hover,
@@ -977,11 +1018,11 @@ input:focus {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: calc(var(--mm-font-base) * 0.85);
 }
 
 .suggestion-source {
-  font-size: 9px;
+  font-size: calc(var(--mm-font-base) * 0.69);
   text-transform: uppercase;
   letter-spacing: 0.4px;
   opacity: 0.7;
@@ -1017,7 +1058,7 @@ input:focus {
 
 .settings-section h3 {
   margin: 0;
-  font-size: 11px;
+  font-size: calc(var(--mm-font-base) * 0.85);
   text-transform: uppercase;
   letter-spacing: 0.6px;
   color: var(--muted);
@@ -1038,17 +1079,17 @@ input:focus {
   display: flex;
   flex-direction: column;
   gap: 3px;
-  font-size: 12px;
+  font-size: calc(var(--mm-font-base) * 0.92);
 }
 
 .field > span:first-child {
   color: var(--muted);
-  font-size: 11px;
+  font-size: calc(var(--mm-font-base) * 0.85);
 }
 
 .hint {
   margin: 0;
-  font-size: 10.5px;
+  font-size: calc(var(--mm-font-base) * 0.81);
   color: var(--muted);
   line-height: 1.4;
 }
@@ -1057,7 +1098,7 @@ input:focus {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: calc(var(--mm-font-base) * 0.92);
 }
 
 .checkbox input {
@@ -1071,8 +1112,12 @@ input:focus {
   gap: 8px;
 }
 
+.value {
+  color: var(--vscode-foreground);
+}
+
 .saved {
-  font-size: 11px;
+  font-size: calc(var(--mm-font-base) * 0.85);
   color: var(--accent);
 }
 
@@ -1084,7 +1129,7 @@ input:focus {
   justify-content: center;
   padding: 24px 18px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: calc(var(--mm-font-base) * 0.92);
   line-height: 1.6;
   text-align: center;
 }
@@ -1141,7 +1186,7 @@ input:focus {
   text-align: left;
   padding: 5px 8px;
   border-radius: 3px;
-  font-size: 12px;
+  font-size: calc(var(--mm-font-base) * 0.92);
 }
 
 .session-new:hover {
@@ -1151,7 +1196,7 @@ input:focus {
 .session-empty {
   padding: 6px 8px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: calc(var(--mm-font-base) * 0.85);
 }
 
 .session-item {
@@ -1189,12 +1234,12 @@ input:focus {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 12px;
+  font-size: calc(var(--mm-font-base) * 0.92);
 }
 
 .session-time {
   color: var(--muted);
-  font-size: 10px;
+  font-size: calc(var(--mm-font-base) * 0.77);
 }
 
 .session-delete {
@@ -1204,7 +1249,7 @@ input:focus {
   color: var(--muted);
   cursor: pointer;
   padding: 2px 6px;
-  font-size: 13px;
+  font-size: calc(var(--mm-font-base) * 1);
   line-height: 1;
 }
 
@@ -1286,7 +1331,7 @@ input:focus {
 
 .markdown .code-lang {
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: calc(var(--mm-font-base) * 0.77);
   text-transform: uppercase;
   letter-spacing: 0.6px;
   color: var(--accent);
@@ -1316,7 +1361,7 @@ input:focus {
   background: transparent;
   color: var(--muted);
   cursor: pointer;
-  font-size: 10px;
+  font-size: calc(var(--mm-font-base) * 0.77);
 }
 
 .markdown .code-copy:hover {

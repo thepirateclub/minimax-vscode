@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { ProjectSearch } from '../../src/search/project';
 import { createExploreTools } from '../../src/tools/explore';
 
 function makeContext(root: string) {
@@ -32,6 +33,45 @@ describe('explore tools', () => {
     const result = await tool!.execute({ query: 'needle' }, makeContext(root));
     expect(result.content).toContain('a.ts');
     expect(result.content).toContain('const needle');
+  });
+
+  it('searches through the index of the project', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-'));
+    await mkdir(join(root, 'src'), { recursive: true });
+    await writeFile(
+      join(root, 'src', 'a.ts'),
+      'export function readFile() { return 1; }\n',
+      'utf8'
+    );
+    await writeFile(
+      join(root, 'src', 'b.ts'),
+      'export function writeFile() { return 2; }\n',
+      'utf8'
+    );
+    const search = new ProjectSearch(root);
+    const tool = createExploreTools({ search: () => search }).find(
+      (t) => t.name === 'search_code'
+    );
+    const result = await tool!.execute({ query: 'readFile' }, makeContext(root));
+    expect(result.content).toContain('src/a.ts');
+    expect(result.content).toContain('readFile');
+    expect(result.content.split('\n')[0]).toContain('src/a.ts');
+  });
+
+  it('finds a cut word with the fuzzy match', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-'));
+    await mkdir(join(root, 'src'), { recursive: true });
+    await writeFile(
+      join(root, 'src', 'a.ts'),
+      'export function readFile() { return 1; }\n',
+      'utf8'
+    );
+    const search = new ProjectSearch(root);
+    const tool = createExploreTools({ search: () => search }).find(
+      (t) => t.name === 'search_code'
+    );
+    const result = await tool!.execute({ query: 'eadFil' }, makeContext(root));
+    expect(result.content).toContain('src/a.ts');
   });
 
   it('returns nothing when there is no match', async () => {

@@ -43,4 +43,9 @@ describe('MODELS', () => {
   it('keeps a context window of one million for both models', () => {
     expect(MODELS.every((model) => model.contextWindow === 1_000_000)).toBe(true);
   });
+
+  it('keeps the limit of the answer in the catalog', () => {
+    expect(MODELS.every((model) => model.maxTokens >= 4096)).toBe(true);
+    expect(MODELS.every((model) => model.maxTokens <= 200_000)).toBe(true);
+  });
 });

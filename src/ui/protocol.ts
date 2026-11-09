@@ -73,8 +73,11 @@ export interface UiSettingsValues {
   effort: EffortLevel;
   mode: AgentMode;
   thinking: boolean;
-  maxTokens: number;
   maxIterations: number;
+  fontSize: number;
+  historyMaxMessages: number;
+  contextThreshold: number;
+  semanticSearch: boolean;
   autoApprove: string[];
   rulesEnabled: boolean;
   enableWebSearch: boolean;
@@ -107,6 +110,8 @@ export interface UiState {
   usage: UiUsageTurn[];
   hasApiKey: boolean;
   theme: ThemeKind;
+  // The size of the font of the panel in pixels.
+  fontSize: number;
 }
 
 export type ExtToWeb =

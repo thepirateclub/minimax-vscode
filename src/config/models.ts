@@ -21,6 +21,9 @@ export interface ModelInfo {
   thinkingAlwaysOn: boolean;
   reasoning: ReasoningControl;
   contextWindow: number;
+  // The limit of the answer of one request, the thinking tokens count into it.
+  // The server accepts far more, the catalog keeps a value that fits a code answer.
+  maxTokens: number;
 }
 
 export const MODELS: ModelInfo[] = [
@@ -31,7 +34,8 @@ export const MODELS: ModelInfo[] = [
     supportsEffort: true,
     thinkingAlwaysOn: true,
     reasoning: 'depth',
-    contextWindow: 1_000_000
+    contextWindow: 1_000_000,
+    maxTokens: 65_536
   },
   {
     id: 'MiniMax-M3',
@@ -40,7 +44,8 @@ export const MODELS: ModelInfo[] = [
     supportsEffort: false,
     thinkingAlwaysOn: false,
     reasoning: 'variants',
-    contextWindow: 1_000_000
+    contextWindow: 1_000_000,
+    maxTokens: 65_536
   }
 ];
 

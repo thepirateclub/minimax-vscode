@@ -82,6 +82,11 @@
         "category": "MiniMax"
       },
       {
+        "command": "minimax.reindex",
+        "title": "Rebuild Project Index",
+        "category": "MiniMax"
+      },
+      {
         "command": "minimax.showLogs",
         "title": "Show Logs",
         "category": "MiniMax"
@@ -153,7 +158,34 @@
           "type": "number",
           "default": 32000,
           "minimum": 4096,
-          "maximum": 65536
+          "maximum": 65536,
+          "deprecationMessage": "The limit of the answer comes from the model catalog now, this setting is ignored."
+        },
+        "minimax.fontSize": {
+          "type": "number",
+          "default": 13,
+          "minimum": 10,
+          "maximum": 22,
+          "description": "The size of the font of the panel in pixels."
+        },
+        "minimax.historyMaxMessages": {
+          "type": "number",
+          "default": 120,
+          "minimum": 10,
+          "maximum": 1000,
+          "description": "How many messages the chat keeps before the oldest turns are cut."
+        },
+        "minimax.contextThreshold": {
+          "type": "number",
+          "default": 50,
+          "minimum": 5,
+          "maximum": 95,
+          "description": "The share of the context window the history may take, in percent."
+        },
+        "minimax.semanticSearch": {
+          "type": "boolean",
+          "default": false,
+          "description": "Adds the semantic layer to the search. The code of the project is sent to MiniMax to build the vectors."
         },
         "minimax.maxIterations": {
           "type": "number",

@@ -1,29 +1,22 @@
 import { readFile, readdir } from 'node:fs/promises';
 import { join, relative, sep } from 'node:path';
+import { IGNORED_DIRS, isIgnoredName, isTextFile, TEXT_EXTENSIONS } from '../search/files';
+import type { ProjectSearch, SearchMode } from '../search/project';
 import type { ToolEntry } from './types';
 
-export const IGNORED_DIRS = ['node_modules', '.git', 'dist', 'build', 'out', 'coverage', '.next'];
+export { IGNORED_DIRS, isTextFile };
 
 const MAX_LIST_ENTRIES = 300;
 const MAX_SEARCH_RESULTS = 200;
-const DEFAULT_SEARCH_RESULTS = 50;
-const TEXT_EXTENSIONS = new Set([
-  '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.json', '.md', '.txt', '.yml', '.yaml',
-  '.py', '.go', '.rs', '.java', '.kt', '.c', '.h', '.cpp', '.hpp', '.cs', '.rb', '.php',
-  '.sh', '.ps1', '.html', '.css', '.scss', '.sql', '.toml', '.ini', '.vue', '.svelte'
-]);
+const DEFAULT_SEARCH_RESULTS = 30;
 
-function isIgnored(name: string): boolean {
-  return IGNORED_DIRS.includes(name) || name.startsWith('.');
+export interface ExploreOptions {
+  // The index of the project. The resolver picks the index of the workspace
+  // root, the tool walks the tree when there is no index.
+  search?: (workspaceRoot: string) => ProjectSearch | undefined;
 }
 
-export function isTextFile(path: string): boolean {
-  const dot = path.lastIndexOf('.');
-  const extension = dot === -1 ? '' : path.slice(dot).toLowerCase();
-  return TEXT_EXTENSIONS.has(extension);
-}
-
-export function createExploreTools(): ToolEntry[] {
+export function createExploreTools(options: ExploreOptions = {}): ToolEntry[] {
   const listFiles: ToolEntry = {
     name: 'list_files',
     description:
@@ -55,7 +48,7 @@ export function createExploreTools(): ToolEntry[] {
           if (lines.length >= MAX_LIST_ENTRIES) {
             return;
           }
-          if (isIgnored(entry.name)) {
+          if (isIgnoredName(entry.name)) {
             continue;
           }
           const full = join(dir, entry.name);
@@ -77,19 +70,25 @@ export function createExploreTools(): ToolEntry[] {
   const searchCode: ToolEntry = {
     name: 'search_code',
     description:
-      'Search the workspace for a literal string. Returns matching file paths with line numbers and the matching line.',
+      'Search the workspace for a text. The index of the project ranks the files, the answer holds the path, the line number and the line of the code. Use it to find a place in the code, not to read a whole file.',
     approval: 'never',
     sideEffect: false,
     inputSchema: {
       type: 'object',
       properties: {
-        query: { type: 'string', description: 'Literal text to look for.' },
+        query: { type: 'string', description: 'The text to look for.' },
         path: { type: 'string', description: 'Subdirectory to search in, relative to the workspace root.' },
         max_results: {
           type: 'integer',
           minimum: 1,
           maximum: MAX_SEARCH_RESULTS,
-          description: 'Maximum number of matches, default 50.'
+          description: 'Maximum number of matches, default 30.'
+        },
+        mode: {
+          type: 'string',
+          enum: ['auto', 'lexical', 'semantic', 'hybrid'],
+          description:
+            'How the search runs. Auto uses the lexical index and adds the semantic layer when it is on.'
         }
       },
       required: ['query']
@@ -103,6 +102,22 @@ export function createExploreTools(): ToolEntry[] {
         MAX_SEARCH_RESULTS,
         Math.max(1, Number(input['max_results'] ?? DEFAULT_SEARCH_RESULTS))
       );
+      const mode = String(input['mode'] ?? 'auto') as SearchMode;
+      const sub = input['path'] === undefined ? undefined : String(input['path']);
+
+      const search = options.search?.(ctx.workspaceRoot);
+      if (search) {
+        const outcome = await search.search(query, { limit, mode, path: sub });
+        if (outcome.hits.length === 0) {
+          const note = outcome.note ? ' (' + outcome.note + ')' : '';
+          return { content: 'No matches for ' + JSON.stringify(query) + note, isError: false };
+        }
+        const lines = outcome.hits.map(
+          (hit) => hit.path + ':' + hit.line + ': ' + hit.snippet
+        );
+        return { content: lines.join('\n'), isError: false };
+      }
+
       const root = join(ctx.workspaceRoot, String(input['path'] ?? '.'));
       const results: string[] = [];
       const walk = async (dir: string): Promise<void> => {
@@ -119,7 +134,7 @@ export function createExploreTools(): ToolEntry[] {
           if (results.length >= limit) {
             return;
           }
-          if (isIgnored(entry.name)) {
+          if (isIgnoredName(entry.name)) {
             continue;
           }
           const full = join(dir, entry.name);

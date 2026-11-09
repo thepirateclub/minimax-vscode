@@ -31,7 +31,8 @@ const EMPTY_STATE: UiState = {
   tokens: 0,
   usage: [],
   hasApiKey: false,
-  theme: 'dark'
+  theme: 'dark',
+  fontSize: 13
 };
 
 export function App({ vscode }: { vscode: VsCodeApi }) {
@@ -181,6 +182,11 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
     }
     body.classList.add('mm-theme-' + state.theme);
   }, [state.theme]);
+
+  // The size of the font of the panel comes from the settings of the host.
+  useEffect(() => {
+    document.body.style.setProperty('--mm-font-base', state.fontSize + 'px');
+  }, [state.fontSize]);
 
   const busy = state.state !== 'idle' && state.state !== 'error';
 

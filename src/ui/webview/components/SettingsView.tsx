@@ -12,12 +12,21 @@ function toValues(settings: UiSettings): UiSettingsValues {
     effort: settings.effort,
     mode: settings.mode,
     thinking: settings.thinking,
-    maxTokens: settings.maxTokens,
     maxIterations: settings.maxIterations,
+    fontSize: settings.fontSize,
+    historyMaxMessages: settings.historyMaxMessages,
+    contextThreshold: settings.contextThreshold,
+    semanticSearch: settings.semanticSearch,
     autoApprove: settings.autoApprove,
     rulesEnabled: settings.rulesEnabled,
     enableWebSearch: settings.enableWebSearch
   };
+}
+
+// The limit of the answer belongs to the model, the panel only shows it.
+function modelMaxTokens(settings: UiSettings, model: string): string {
+  const found = settings.models.find((item) => item.id === model);
+  return found ? String(found.maxTokens) : '-';
 }
 
 export function SettingsView({
@@ -181,14 +190,8 @@ export function SettingsView({
         <h3>Limits</h3>
         <label className="field">
           <span>{STRINGS.maxTokens}</span>
-          <input
-            type="number"
-            min={4096}
-            max={65536}
-            step={1024}
-            value={values.maxTokens}
-            onChange={(event) => patch({ maxTokens: Number(event.target.value) })}
-          />
+          <span className="value">{modelMaxTokens(settings, values.model)}</span>
+          <span className="hint">{STRINGS.maxTokensHint}</span>
         </label>
         <label className="field">
           <span>{STRINGS.maxIterations}</span>
@@ -200,6 +203,59 @@ export function SettingsView({
             onChange={(event) => patch({ maxIterations: Number(event.target.value) })}
           />
         </label>
+        <label className="field">
+          <span>{STRINGS.historyMaxMessages}</span>
+          <input
+            type="number"
+            min={10}
+            max={1000}
+            step={10}
+            value={values.historyMaxMessages}
+            onChange={(event) => patch({ historyMaxMessages: Number(event.target.value) })}
+          />
+          <span className="hint">{STRINGS.historyMaxMessagesHint}</span>
+        </label>
+        <label className="field">
+          <span>{STRINGS.contextThreshold}</span>
+          <input
+            type="number"
+            min={5}
+            max={95}
+            step={5}
+            value={values.contextThreshold}
+            onChange={(event) => patch({ contextThreshold: Number(event.target.value) })}
+          />
+          <span className="hint">{STRINGS.contextThresholdHint}</span>
+        </label>
+      </section>
+
+      <section className="settings-section">
+        <h3>{STRINGS.appearance}</h3>
+        <label className="field">
+          <span>{STRINGS.fontSize}</span>
+          <input
+            type="number"
+            min={10}
+            max={22}
+            step={1}
+            value={values.fontSize}
+            onChange={(event) => patch({ fontSize: Number(event.target.value) })}
+          />
+          <span className="hint">{STRINGS.fontSizeHint}</span>
+        </label>
+      </section>
+
+      <section className="settings-section">
+        <h3>{STRINGS.search}</h3>
+        <label className="checkbox">
+          <input
+            type="checkbox"
+            checked={values.semanticSearch}
+            onChange={(event) => patch({ semanticSearch: event.target.checked })}
+          />
+          <span>{STRINGS.semanticSearch}</span>
+        </label>
+        <p className="hint">{STRINGS.semanticSearchHint}</p>
       </section>
 
       <section className="settings-section">

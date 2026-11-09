@@ -1,5 +1,5 @@
 import type { MiniMaxClient } from '../api/client';
-import { fitHistory, MAX_HISTORY_MESSAGES } from '../api/history';
+import { fitHistory } from '../api/history';
 import type { AnthropicMessage, EffortLevel } from '../api/types';
 import type { AgentMode } from '../config/models';
 import { Agent, type AgentEvent } from './agent';
@@ -19,6 +19,10 @@ export interface SessionOptions {
   thinking?: 'adaptive';
   // The context window of the model, the history is cut to fit into it.
   contextWindow?: number;
+  // How many messages the history keeps before the old turns are cut.
+  historyLimit: number;
+  // The share of the context window the history may take, in percent.
+  contextThreshold: number;
   mode: AgentMode;
   systemPrompt: string;
   workspaceRoot: string;
@@ -102,8 +106,9 @@ export class AgentSession {
     const result = await this.agent.run(prompt, this.history);
     this.history = fitHistory(
       result.messages,
-      MAX_HISTORY_MESSAGES,
-      this.options.contextWindow ?? 1_000_000
+      this.options.historyLimit,
+      this.options.contextWindow ?? 1_000_000,
+      this.options.contextThreshold
     );
   }
 

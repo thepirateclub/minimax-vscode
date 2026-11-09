@@ -1,6 +1,7 @@
 import { unlink, writeFile } from 'node:fs/promises';
 import { isAbsolute } from 'node:path';
 import * as vscode from 'vscode';
+import { HttpEmbeddingsClient } from './api/embeddings';
 import { HttpMiniMaxClient } from './api/client';
 import { fetchQuota, type QuotaSnapshot } from './api/quota';
 import type { AnthropicMessage, EffortLevel } from './api/types';
@@ -17,6 +18,7 @@ import {
 } from './config/secrets';
 import { getSettings, onSettingsChanged, type MiniMaxSettings } from './config/settings';
 import { createLogger, type Logger } from './logger';
+import { ProjectSearch } from './search/project';
 import { InMemoryBackupStore } from './storage/backups';
 import { SessionStore, type StoredSession } from './storage/sessions';
 import { createExploreTools, isTextFile } from './tools/explore';
@@ -64,6 +66,8 @@ class MiniMaxController {
   private readonly panel: AgentPanelProvider;
   private readonly statusBar = new StatusBarController();
   private readonly sessions = new Map<string, RuntimeSession>();
+  // The index of the project, one per workspace folder.
+  private readonly searches = new Map<string, ProjectSearch>();
   private activeSessionId: string | undefined;
   private agentState: AgentState = 'idle';
   private counter = 0;
@@ -86,7 +90,7 @@ class MiniMaxController {
 
     for (const tool of [
       ...createFileTools({ backups: this.backups }),
-      ...createExploreTools(),
+      ...createExploreTools({ search: (root) => this.searchFor(root) }),
       ...createTerminalTools()
     ]) {
       this.registry.register(tool);
@@ -153,6 +157,24 @@ class MiniMaxController {
         this.panel.post({ type: 'theme', kind: themeKind() });
       })
     );
+
+    // The index of the project follows the files of the workspace.
+    const watcher = vscode.workspace.createFileSystemWatcher('**/*');
+    const onFile = (uri: vscode.Uri): void => {
+      const path = vscode.workspace.asRelativePath(uri, false);
+      if (path.length === 0 || path.startsWith('..') || isAbsolute(path)) {
+        return;
+      }
+      this.searchFor(this.workspaceRoot()).invalidate(path);
+    };
+    watcher.onDidChange(onFile);
+    watcher.onDidCreate(onFile);
+    watcher.onDidDelete(onFile);
+    context.subscriptions.push(watcher);
+
+    context.subscriptions.push(
+      vscode.commands.registerCommand('minimax.reindex', () => void this.reindex())
+    );
     context.subscriptions.push(this.statusBar);
 
     const quotaTimer = setInterval(() => {
@@ -163,6 +185,50 @@ class MiniMaxController {
         clearInterval(quotaTimer);
       }
     });
+  }
+
+  // The index of the project, it lives as long as the folder is open.
+  private searchFor(root: string): ProjectSearch {
+    let search = this.searches.get(root);
+    if (!search) {
+      search = new ProjectSearch(root);
+      this.searches.set(root, search);
+      void this.applySemanticProvider();
+    }
+    return search;
+  }
+
+  // The semantic layer asks the server for the vectors of the code, it stays
+  // off until the user turns it on.
+  private async applySemanticProvider(): Promise<void> {
+    const settings = getSettings();
+    const key = settings.semanticSearch ? await getApiKey(this.context.secrets) : undefined;
+    for (const search of this.searches.values()) {
+      if (!key) {
+        search.setSemanticProvider(undefined);
+        continue;
+      }
+      search.setSemanticProvider(
+        new HttpEmbeddingsClient({
+          baseUrl: resolveBaseUrl(settings.baseUrl, settings.customBaseUrl),
+          apiKey: key
+        })
+      );
+    }
+  }
+
+  // The index of the project starts to build before the first request.
+  prepareIndex(): void {
+    void this.searchFor(this.workspaceRoot()).ensureIndex();
+  }
+
+  // The index of the project is built again from the files of the disk.
+  private async reindex(): Promise<void> {
+    const search = this.searchFor(this.workspaceRoot());
+    await search.rebuild();
+    void vscode.window.showInformationMessage(
+      'MiniMax: the index of the project is ready, ' + search.fileCount + ' files.'
+    );
   }
 
   private showLogs(): void {
@@ -227,6 +293,7 @@ class MiniMaxController {
       return undefined;
     }
     const settings = getSettings();
+    const model = MODELS.find((item) => item.id === settings.model);
     const agent = new AgentSession({
       client: new HttpMiniMaxClient({
         baseUrl: resolveBaseUrl(settings.baseUrl, settings.customBaseUrl),
@@ -234,12 +301,14 @@ class MiniMaxController {
       }),
       registry: this.registry,
       model: settings.model,
-      maxTokens: settings.maxTokens,
+      maxTokens: model?.maxTokens ?? 65_536,
       maxIterations: settings.maxIterations,
       effort: settings.effort,
       mode: settings.mode,
       thinking: this.thinkingMode(settings),
-      contextWindow: MODELS.find((model) => model.id === settings.model)?.contextWindow,
+      contextWindow: model?.contextWindow,
+      historyLimit: settings.historyMaxMessages,
+      contextThreshold: settings.contextThreshold,
       systemPrompt: await this.buildPrompt(),
       workspaceRoot: this.workspaceRoot(),
       logger: this.logger,
@@ -728,8 +797,11 @@ class MiniMaxController {
       effort: settings.effort,
       mode: settings.mode,
       thinking: settings.thinking,
-      maxTokens: settings.maxTokens,
       maxIterations: settings.maxIterations,
+      fontSize: settings.fontSize,
+      historyMaxMessages: settings.historyMaxMessages,
+      contextThreshold: settings.contextThreshold,
+      semanticSearch: settings.semanticSearch,
       autoApprove: settings.autoApprove,
       rulesEnabled: settings.rulesEnabled,
       enableWebSearch: settings.enableWebSearch,
@@ -748,8 +820,11 @@ class MiniMaxController {
       ['effort', values.effort],
       ['mode', values.mode],
       ['thinking', values.thinking],
-      ['maxTokens', values.maxTokens],
       ['maxIterations', values.maxIterations],
+      ['fontSize', values.fontSize],
+      ['historyMaxMessages', values.historyMaxMessages],
+      ['contextThreshold', values.contextThreshold],
+      ['semanticSearch', values.semanticSearch],
       ['autoApprove', values.autoApprove],
       ['rulesEnabled', values.rulesEnabled],
       ['enableWebSearch', values.enableWebSearch]
@@ -909,13 +984,15 @@ class MiniMaxController {
         tokens: this.usageTotal(runtime),
         usage: runtime ? [...runtime.usage] : [],
         hasApiKey: Boolean(key),
-        theme: themeKind()
+        theme: themeKind(),
+        fontSize: settings.fontSize
       }
     });
   }
 
   private applySettings(): void {
     const settings = getSettings();
+    void this.applySemanticProvider();
     for (const runtime of this.sessions.values()) {
       if (runtime.busy) {
         runtime.agent?.setAutoApprove(settings.autoApprove);
@@ -1078,6 +1155,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   controller.register(context);
   controller.restoreSession();
   void controller.refreshQuota();
+  // The index of the project is built in the background, the first search
+  // does not wait for the files of the disk.
+  void controller.prepareIndex();
 }
 
 export function deactivate(): void {
