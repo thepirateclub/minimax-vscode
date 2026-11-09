@@ -66,8 +66,9 @@ function firstLine(value: string | undefined): string {
 }
 
 // The card shows what the agent did, not the name of the tool.
-function describe(tool: UiToolCall): ToolView {
-  const view = describeTool(tool);
+// A folded card hides its body, so the header has to name the command.
+function describe(tool: UiToolCall, folded: boolean): ToolView {
+  const view = describeTool(tool, folded);
   const path = filePaths(tool.input)[0] ?? '';
   const result = (tool.content ?? '').split('\n')[0] ?? '';
   // The tool names the file in its result, the title of the card names it
@@ -96,7 +97,7 @@ function readRange(input: Record<string, unknown>): string {
   return first === last ? String(first) : first + '-' + last;
 }
 
-function describeTool(tool: UiToolCall): ToolView {
+function describeTool(tool: UiToolCall, folded: boolean): ToolView {
   const input = tool.input;
   const paths = filePaths(input);
   const content = tool.content;
@@ -149,7 +150,9 @@ function describeTool(tool: UiToolCall): ToolView {
     const failed = /exit code (\d+)/.exec(content ?? '');
     return {
       icon: <IconTerminal />,
-      title: STRINGS.toolTerminal + ' ' + command,
+      // The command stands in the terminal block. The header repeats it
+      // only while the card is folded and the block is hidden.
+      title: folded ? STRINGS.toolTerminal + ' ' + command : STRINGS.toolTerminal,
       // The output speaks for itself, the summary keeps only the failure.
       summary: failed ? STRINGS.toolExitCode + ' ' + failed[1] : ''
     };
@@ -203,7 +206,7 @@ export function ToolCard({
     : tool.isError
       ? STRINGS.toolFailed
       : STRINGS.toolDone;
-  const view = describe(tool);
+  const view = describe(tool, !open);
   return (
     <div
       className={

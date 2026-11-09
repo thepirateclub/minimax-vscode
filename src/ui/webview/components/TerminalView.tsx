@@ -7,6 +7,9 @@ import { parseTerminalOutput } from '../terminalOutput';
 // own line, the failure of it is red, the rest of the output stays quiet.
 export function TerminalView({ command, content }: { command: string; content: string }) {
   const lines = useMemo(() => parseTerminalOutput(command, content), [command, content]);
+  const body = lines.filter((line) => line.kind !== 'command');
+  // The copy gives the transcript of the terminal, the command included.
+  const transcript = [command, ...body.map((line) => line.text)].join('\n');
   return (
     <div className="term">
       <button
@@ -14,7 +17,7 @@ export function TerminalView({ command, content }: { command: string; content: s
         title={STRINGS.copy}
         aria-label={STRINGS.copy}
         onClick={() => {
-          void navigator.clipboard?.writeText(content);
+          void navigator.clipboard?.writeText(transcript);
         }}
       >
         <IconCopy />
@@ -26,13 +29,11 @@ export function TerminalView({ command, content }: { command: string; content: s
         <span className="term-cmd-text">{command}</span>
       </div>
       <div className="term-body">
-        {lines
-          .filter((line) => line.kind !== 'command')
-          .map((line, index) => (
-            <div key={index} className={'term-line term-line-' + line.kind}>
-              {line.text}
-            </div>
-          ))}
+        {body.map((line, index) => (
+          <div key={index} className={'term-line term-line-' + line.kind}>
+            {line.text}
+          </div>
+        ))}
       </div>
     </div>
   );

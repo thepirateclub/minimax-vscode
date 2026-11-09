@@ -8,15 +8,16 @@ describe('the output of a command', () => {
     expect(lines[1]).toEqual({ kind: 'output', text: 'Volume in drive H has no label.' });
   });
 
-  it('marks the failure of a command', () => {
+  it('drops the wrapper of a failure, the card shows the exit code', () => {
     const lines = parseTerminalOutput(
       'bad',
       'Command failed with exit code 255\n[stderr] not recognized'
     );
+    // The tool wraps the failure with the exit code, the header of the card
+    // shows it. The transcript keeps the output of the command itself.
     expect(lines[1]?.kind).toBe('error');
-    expect(lines[1]?.text).toBe('Command failed with exit code 255');
-    expect(lines[2]?.kind).toBe('error');
-    expect(lines[2]?.text).toBe('not recognized');
+    expect(lines[1]?.text).toBe('not recognized');
+    expect(lines.some((line) => line.text.includes('exit code'))).toBe(false);
   });
 
   it('marks the stderr of a command', () => {

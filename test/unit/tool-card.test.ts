@@ -56,6 +56,12 @@ function summaryOf(markup: string): string {
   return match?.[1] ?? '';
 }
 
+// The title of the card names the action.
+function titleOf(markup: string): string {
+  const match = /<span class="tool-title">([^<]*)<\/span>/.exec(markup);
+  return match?.[1] ?? '';
+}
+
 // The size of the change sits in the header of the card.
 function addedOf(markup: string): string {
   const match = /<span class="tool-stat tool-stat-add">([^<]*)<\/span>/.exec(markup);
@@ -317,5 +323,41 @@ describe('the dot of an action', () => {
       content: '10: alpha'
     });
     expect(markup).toContain('Read demo.txt 10-40');
+  });
+
+  it('does not repeat the command in the header of an open card', () => {
+    const markup = card({
+      name: 'run_terminal',
+      input: { command: 'dir tmp-demo.txt' },
+      content: 'Volume in drive H has no label.'
+    });
+    // The command stands in the terminal block, the header names the action.
+    expect(titleOf(markup)).toBe('Run');
+    expect(markup).toContain('term-command');
+  });
+
+  it('keeps the command in the header of a folded card', () => {
+    const markup = card(
+      {
+        name: 'run_terminal',
+        input: { command: 'dir tmp-demo.txt' },
+        content: 'Volume in drive H has no label.'
+      },
+      true
+    );
+    // The body is hidden, so the header has to name the command.
+    expect(titleOf(markup)).toBe('Run dir tmp-demo.txt');
+  });
+
+  it('shows the exit code of a failed command only in the header', () => {
+    const markup = card({
+      name: 'run_terminal',
+      input: { command: 'bad' },
+      content: 'Command failed with exit code 255\n[stderr] not recognized',
+      isError: true
+    });
+    expect(summaryOf(markup)).toBe('exit code 255');
+    // The wrapper of the tool repeats the exit code, the transcript does not.
+    expect(markup).not.toContain('Command failed with exit code');
   });
 });

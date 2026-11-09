@@ -21,9 +21,10 @@ export function parseTerminalOutput(command: string, content: string): TerminalL
     if (line.length === 0) {
       continue;
     }
+    // The tool wraps a failure with the exit code, the header of the card
+    // shows it. The transcript keeps the output of the command itself.
     if (FAILED.test(line)) {
       failed = true;
-      lines.push({ kind: 'error', text: line });
       continue;
     }
     if (STDERR.test(line)) {
