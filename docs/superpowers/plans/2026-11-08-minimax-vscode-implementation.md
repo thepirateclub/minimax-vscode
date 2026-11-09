@@ -5302,4 +5302,4 @@ git commit -m "feat: live-тесты, упаковка .vsix и документ
 | `npm run package` | собран `minimax-agent-0.1.0.vsix`, 9 файлов, 121 КБ |
 | `code --install-extension` | расширение установлено как `local.minimax-agent@0.1.0` |
 | Проба реального эндпоинта | `https://api.minimax.io/anthropic/v1/messages` и `https://api.minimaxi.com/anthropic/v1/messages` отвечают `401` на фиктивный ключ, ошибка корректно превращается в понятное сообщение |
-| Живой запрос с настоящим ключом | требуется `MINIMAX_API_KEY` в `.env.local`, выполняется командой `npm run test:live` |
+| Живой запрос с настоящим ключом | пройден: `npm run test:live`, стрим ответа вернул `ready`, round-trip с `read_file` прочитал файл и модель пересказала его содержимое |
