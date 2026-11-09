@@ -58,6 +58,9 @@ export type StopReason =
 export interface Usage {
   inputTokens: number;
   outputTokens: number;
+  // MiniMax reports the cached part of the context separately.
+  cacheReadTokens?: number;
+  cacheCreationTokens?: number;
 }
 
 export type EffortLevel = 'low' | 'medium' | 'high' | 'xhigh' | 'max';

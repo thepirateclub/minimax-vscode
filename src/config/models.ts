@@ -9,6 +9,8 @@ export const AGENT_MODES: AgentMode[] = ['plan', 'code'];
 export interface ModelInfo {
   id: string;
   label: string;
+  // A short name for the compact selector under the prompt.
+  shortLabel: string;
   supportsEffort: boolean;
   thinkingAlwaysOn: boolean;
   contextWindow: number;
@@ -18,6 +20,7 @@ export const MODELS: ModelInfo[] = [
   {
     id: 'MiniMax-M3.1-Flash',
     label: 'MiniMax M3.1 Flash (1M, multimodal, tunable thinking)',
+    shortLabel: 'M3.1 Flash',
     supportsEffort: true,
     thinkingAlwaysOn: true,
     contextWindow: 1_000_000
@@ -25,6 +28,7 @@ export const MODELS: ModelInfo[] = [
   {
     id: 'MiniMax-M3',
     label: 'MiniMax M3 (1M, multimodal, adaptive thinking)',
+    shortLabel: 'M3',
     supportsEffort: false,
     thinkingAlwaysOn: false,
     contextWindow: 1_000_000

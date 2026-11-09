@@ -26,8 +26,10 @@ const EMPTY_STATE: UiState = {
   models: [],
   effort: 'max',
   mode: 'code',
+  thinking: false,
   state: 'idle',
   tokens: 0,
+  usage: [],
   hasApiKey: false
 };
 
@@ -109,6 +111,10 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
           state: message.state,
           tokens: message.tokens ?? prev.tokens
         }));
+        return;
+      }
+      if (message.type === 'usage') {
+        setState((prev) => ({ ...prev, usage: message.turns }));
         return;
       }
       if (message.type === 'session_loaded') {
@@ -198,6 +204,7 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
         onTab={openTab}
         state={state.state}
         tokens={state.tokens}
+        usage={state.usage}
         hasApiKey={state.hasApiKey}
         onNewChat={() => vscode.postMessage({ type: 'new_session' })}
       />
@@ -225,9 +232,11 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
           model={state.model}
           effort={state.effort}
           mode={state.mode}
+          thinking={state.thinking}
           onModel={(model) => vscode.postMessage({ type: 'set_model', model })}
           onEffort={(effort) => vscode.postMessage({ type: 'set_effort', effort })}
           onMode={(mode) => vscode.postMessage({ type: 'set_mode', mode })}
+          onThinking={(thinking) => vscode.postMessage({ type: 'set_thinking', thinking })}
           onSend={(sent, mentions, sentSelections) => {
             vscode.postMessage({
               type: 'send',

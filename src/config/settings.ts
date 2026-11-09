@@ -7,6 +7,7 @@ export interface MiniMaxSettings {
   model: string;
   effort: EffortLevel;
   mode: AgentMode;
+  thinking: boolean;
   maxTokens: number;
   maxIterations: number;
   autoApprove: string[];
@@ -22,6 +23,7 @@ export function getSettings(): MiniMaxSettings {
     model: cfg.get<string>('model', 'MiniMax-M3.1-Flash'),
     effort: cfg.get<EffortLevel>('effort', 'max'),
     mode: cfg.get<AgentMode>('mode', 'code'),
+    thinking: cfg.get<boolean>('thinking', false),
     maxTokens: cfg.get<number>('maxTokens', 32000),
     maxIterations: cfg.get<number>('maxIterations', 40),
     autoApprove: cfg.get<string[]>('autoApprove', []),

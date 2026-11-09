@@ -56,6 +56,17 @@ function signatureOf(name: string, input: Record<string, unknown>): string {
   return name + ':' + JSON.stringify(input);
 }
 
+// One action can send several requests to the API, the spend of the action
+// is the sum of all of them.
+function addUsage(total: Usage, part: Usage): Usage {
+  return {
+    inputTokens: total.inputTokens + part.inputTokens,
+    outputTokens: total.outputTokens + part.outputTokens,
+    cacheReadTokens: (total.cacheReadTokens ?? 0) + (part.cacheReadTokens ?? 0),
+    cacheCreationTokens: (total.cacheCreationTokens ?? 0) + (part.cacheCreationTokens ?? 0)
+  };
+}
+
 export class Agent {
   private readonly options: AgentOptions;
   private readonly controller = new AbortController();
@@ -89,7 +100,7 @@ export class Agent {
       this.pendingAssistantStart = true;
       const streamed = await this.streamWithRetry(messages);
       const blocks = streamed.blocks;
-      usage = streamed.usage;
+      usage = addUsage(usage, streamed.usage);
 
       messages.push({ role: 'assistant', content: blocks });
 

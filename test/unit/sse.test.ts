@@ -40,6 +40,19 @@ describe('StreamDecoder', () => {
     expect(stop?.usage.outputTokens).toBe(5);
   });
 
+  it('takes the counters of the request from message_delta', () => {
+    const decoder = new StreamDecoder();
+    const events = [
+      ...decoder.push('event: message_start\ndata: {"type":"message_start","message":{"usage":{"input_tokens":0,"output_tokens":0}}}\n\n'),
+      ...decoder.push('event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"input_tokens":11,"output_tokens":22,"cache_read_input_tokens":197}}\n\n'),
+      ...decoder.push('event: message_stop\ndata: {"type":"message_stop"}\n\n')
+    ];
+    const stop = events.find((e) => e.type === 'message_stop');
+    expect(stop?.usage.inputTokens).toBe(11);
+    expect(stop?.usage.outputTokens).toBe(22);
+    expect(stop?.usage.cacheReadTokens).toBe(197);
+  });
+
   it('keeps thinking blocks separate from text', () => {
     const decoder = new StreamDecoder();
     const events = [

@@ -462,6 +462,7 @@ describe('extension activation', () => {
         model: 'MiniMax-M3',
         effort: 'high',
         mode: 'plan',
+        thinking: true,
         maxTokens: 16384,
         maxIterations: 12,
         autoApprove: ['run_terminal'],
@@ -475,6 +476,7 @@ describe('extension activation', () => {
     expect(state.config.get('baseUrl')).toBe('china');
     expect(state.config.get('effort')).toBe('high');
     expect(state.config.get('mode')).toBe('plan');
+    expect(state.config.get('thinking')).toBe(true);
     expect(state.config.get('maxTokens')).toBe(16384);
     expect(state.config.get('autoApprove')).toEqual(['run_terminal']);
     expect(state.config.get('rulesEnabled')).toBe(false);
@@ -562,6 +564,76 @@ describe('extension activation', () => {
     expect(names).not.toContain('run_terminal');
     expect(body.system).toContain('Mode: PLAN');
     expect(body.system).not.toContain('write_file');
+  });
+
+  it('collects the token spend of every action', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.secrets.set('minimax.apiKey', 'test-key');
+    state.responses.push(TEXT_SSE);
+    await boot();
+
+    state.posted.length = 0;
+    state.receive?.({ type: 'send', text: 'hello', mentions: [], selections: [] });
+    await vi.waitFor(() => {
+      expect(ofType('usage').length).toBe(1);
+    });
+    expect(ofType('usage')[0]!.turns).toEqual([
+      { input: 11, output: 7, cache: 0 }
+    ]);
+    await vi.waitFor(() => {
+      const statuses = ofType('status');
+      expect(statuses[statuses.length - 1]!.tokens).toBe(18);
+    });
+  });
+
+  it('switches the thinking of the model from the webview', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    await boot();
+    expect(ofType('init')[0]!.state.thinking).toBe(false);
+    state.receive?.({ type: 'set_thinking', thinking: true });
+    await vi.waitFor(() => {
+      expect(state.config.get('thinking')).toBe(true);
+    });
+    await vi.waitFor(() => {
+      const inits = ofType('init');
+      expect(inits[inits.length - 1]!.state.thinking).toBe(true);
+    });
+  });
+
+  it('asks the M3 model to think when the thinking is on', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.secrets.set('minimax.apiKey', 'test-key');
+    state.config.set('model', 'MiniMax-M3');
+    state.config.set('thinking', true);
+    state.responses.push(TEXT_SSE);
+    await boot();
+
+    state.receive?.({ type: 'send', text: 'hello', mentions: [], selections: [] });
+    await vi.waitFor(() => {
+      expect(ofType('text_delta').length).toBeGreaterThan(0);
+    });
+    const body = JSON.parse(state.bodies[0]!) as Record<string, unknown>;
+    expect(body['thinking']).toEqual({ type: 'adaptive' });
+    expect(body['output_config']).toBeUndefined();
+  });
+
+  it('keeps the thinking of the M3 model off by default', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.secrets.set('minimax.apiKey', 'test-key');
+    state.config.set('model', 'MiniMax-M3');
+    state.responses.push(TEXT_SSE);
+    await boot();
+
+    state.receive?.({ type: 'send', text: 'hello', mentions: [], selections: [] });
+    await vi.waitFor(() => {
+      expect(ofType('text_delta').length).toBeGreaterThan(0);
+    });
+    const body = JSON.parse(state.bodies[0]!) as Record<string, unknown>;
+    expect(body['thinking']).toBeUndefined();
   });
 
   it('shows the remaining 5-hour quota in the status bar', async () => {

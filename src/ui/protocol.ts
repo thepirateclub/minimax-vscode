@@ -67,6 +67,7 @@ export interface UiSettingsValues {
   model: string;
   effort: EffortLevel;
   mode: AgentMode;
+  thinking: boolean;
   maxTokens: number;
   maxIterations: number;
   autoApprove: string[];
@@ -80,6 +81,13 @@ export interface UiSettings extends UiSettingsValues {
   tools: string[];
 }
 
+// The token spend of one action, the input and the output parts.
+export interface UiUsageTurn {
+  input: number;
+  output: number;
+  cache: number;
+}
+
 export interface UiState {
   sessions: UiSessionSummary[];
   activeSessionId: string | undefined;
@@ -88,8 +96,10 @@ export interface UiState {
   models: ModelInfo[];
   effort: EffortLevel;
   mode: AgentMode;
+  thinking: boolean;
   state: AgentState;
   tokens: number;
+  usage: UiUsageTurn[];
   hasApiKey: boolean;
 }
 
@@ -104,6 +114,7 @@ export type ExtToWeb =
   | { type: 'approval_request'; approval: UiApproval }
   | { type: 'approval_resolved'; id: string; approved: boolean }
   | { type: 'status'; state: AgentState; tokens?: number }
+  | { type: 'usage'; turns: UiUsageTurn[] }
   | { type: 'error'; message: string }
   | { type: 'session_loaded'; messages: UiMessage[] }
   | { type: 'sessions'; sessions: UiSessionSummary[] }
@@ -126,6 +137,7 @@ export type WebToExt =
   | { type: 'set_model'; model: string }
   | { type: 'set_effort'; effort: EffortLevel }
   | { type: 'set_mode'; mode: AgentMode }
+  | { type: 'set_thinking'; thinking: boolean }
   | { type: 'pick_files'; requestId: string }
   | { type: 'files_picked'; requestId: string; files: string[] }
   | { type: 'undo_last_change' }

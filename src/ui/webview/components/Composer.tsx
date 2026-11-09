@@ -3,7 +3,9 @@ import type { KeyboardEvent, MouseEvent } from 'react';
 import type { EffortLevel } from '../../../api/types';
 import type { AgentMode, ModelInfo } from '../../../config/models';
 import type { UiSelection, UiSuggestion } from '../../protocol';
+import { IconAttach, IconCode, IconModel, IconPlan, IconThinking } from '../icons';
 import { STRINGS } from '../strings';
+import { IconSelect, IconToggle, type IconSelectOption } from './IconSelect';
 
 export interface InsertRequest {
   paths: string[];
@@ -16,6 +18,31 @@ export interface EditorContent {
 }
 
 const BLOCK_TAGS = new Set(['DIV', 'P']);
+
+// The rows of the composer are compact, the labels are shorter than the ids.
+const MODE_OPTIONS: IconSelectOption<AgentMode>[] = [
+  {
+    value: 'plan',
+    label: STRINGS.modePlan,
+    icon: <IconPlan />,
+    hint: STRINGS.modePlanHint
+  },
+  {
+    value: 'code',
+    label: STRINGS.modeCode,
+    icon: <IconCode />,
+    hint: STRINGS.modeCodeHint
+  }
+];
+
+const EFFORT_OPTIONS: IconSelectOption<EffortLevel>[] = (
+  ['low', 'medium', 'high', 'xhigh', 'max'] as const
+).map((level) => ({
+  value: level,
+  label: level,
+  icon: <IconThinking />,
+  hint: STRINGS.effortHint
+}));
 
 interface WalkResult extends EditorContent {
   visible: string;
@@ -183,9 +210,11 @@ export function Composer({
   model,
   effort,
   mode,
+  thinking,
   onModel,
   onEffort,
   onMode,
+  onThinking,
   onSend,
   onStop,
   onPickFiles,
@@ -204,9 +233,11 @@ export function Composer({
   model: string;
   effort: EffortLevel;
   mode: AgentMode;
+  thinking: boolean;
   onModel: (model: string) => void;
   onEffort: (effort: EffortLevel) => void;
   onMode: (mode: AgentMode) => void;
+  onThinking: (thinking: boolean) => void;
   onSend: (text: string, mentions: string[], selections: UiSelection[]) => void;
   onStop: () => void;
   onPickFiles: () => void;
@@ -214,6 +245,14 @@ export function Composer({
   onSuggest: (prefix: string | undefined) => void;
   onContentChange?: (content: EditorContent) => void;
 }) {
+  const currentModel = models.find((item) => item.id === model);
+  const modelOptions: IconSelectOption<string>[] = models.map((item) => ({
+    value: item.id,
+    label: item.shortLabel,
+    icon: <IconModel />,
+    hint: item.label
+  }));
+
   const [active, setActive] = useState(0);
   const [empty, setEmpty] = useState(true);
   const editorRef = useRef<HTMLDivElement>(null);
@@ -387,52 +426,62 @@ export function Composer({
           ))}
         </div>
       ) : null}
-      <div
-        ref={editorRef}
-        className={'composer-input' + (empty ? ' is-empty' : '')}
-        contentEditable
-        suppressContentEditableWarning
-        role="textbox"
-        aria-multiline="true"
-        data-placeholder={STRINGS.placeholder}
-        onInput={report}
-        onKeyDown={handleKeyDown}
-        onMouseDown={handleMouseDown}
-      />
+      <div className="composer-input-wrap">
+        <div
+          ref={editorRef}
+          className={'composer-input' + (empty ? ' is-empty' : '')}
+          contentEditable
+          suppressContentEditableWarning
+          role="textbox"
+          aria-multiline="true"
+          data-placeholder={STRINGS.placeholder}
+          onInput={report}
+          onKeyDown={handleKeyDown}
+          onMouseDown={handleMouseDown}
+        />
+        <button
+          className="composer-attach"
+          title={STRINGS.attach}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={onPickFiles}
+        >
+          <IconAttach />
+        </button>
+      </div>
       <div className="composer-selects">
-        <select
+        <IconSelect
           value={mode}
+          options={MODE_OPTIONS}
+          icon={mode === 'plan' ? <IconPlan /> : <IconCode />}
           title={mode === 'plan' ? STRINGS.modePlanHint : STRINGS.modeCodeHint}
-          onChange={(event) => onMode(event.target.value as AgentMode)}
-        >
-          {(['plan', 'code'] as const).map((value) => (
-            <option key={value} value={value}>
-              {STRINGS.mode}: {value}
-            </option>
-          ))}
-        </select>
-        <select value={model} onChange={(event) => onModel(event.target.value)}>
-          {models.map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.id}
-            </option>
-          ))}
-        </select>
-        <select
-          value={effort}
-          onChange={(event) => onEffort(event.target.value as EffortLevel)}
-        >
-          {(['low', 'medium', 'high', 'xhigh', 'max'] as const).map((level) => (
-            <option key={level} value={level}>
-              {STRINGS.effort}: {level}
-            </option>
-          ))}
-        </select>
+          onChange={onMode}
+        />
+        <IconSelect
+          value={model}
+          options={modelOptions}
+          icon={<IconModel />}
+          title={STRINGS.model}
+          onChange={onModel}
+        />
+        {currentModel && !currentModel.thinkingAlwaysOn ? (
+          <IconToggle
+            value={thinking}
+            icon={<IconThinking />}
+            label={thinking ? STRINGS.thinkingOn : STRINGS.thinkingOff}
+            title={STRINGS.thinkingHint}
+            onChange={onThinking}
+          />
+        ) : (
+          <IconSelect
+            value={effort}
+            options={EFFORT_OPTIONS}
+            icon={<IconThinking />}
+            title={STRINGS.effortHint}
+            onChange={onEffort}
+          />
+        )}
       </div>
       <div className="composer-actions">
-        <button className="secondary" onClick={onPickFiles}>
-          {STRINGS.attach}
-        </button>
         {busy ? (
           <button className="stop" onClick={onStop}>
             {STRINGS.stop}

@@ -49,6 +49,8 @@ export class StreamDecoder {
   private stopReason: StopReason = 'end_turn';
   private inputTokens = 0;
   private outputTokens = 0;
+  private cacheReadTokens = 0;
+  private cacheCreationTokens = 0;
   private finished = false;
 
   push(chunk: string): StreamEvent[] {
@@ -99,8 +101,11 @@ export class StreamDecoder {
     const type = typeof payload['type'] === 'string' ? (payload['type'] as string) : sse.event;
 
     if (type === 'message_start') {
-      const message = payload['message'] as { usage?: { input_tokens?: number } } | undefined;
+      const message = payload['message'] as
+        | { usage?: { input_tokens?: number; cache_read_input_tokens?: number } }
+        | undefined;
       this.inputTokens = message?.usage?.input_tokens ?? 0;
+      this.cacheReadTokens = message?.usage?.cache_read_input_tokens ?? 0;
       return [{ type: 'message_start', usage: this.usage() }];
     }
 
@@ -171,9 +176,27 @@ export class StreamDecoder {
       if (delta?.stop_reason) {
         this.stopReason = delta.stop_reason;
       }
-      const usage = payload['usage'] as { output_tokens?: number } | undefined;
+      // MiniMax puts the real counters of the request into message_delta,
+      // the message_start block always carries zeros.
+      const usage = payload['usage'] as
+        | {
+            input_tokens?: number;
+            output_tokens?: number;
+            cache_read_input_tokens?: number;
+            cache_creation_input_tokens?: number;
+          }
+        | undefined;
+      if (typeof usage?.input_tokens === 'number') {
+        this.inputTokens = usage.input_tokens;
+      }
       if (typeof usage?.output_tokens === 'number') {
         this.outputTokens = usage.output_tokens;
+      }
+      if (typeof usage?.cache_read_input_tokens === 'number') {
+        this.cacheReadTokens = usage.cache_read_input_tokens;
+      }
+      if (typeof usage?.cache_creation_input_tokens === 'number') {
+        this.cacheCreationTokens = usage.cache_creation_input_tokens;
       }
       return [];
     }
@@ -182,7 +205,12 @@ export class StreamDecoder {
   }
 
   private usage(): Usage {
-    return { inputTokens: this.inputTokens, outputTokens: this.outputTokens };
+    return {
+      inputTokens: this.inputTokens,
+      outputTokens: this.outputTokens,
+      cacheReadTokens: this.cacheReadTokens,
+      cacheCreationTokens: this.cacheCreationTokens
+    };
   }
 
   private buildBlocks(): AnthropicContentBlock[] {

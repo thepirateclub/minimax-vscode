@@ -98,6 +98,22 @@ function makeAgent(
 }
 
 describe('Agent', () => {
+  it('sums the spend of every request of an action', async () => {
+    const client = new FakeClient([toolResponse('read_file', {}), textResponse('done')]);
+    const { agent, events } = makeAgent(client);
+    await agent.run('hi', []);
+    expect(client.requests).toHaveLength(2);
+    const done = events.find(
+      (event): event is Extract<AgentEvent, { type: 'done' }> => event.type === 'done'
+    );
+    expect(done?.usage).toEqual({
+      inputTokens: 20,
+      outputTokens: 10,
+      cacheReadTokens: 0,
+      cacheCreationTokens: 0
+    });
+  });
+
   it('returns assistant text without calling tools', async () => {
     const client = new FakeClient([textResponse('hello')]);
     const { agent, events } = makeAgent(client);

@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import type { AnthropicMessage } from '../api/types';
-import type { UiMessage } from '../ui/protocol';
+import type { UiMessage, UiUsageTurn } from '../ui/protocol';
 
 export interface StoredSession {
   id: string;
@@ -8,6 +8,7 @@ export interface StoredSession {
   updatedAt: number;
   messages: AnthropicMessage[];
   uiMessages: UiMessage[];
+  usage: UiUsageTurn[];
 }
 
 export class SessionStore {

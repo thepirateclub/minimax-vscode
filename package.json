@@ -144,6 +144,11 @@
           ],
           "description": "Agent mode. Plan is read-only, the agent investigates and answers with a plan. Code lets the agent change files and run commands."
         },
+        "minimax.thinking": {
+          "type": "boolean",
+          "default": false,
+          "description": "Adaptive thinking for the MiniMax M3 model. M3.1 Flash always thinks and ignores this flag."
+        },
         "minimax.maxTokens": {
           "type": "number",
           "default": 32000,

@@ -9,6 +9,7 @@ function toValues(settings: UiSettings): UiSettingsValues {
     model: settings.model,
     effort: settings.effort,
     mode: settings.mode,
+    thinking: settings.thinking,
     maxTokens: settings.maxTokens,
     maxIterations: settings.maxIterations,
     autoApprove: settings.autoApprove,
@@ -143,6 +144,15 @@ export function SettingsView({
             {values.mode === 'plan' ? STRINGS.modePlanHint : STRINGS.modeCodeHint}
           </span>
         </label>
+        <label className="checkbox">
+          <input
+            type="checkbox"
+            checked={values.thinking}
+            onChange={(event) => patch({ thinking: event.target.checked })}
+          />
+          <span>{STRINGS.thinking}</span>
+        </label>
+        <p className="hint">{STRINGS.thinkingHint}</p>
       </section>
 
       <section className="settings-section">

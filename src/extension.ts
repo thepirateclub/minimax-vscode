@@ -15,7 +15,7 @@ import {
   getApiKey,
   setApiKey
 } from './config/secrets';
-import { getSettings, onSettingsChanged } from './config/settings';
+import { getSettings, onSettingsChanged, type MiniMaxSettings } from './config/settings';
 import { createLogger, type Logger } from './logger';
 import { InMemoryBackupStore } from './storage/backups';
 import { SessionStore, type StoredSession } from './storage/sessions';
@@ -31,6 +31,7 @@ import type {
   UiSettings,
   UiSettingsValues,
   UiSuggestion,
+  UiUsageTurn,
   WebToExt
 } from './ui/protocol';
 import { StatusBarController } from './ui/statusbar';
@@ -44,9 +45,13 @@ interface RuntimeSession {
   agent: AgentSession | undefined;
   busy: boolean;
   errorReported: boolean;
+  // The token spend of every action of this session.
+  usage: UiUsageTurn[];
 }
 
 const TITLE_LIMIT = 60;
+// How many actions the spend graph keeps in the header.
+const MAX_USAGE_TURNS = 24;
 
 class MiniMaxController {
   private readonly context: vscode.ExtensionContext;
@@ -60,7 +65,6 @@ class MiniMaxController {
   private readonly sessions = new Map<string, RuntimeSession>();
   private activeSessionId: string | undefined;
   private agentState: AgentState = 'idle';
-  private tokens = 0;
   private counter = 0;
   private fileCache: { files: string[]; at: number } | undefined;
   private quota: QuotaSnapshot | undefined;
@@ -226,6 +230,7 @@ class MiniMaxController {
       maxIterations: settings.maxIterations,
       effort: settings.effort,
       mode: settings.mode,
+      thinking: this.thinkingMode(settings),
       systemPrompt: await this.buildPrompt(),
       workspaceRoot: this.workspaceRoot(),
       logger: this.logger,
@@ -290,7 +295,16 @@ class MiniMaxController {
       return;
     }
     if (event.type === 'done') {
-      this.tokens = event.usage.outputTokens;
+      runtime.usage.push({
+        input: event.usage.inputTokens,
+        output: event.usage.outputTokens,
+        cache:
+          (event.usage.cacheReadTokens ?? 0) + (event.usage.cacheCreationTokens ?? 0)
+      });
+      if (runtime.usage.length > MAX_USAGE_TURNS) {
+        runtime.usage = runtime.usage.slice(-MAX_USAGE_TURNS);
+      }
+      this.panel.post({ type: 'usage', turns: runtime.usage });
       this.setState('idle');
       return;
     }
@@ -323,7 +337,34 @@ class MiniMaxController {
   private setState(state: AgentState): void {
     this.agentState = state;
     this.statusBar.setState(state);
-    this.panel.post({ type: 'status', state, tokens: this.tokens });
+    this.panel.post({
+      type: 'status',
+      state,
+      tokens: this.usageTotal(this.activeSession())
+    });
+  }
+
+  // The spend of the session, input and output tokens of every action.
+  private usageTotal(runtime: RuntimeSession | undefined): number {
+    if (!runtime) {
+      return 0;
+    }
+    return runtime.usage.reduce(
+      (sum, turn) => sum + turn.input + turn.output + (turn.cache ?? 0),
+      0
+    );
+  }
+
+  // M3.1-Flash always thinks, M3 thinks only when the user turns it on.
+  private thinkingMode(settings: MiniMaxSettings): 'adaptive' | undefined {
+    if (!settings.thinking) {
+      return undefined;
+    }
+    const model = MODELS.find((item) => item.id === settings.model);
+    if (!model || model.thinkingAlwaysOn) {
+      return undefined;
+    }
+    return 'adaptive';
   }
 
   async refreshQuota(): Promise<void> {
@@ -388,6 +429,10 @@ class MiniMaxController {
     }
     if (message.type === 'set_mode') {
       await this.updateSetting('mode', message.mode);
+      return;
+    }
+    if (message.type === 'set_thinking') {
+      await this.updateSetting('thinking', message.thinking);
       return;
     }
     if (message.type === 'pick_files') {
@@ -639,6 +684,7 @@ class MiniMaxController {
       models: MODELS,
       effort: settings.effort,
       mode: settings.mode,
+      thinking: settings.thinking,
       maxTokens: settings.maxTokens,
       maxIterations: settings.maxIterations,
       autoApprove: settings.autoApprove,
@@ -658,6 +704,7 @@ class MiniMaxController {
       ['model', values.model],
       ['effort', values.effort],
       ['mode', values.mode],
+      ['thinking', values.thinking],
       ['maxTokens', values.maxTokens],
       ['maxIterations', values.maxIterations],
       ['autoApprove', values.autoApprove],
@@ -690,7 +737,8 @@ class MiniMaxController {
       title: runtime.title,
       updatedAt: runtime.updatedAt,
       messages: runtime.history,
-      uiMessages: runtime.uiMessages
+      uiMessages: runtime.uiMessages,
+      usage: runtime.usage
     };
     this.store.save(stored);
     this.panel.post({ type: 'sessions', sessions: this.store.summaryList() });
@@ -706,7 +754,8 @@ class MiniMaxController {
       uiMessages: [],
       agent: undefined,
       busy: false,
-      errorReported: false
+      errorReported: false,
+      usage: []
     });
     this.activeSessionId = id;
     this.setState('idle');
@@ -728,7 +777,12 @@ class MiniMaxController {
         uiMessages: [...(stored.uiMessages ?? [])],
         agent: undefined,
         busy: false,
-        errorReported: false
+        errorReported: false,
+        usage: (stored.usage ?? []).map((turn) => ({
+          input: turn.input,
+          output: turn.output,
+          cache: turn.cache ?? 0
+        }))
       };
       this.sessions.set(id, runtime);
     }
@@ -761,8 +815,10 @@ class MiniMaxController {
         models: MODELS,
         effort: settings.effort,
         mode: settings.mode,
+        thinking: settings.thinking,
         state: this.agentState,
-        tokens: this.tokens,
+        tokens: this.usageTotal(runtime),
+        usage: runtime ? [...runtime.usage] : [],
         hasApiKey: Boolean(key)
       }
     });
@@ -779,7 +835,7 @@ class MiniMaxController {
     }
   }
 
-  private async updateSetting(key: string, value: string): Promise<void> {
+  private async updateSetting(key: string, value: unknown): Promise<void> {
     await vscode.workspace
       .getConfiguration('minimax')
       .update(key, value, vscode.ConfigurationTarget.Global);

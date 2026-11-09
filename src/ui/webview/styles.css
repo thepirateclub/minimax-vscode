@@ -507,6 +507,12 @@ input:focus {
   opacity: 0.7;
 }
 
+/* inline icons of the panel */
+.icon {
+  flex: 0 0 auto;
+  display: block;
+}
+
 /* composer */
 .composer {
   position: relative;
@@ -528,7 +534,7 @@ input:focus {
   background: var(--vscode-input-background, #2b2b2b);
   border: 1px solid var(--vscode-input-border, var(--border));
   border-radius: var(--radius);
-  padding: 7px 8px;
+  padding: 7px 30px 7px 8px;
   outline: none;
   white-space: pre-wrap;
   word-break: break-word;
@@ -584,12 +590,145 @@ input:focus {
 .composer-selects {
   display: flex;
   align-items: center;
-  gap: 6px;
+  flex-wrap: wrap;
+  gap: 4px;
 }
 
-.composer-selects select {
-  flex: 1 1 0;
-  min-width: 0;
+/* the paperclip lives in the corner of the input field */
+.composer-input-wrap {
+  position: relative;
+}
+
+.composer-attach {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.composer-attach:hover {
+  background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.16));
+  color: var(--vscode-foreground);
+}
+
+/* a compact dropdown, a native select cannot carry an icon */
+.icon-select {
+  position: relative;
+  z-index: 5;
+}
+
+.icon-select-trigger,
+.icon-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  max-width: 100%;
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--vscode-foreground);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.icon-select-trigger:hover,
+.icon-toggle:hover {
+  background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.16));
+}
+
+.icon-toggle.on {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.icon-select-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* the menu opens upward, the panel sits at the bottom of the screen */
+.icon-select-menu {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 100%;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--vscode-dropdown-background, var(--vscode-editorWidget-background, #252526));
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+}
+
+.icon-select-option {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 6px;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--vscode-foreground);
+  font-size: 11px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.icon-select-option:hover {
+  background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.16));
+}
+
+.icon-select-option.active {
+  background: var(--vscode-list-activeSelectionBackground, rgba(128, 128, 128, 0.24));
+  color: var(--vscode-list-activeSelectionForeground, var(--vscode-foreground));
+}
+
+/* the spend of every action, the input tokens are muted, the output is accent */
+.usage-graph {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  flex: 0 1 auto;
+  height: 22px;
+  max-width: 60%;
+  overflow: hidden;
+}
+
+.usage-column {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  width: 5px;
+  min-width: 3px;
+  height: 100%;
+  overflow: hidden;
+}
+
+.usage-input {
+  flex: 0 0 auto;
+  width: 100%;
+  background: var(--muted);
+  opacity: 0.35;
+}
+
+.usage-output {
+  flex: 0 0 auto;
+  width: 100%;
+  background: var(--accent);
 }
 
 .composer-input:focus {

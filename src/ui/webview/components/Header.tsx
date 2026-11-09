@@ -1,4 +1,5 @@
-import type { AgentState } from '../../protocol';
+import type { AgentState, UiUsageTurn } from '../../protocol';
+import { UsageGraph } from './UsageGraph';
 import { STRINGS } from '../strings';
 
 export type PanelTab = 'chat' | 'settings';
@@ -8,6 +9,7 @@ export function Header({
   onTab,
   state,
   tokens,
+  usage,
   hasApiKey,
   onNewChat
 }: {
@@ -15,6 +17,7 @@ export function Header({
   onTab: (tab: PanelTab) => void;
   state: AgentState;
   tokens: number;
+  usage: UiUsageTurn[];
   hasApiKey: boolean;
   onNewChat: () => void;
 }) {
@@ -40,6 +43,7 @@ export function Header({
       </div>
       {tab === 'chat' ? (
         <div className="header-row">
+          <UsageGraph turns={usage} />
           <span className="tokens">
             {tokens} {STRINGS.tokens}
           </span>
