@@ -21,7 +21,7 @@ import {
   IconThinking,
   IconWrite
 } from '../../src/ui/webview/icons';
-import { markupBBox } from '../helpers/iconGeometry';
+import { markupBBox, pathPoints } from '../helpers/iconGeometry';
 
 const ICONS: Array<[string, () => ReactNode]> = [
   ['IconAttach', IconAttach],
@@ -50,32 +50,25 @@ function renderIcon(render: () => ReactNode): { markup: string; viewBox: number[
   return { markup, viewBox };
 }
 
-// The tip of the plane is the point with the largest x, the two edges
-// that meet there have to form a right angle.
-function tipAngle(markup: string): number {
-  const outline = /<path d="([^"]+)"/.exec(markup)?.[1] ?? '';
-  const numbers = (outline.match(/-?\d*\.?\d+/g) ?? []).map(Number);
-  const points: Array<[number, number]> = [];
-  for (let i = 0; i + 1 < numbers.length; i += 2) {
-    points.push([numbers[i] ?? 0, numbers[i + 1] ?? 0]);
-  }
-  if (points.length < 3) {
-    return Number.NaN;
-  }
-  let tip = 0;
-  for (let i = 1; i < points.length; i++) {
-    if ((points[i]?.[0] ?? 0) > (points[tip]?.[0] ?? 0)) {
-      tip = i;
+// The path of an icon, the send icon is a single shape.
+function pathOf(markup: string): string {
+  return /<path d="([^"]+)"/.exec(markup)?.[1] ?? '';
+}
+
+// The left edge of a shape on a horizontal line, the polyline is crossed
+// with the line and the leftmost crossing wins.
+function leftEdge(points: Array<[number, number]>, y: number): number {
+  const xs: number[] = [];
+  for (let i = 0; i + 1 < points.length; i++) {
+    const a = points[i]!;
+    const b = points[i + 1]!;
+    if ((a[1] > y) === (b[1] > y)) {
+      continue;
     }
+    const t = (y - a[1]) / (b[1] - a[1]);
+    xs.push(a[0] + (b[0] - a[0]) * t);
   }
-  const head = points[tip]!;
-  const previous = points[(tip - 1 + points.length) % points.length]!;
-  const next = points[(tip + 1) % points.length]!;
-  const a = [previous[0] - head[0], previous[1] - head[1]];
-  const b = [next[0] - head[0], next[1] - head[1]];
-  const dot = (a[0] ?? 0) * (b[0] ?? 0) + (a[1] ?? 0) * (b[1] ?? 0);
-  const len = Math.hypot(a[0] ?? 0, a[1] ?? 0) * Math.hypot(b[0] ?? 0, b[1] ?? 0);
-  return (Math.acos(Math.min(1, Math.max(-1, dot / len))) * 180) / Math.PI;
+  return xs.length > 0 ? Math.min(...xs) : Number.NaN;
 }
 
 // The panel draws the icons in a tiny square, a glyph that hangs to one side
@@ -107,59 +100,6 @@ describe('panel icons', () => {
     });
   }
 
-  it('keeps a right angle at the tip of the send icon', () => {
-    const { markup } = renderIcon(IconSend);
-    const angle = tipAngle(markup);
-    expect(Number.isFinite(angle)).toBe(true);
-    expect(Math.abs(angle - 90)).toBeLessThan(0.5);
-  });
-
-  it('keeps the silhouette of the send icon from the reference', () => {
-    const { markup } = renderIcon(IconSend);
-    const paths = [...markup.matchAll(/<path d="([^"]+)"/g)].map((match) => match[1] ?? '');
-    expect(paths).toHaveLength(2);
-    // The plane is a closed contour plus a fold that runs from the tail to the nose.
-    expect(paths[0]).toMatch(/z$/i);
-    const box = markupBBox(markup);
-    const ratio = (box.maxY - box.minY) / (box.maxX - box.minX);
-    expect(ratio).toBeGreaterThan(1.2);
-    expect(ratio).toBeLessThan(1.5);
-    const xs = (d: string): number[] =>
-      (d.match(/-?\d*\.?\d+/g) ?? []).map(Number).filter((_, index) => index % 2 === 0);
-    const nose = Math.max(...xs(paths[0] ?? ''));
-    const foldEnd = Math.max(...xs(paths[1] ?? ''));
-    expect(Math.abs(nose - foldEnd)).toBeLessThan(0.2);
-  });
-
-  // The picture the icon was taken from: the ink of the plane is 16.9 pixels
-  // tall and 12.7 pixels wide, the button has to show the same glyph.
-  it('renders the send icon of the reference at the same pixel size', () => {
-    const { markup, viewBox } = renderIcon(IconSend);
-    const size = Number(/width="([\d.]+)"/.exec(markup)?.[1] ?? '0');
-    const stroke = Number(/stroke-width="([\d.]+)"/.exec(markup)?.[1] ?? '0');
-    const box = markupBBox(markup);
-    const scale = size / (viewBox[3] ?? 24);
-    const inkHeight = (box.maxY - box.minY + stroke) * scale;
-    const inkWidth = (box.maxX - box.minX + stroke) * scale;
-    expect(inkHeight).toBeGreaterThan(16.5);
-    expect(inkHeight).toBeLessThan(17.5);
-    expect(inkWidth).toBeGreaterThan(12.5);
-    expect(inkWidth).toBeLessThan(13.5);
-  });
-
-  // The square of the stop button keeps the weight of the plane, so the
-  // button does not shrink when the turn starts.
-  it('keeps the stop square at the weight of the plane', () => {
-    const { markup, viewBox } = renderIcon(IconStop);
-    const size = Number(/width="([\d.]+)"/.exec(markup)?.[1] ?? '0');
-    const stroke = Number(/stroke-width="([\d.]+)"/.exec(markup)?.[1] ?? '0');
-    const box = markupBBox(markup);
-    const scale = size / (viewBox[3] ?? 24);
-    const outer = (box.maxX - box.minX + stroke) * scale;
-    expect(outer).toBeGreaterThan(12.5);
-    expect(outer).toBeLessThan(13.5);
-  });
-
   it('centers the icon inside the square button of the header', () => {
     const css = readFileSync(
       new URL('../../src/ui/webview/styles.css', import.meta.url),
@@ -175,5 +115,85 @@ describe('panel icons', () => {
         rule.includes('justify-content: center')
     );
     expect(centered).toBe(true);
+  });
+});
+
+// The picture the user gave is the measure: a solid arrow that points to
+// the right, with a horizontal slot between the two wings and a tail that
+// folds back to the left.
+describe('send icon of the reference picture', () => {
+  it('fills the arrow instead of stroking it', () => {
+    const { markup } = renderIcon(IconSend);
+    expect(markup).toContain('fill="currentColor"');
+    expect(markup).toContain('stroke="none"');
+  });
+
+  it('keeps the proportions of the arrow from the picture', () => {
+    const { markup } = renderIcon(IconSend);
+    const box = markupBBox(markup);
+    const width = box.maxX - box.minX;
+    const height = box.maxY - box.minY;
+    // The ink of the picture is 246 pixels wide and 222 pixels tall.
+    expect(width / height).toBeGreaterThan(1.05);
+    expect(width / height).toBeLessThan(1.17);
+  });
+
+  it('points the nose of the arrow to the right and to the middle', () => {
+    const { markup, viewBox } = renderIcon(IconSend);
+    const points = pathPoints(pathOf(markup));
+    let nose = points[0] ?? [0, 0];
+    for (const point of points) {
+      if (point[0] > nose[0]) {
+        nose = point;
+      }
+    }
+    const middleY = ((viewBox[1] ?? 0) + (viewBox[3] ?? 0)) / 2;
+    const rightEdge = (viewBox[0] ?? 0) + (viewBox[2] ?? 0);
+    expect(nose[0]).toBeGreaterThan(rightEdge * 0.85);
+    expect(Math.abs(nose[1] - middleY)).toBeLessThan(0.6);
+  });
+
+  it('keeps the slot between the wings horizontal and open to the left', () => {
+    const { markup, viewBox } = renderIcon(IconSend);
+    const points = pathPoints(pathOf(markup));
+    const top = viewBox[1] ?? 0;
+    const height = viewBox[3] ?? 24;
+    const middleY = top + height / 2;
+    // The nose of the slot is the left edge of the shape on the middle line.
+    const slotNose = leftEdge(points, middleY);
+    // A quarter of the way up the shape is the edge of the upper wing.
+    const upperWing = leftEdge(points, top + height * 0.25);
+    const lowerWing = leftEdge(points, top + height * 0.75);
+    expect(slotNose).toBeGreaterThan(upperWing + 5);
+    expect(slotNose).toBeGreaterThan(lowerWing + 5);
+    // The slot is horizontal, it is the widest exactly on the middle line.
+    expect(slotNose).toBeGreaterThan(leftEdge(points, middleY - 0.5) + 2);
+    expect(slotNose).toBeGreaterThan(leftEdge(points, middleY + 0.5) + 2);
+    // The wings of the arrow are mirror images.
+    expect(Math.abs(upperWing - lowerWing)).toBeLessThan(0.2);
+  });
+
+  it('renders the arrow of the picture at the same pixel size', () => {
+    const { markup, viewBox } = renderIcon(IconSend);
+    const size = Number(/width="([\d.]+)"/.exec(markup)?.[1] ?? '0');
+    const box = markupBBox(markup);
+    const scale = size / (viewBox[3] ?? 24);
+    const inkWidth = (box.maxX - box.minX) * scale;
+    const inkHeight = (box.maxY - box.minY) * scale;
+    expect(inkWidth).toBeGreaterThan(16.8);
+    expect(inkWidth).toBeLessThan(17.4);
+    expect(inkHeight).toBeGreaterThan(15.2);
+    expect(inkHeight).toBeLessThan(15.7);
+  });
+
+  it('keeps the stop square filled and at the weight of the arrow', () => {
+    const { markup, viewBox } = renderIcon(IconStop);
+    expect(markup).toContain('fill="currentColor"');
+    const size = Number(/width="([\d.]+)"/.exec(markup)?.[1] ?? '0');
+    const box = markupBBox(markup);
+    const scale = size / (viewBox[3] ?? 24);
+    const side = (box.maxX - box.minX) * scale;
+    expect(side).toBeGreaterThan(10.5);
+    expect(side).toBeLessThan(11.5);
   });
 });

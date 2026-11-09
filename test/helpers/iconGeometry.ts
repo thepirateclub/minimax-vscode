@@ -8,6 +8,8 @@ export interface Box {
   maxY: number;
 }
 
+export type Point = [number, number];
+
 interface Command {
   cmd: string;
   args: number[];
@@ -65,19 +67,7 @@ function parse(d: string): Command[] {
   return flat;
 }
 
-function emptyBox(): Box {
-  return { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
-}
-
-function addPoint(box: Box, x: number, y: number): void {
-  box.minX = Math.min(box.minX, x);
-  box.minY = Math.min(box.minY, y);
-  box.maxX = Math.max(box.maxX, x);
-  box.maxY = Math.max(box.maxY, y);
-}
-
-function addCubic(
-  box: Box,
+function cubicPoints(
   x0: number,
   y0: number,
   x1: number,
@@ -86,40 +76,42 @@ function addCubic(
   y2: number,
   x3: number,
   y3: number
-): void {
+): Point[] {
+  const points: Point[] = [];
   const steps = 24;
   for (let i = 0; i <= steps; i++) {
     const t = i / steps;
     const u = 1 - t;
-    const x = u * u * u * x0 + 3 * u * u * t * x1 + 3 * u * t * t * x2 + t * t * t * x3;
-    const y = u * u * u * y0 + 3 * u * u * t * y1 + 3 * u * t * t * y2 + t * t * t * y3;
-    addPoint(box, x, y);
+    points.push([
+      u * u * u * x0 + 3 * u * u * t * x1 + 3 * u * t * t * x2 + t * t * t * x3,
+      u * u * u * y0 + 3 * u * u * t * y1 + 3 * u * t * t * y2 + t * t * t * y3
+    ]);
   }
+  return points;
 }
 
-function addQuad(
-  box: Box,
+function quadPoints(
   x0: number,
   y0: number,
   x1: number,
   y1: number,
   x2: number,
   y2: number
-): void {
+): Point[] {
+  const points: Point[] = [];
   const steps = 16;
   for (let i = 0; i <= steps; i++) {
     const t = i / steps;
     const u = 1 - t;
-    addPoint(
-      box,
+    points.push([
       u * u * x0 + 2 * u * t * x1 + t * t * x2,
       u * u * y0 + 2 * u * t * y1 + t * t * y2
-    );
+    ]);
   }
+  return points;
 }
 
-function addArc(
-  box: Box,
+function arcPoints(
   x1: number,
   y1: number,
   rxInput: number,
@@ -129,12 +121,11 @@ function addArc(
   sweep: number,
   x2: number,
   y2: number
-): void {
+): Point[] {
   let rx = Math.abs(rxInput);
   let ry = Math.abs(ryInput);
   if (rx === 0 || ry === 0) {
-    addPoint(box, x2, y2);
-    return;
+    return [[x2, y2]];
   }
   const phi = (rotation * Math.PI) / 180;
   const cosPhi = Math.cos(phi);
@@ -177,17 +168,21 @@ function addArc(
     delta += 2 * Math.PI;
   }
 
+  const points: Point[] = [];
   const steps = 32;
   for (let i = 0; i <= steps; i++) {
     const t = theta + (delta * i) / steps;
-    const px = cx + rx * Math.cos(t) * cosPhi - ry * Math.sin(t) * sinPhi;
-    const py = cy + rx * Math.cos(t) * sinPhi + ry * Math.sin(t) * cosPhi;
-    addPoint(box, px, py);
+    points.push([
+      cx + rx * Math.cos(t) * cosPhi - ry * Math.sin(t) * sinPhi,
+      cy + rx * Math.cos(t) * sinPhi + ry * Math.sin(t) * cosPhi
+    ]);
   }
+  return points;
 }
 
-export function pathBBox(d: string): Box {
-  const box = emptyBox();
+// The path as a polyline, the curves and the arcs are sampled.
+export function pathPoints(d: string): Point[] {
+  const points: Point[] = [];
   let x = 0;
   let y = 0;
   let startX = 0;
@@ -215,26 +210,26 @@ export function pathBBox(d: string): Box {
         y = ny;
         startX = x;
         startY = y;
-        addPoint(box, x, y);
+        points.push([x, y]);
         resetSmooth();
         break;
       }
       case 'l': {
         x = relative ? x + (args[0] ?? 0) : args[0] ?? x;
         y = relative ? y + (args[1] ?? 0) : args[1] ?? y;
-        addPoint(box, x, y);
+        points.push([x, y]);
         resetSmooth();
         break;
       }
       case 'h': {
         x = relative ? x + (args[0] ?? 0) : args[0] ?? x;
-        addPoint(box, x, y);
+        points.push([x, y]);
         resetSmooth();
         break;
       }
       case 'v': {
         y = relative ? y + (args[0] ?? 0) : args[0] ?? y;
-        addPoint(box, x, y);
+        points.push([x, y]);
         resetSmooth();
         break;
       }
@@ -245,7 +240,7 @@ export function pathBBox(d: string): Box {
         const y2 = relative ? y + (args[3] ?? 0) : args[3] ?? y;
         const x3 = relative ? x + (args[4] ?? 0) : args[4] ?? x;
         const y3 = relative ? y + (args[5] ?? 0) : args[5] ?? y;
-        addCubic(box, x, y, x1, y1, x2, y2, x3, y3);
+        points.push(...cubicPoints(x, y, x1, y1, x2, y2, x3, y3));
         x = x3;
         y = y3;
         lastCubicX = x2;
@@ -255,13 +250,13 @@ export function pathBBox(d: string): Box {
         break;
       }
       case 's': {
-        const x2 = relative ? x + (args[0] ?? 0) : args[0] ?? x;
-        const y2 = relative ? y + (args[1] ?? 0) : args[1] ?? y;
-        const x3 = relative ? x + (args[2] ?? 0) : args[2] ?? x;
-        const y3 = relative ? y + (args[3] ?? 0) : args[3] ?? y;
+        const x2 = relative ? x + (args[2] ?? 0) : args[2] ?? x;
+        const y2 = relative ? y + (args[3] ?? 0) : args[3] ?? y;
+        const x3 = relative ? x + (args[4] ?? 0) : args[4] ?? x;
+        const y3 = relative ? y + (args[5] ?? 0) : args[5] ?? y;
         const x1 = lastCubicX === undefined ? x : 2 * x - lastCubicX;
         const y1 = lastCubicY === undefined ? y : 2 * y - lastCubicY;
-        addCubic(box, x, y, x1, y1, x2, y2, x3, y3);
+        points.push(...cubicPoints(x, y, x1, y1, x2, y2, x3, y3));
         x = x3;
         y = y3;
         lastCubicX = x2;
@@ -273,7 +268,7 @@ export function pathBBox(d: string): Box {
         const y1 = relative ? y + (args[1] ?? 0) : args[1] ?? y;
         const x2 = relative ? x + (args[2] ?? 0) : args[2] ?? x;
         const y2 = relative ? y + (args[3] ?? 0) : args[3] ?? y;
-        addQuad(box, x, y, x1, y1, x2, y2);
+        points.push(...quadPoints(x, y, x1, y1, x2, y2));
         x = x2;
         y = y2;
         lastQuadX = x1;
@@ -283,31 +278,34 @@ export function pathBBox(d: string): Box {
         break;
       }
       case 't': {
-        const x2 = relative ? x + (args[0] ?? 0) : args[0] ?? x;
-        const y2 = relative ? y + (args[1] ?? 0) : args[1] ?? y;
+        const x2 = relative ? x + (args[2] ?? 0) : args[2] ?? x;
+        const y2 = relative ? y + (args[3] ?? 0) : args[3] ?? y;
         const x1 = lastQuadX === undefined ? x : 2 * x - lastQuadX;
         const y1 = lastQuadY === undefined ? y : 2 * y - lastQuadY;
-        addQuad(box, x, y, x1, y1, x2, y2);
+        points.push(...quadPoints(x, y, x1, y1, x2, y2));
         x = x2;
         y = y2;
         lastQuadX = x1;
         lastQuadY = y1;
+        lastCubicX = undefined;
+        lastCubicY = undefined;
         break;
       }
       case 'a': {
         const x2 = relative ? x + (args[5] ?? 0) : args[5] ?? x;
         const y2 = relative ? y + (args[6] ?? 0) : args[6] ?? y;
-        addArc(
-          box,
-          x,
-          y,
-          args[0] ?? 0,
-          args[1] ?? 0,
-          args[2] ?? 0,
-          args[3] ?? 0,
-          args[4] ?? 0,
-          x2,
-          y2
+        points.push(
+          ...arcPoints(
+            x,
+            y,
+            args[0] ?? 0,
+            args[1] ?? 0,
+            args[2] ?? 0,
+            args[3] ?? 0,
+            args[4] ?? 0,
+            x2,
+            y2
+          )
         );
         x = x2;
         y = y2;
@@ -317,7 +315,7 @@ export function pathBBox(d: string): Box {
       case 'z': {
         x = startX;
         y = startY;
-        addPoint(box, x, y);
+        points.push([x, y]);
         resetSmooth();
         break;
       }
@@ -325,14 +323,34 @@ export function pathBBox(d: string): Box {
         break;
     }
   }
-  return box;
+  return points;
+}
+
+export function pathBBox(d: string): Box {
+  const points = pathPoints(d);
+  if (points.length === 0) {
+    return { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+  }
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const [x, y] of points) {
+    minX = Math.min(minX, x);
+    minY = Math.min(minY, y);
+    maxX = Math.max(maxX, x);
+    maxY = Math.max(maxY, y);
+  }
+  return { minX, minY, maxX, maxY };
 }
 
 export function mergeBoxes(boxes: Box[]): Box {
-  const merged = emptyBox();
+  const merged = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
   for (const box of boxes) {
-    addPoint(merged, box.minX, box.minY);
-    addPoint(merged, box.maxX, box.maxY);
+    merged.minX = Math.min(merged.minX, box.minX);
+    merged.minY = Math.min(merged.minY, box.minY);
+    merged.maxX = Math.max(merged.maxX, box.maxX);
+    merged.maxY = Math.max(merged.maxY, box.maxY);
   }
   return merged;
 }

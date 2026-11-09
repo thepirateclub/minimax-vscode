@@ -9,10 +9,12 @@ function Svg({
   size = 14,
   viewBox = '0 0 16 16',
   strokeWidth = 1.4,
+  filled = false,
   children
 }: IconProps & {
   viewBox?: string;
   strokeWidth?: number;
+  filled?: boolean;
   children: ReactNode;
 }): ReactNode {
   return (
@@ -21,8 +23,8 @@ function Svg({
       width={size}
       height={size}
       viewBox={viewBox}
-      fill="none"
-      stroke="currentColor"
+      fill={filled ? 'currentColor' : 'none'}
+      stroke={filled ? 'none' : 'currentColor'}
       strokeWidth={strokeWidth}
       strokeLinecap="round"
       strokeLinejoin="round"
@@ -184,15 +186,15 @@ export function IconCopy(): ReactNode {
   );
 }
 
-// The plane of the reference picture, traced pixel by pixel: a narrow
-// dart with a right angle at the tip and a fold from the tip to the tail.
-// The picture is the measure, the glyph is 15.4 pixels tall and the stroke
-// is 1.5 pixels wide, so the button shows exactly that.
+// The plane of the reference picture: a solid arrow that points to the
+// right, with a horizontal slot between the two wings and a tail that
+// folds back. The picture is the measure, the path was fitted to its
+// raster, the ink of the picture is 246 pixels wide and 222 pixels tall,
+// so the button shows 17.1 by 15.4 pixels of it.
 export function IconSend(): ReactNode {
   return (
-    <Svg viewBox="0 0 24 24" strokeWidth={1.9} size={19}>
-      <path d="M4.84 2.16 L18.93 7.75 L13.34 21.84 L10.4 10.59 Z" />
-      <path d="M10.4 10.59 L18.93 7.75" />
+    <Svg viewBox="0 0 24 24" size={19} filled>
+      <path d="M2.238 2.27 L22.17 11.089 A0.996 0.996 0 0 1 22.17 12.911 L2.238 21.73 A0.726 0.726 0 0 1 1.291 20.749 L4.661 13.8 A0.878 0.878 0 0 1 5.343 13.311 L14.436 12.183 A0.184 0.184 0 0 0 14.436 11.817 L5.343 10.689 A0.878 0.878 0 0 1 4.661 10.2 L1.291 3.251 A0.726 0.726 0 0 1 2.238 2.27 Z" />
     </Svg>
   );
 }
@@ -201,8 +203,8 @@ export function IconSend(): ReactNode {
 // above, so the button does not shrink when the turn starts.
 export function IconStop(): ReactNode {
   return (
-    <Svg viewBox="0 0 24 24" strokeWidth={1.9} size={19}>
-      <rect x="4.75" y="4.75" width="14.5" height="14.5" rx="2" />
+    <Svg viewBox="0 0 24 24" size={19} filled>
+      <rect x="5" y="5" width="14" height="14" rx="2.5" />
     </Svg>
   );
 }
