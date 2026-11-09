@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatCount } from '../../src/ui/webview/format';
+import { formatCount } from '../../src/ui/format';
 
 describe('formatCount', () => {
   it('keeps small numbers as they are', () => {

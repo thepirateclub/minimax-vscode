@@ -1,5 +1,5 @@
-// The panel shows big numbers, a short form with a suffix keeps the header
-// readable: 757247 tokens become 757K.
+// The panel and the status bar show big numbers, a short form with a
+// suffix keeps them readable: 757247 tokens become 757K.
 
 const UNITS = [
   { limit: 1_000_000_000, suffix: 'B' },

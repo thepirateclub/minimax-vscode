@@ -1,5 +1,5 @@
 import type { UiUsageTurn } from '../../protocol';
-import { formatCount } from '../format';
+import { formatCount } from '../../format';
 import { STRINGS } from '../strings';
 
 // One bar per action, the height is the token spend of that action.

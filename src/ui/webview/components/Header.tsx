@@ -1,5 +1,5 @@
 import type { AgentState, UiSessionSummary, UiUsageTurn } from '../../protocol';
-import { formatCount } from '../format';
+import { formatCount } from '../../format';
 import { UsageGraph } from './UsageGraph';
 import { SessionMenu } from './SessionMenu';
 import { STRINGS } from '../strings';

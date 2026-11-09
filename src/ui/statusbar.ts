@@ -1,5 +1,7 @@
 import * as vscode from 'vscode';
 import type { QuotaSnapshot } from '../api/quota';
+import type { UsageSummary } from '../storage/usage';
+import { buildUsageRows } from './usageRows';
 
 export type AgentState = 'idle' | 'thinking' | 'streaming' | 'tool' | 'error';
 
@@ -7,10 +9,12 @@ export class StatusBarController {
   private readonly item: vscode.StatusBarItem;
   private state: AgentState = 'idle';
   private quota: QuotaSnapshot | undefined;
+  private usage: UsageSummary | undefined;
 
   constructor() {
     this.item = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
-    this.item.command = 'minimax.openPanel';
+    // A click opens the numbers of the plan, the panel is one row away.
+    this.item.command = 'minimax.showUsage';
     this.render();
   }
 
@@ -21,6 +25,11 @@ export class StatusBarController {
 
   setQuota(quota: QuotaSnapshot | undefined): void {
     this.quota = quota;
+    this.render();
+  }
+
+  setUsage(usage: UsageSummary | undefined): void {
+    this.usage = usage;
     this.render();
   }
 
@@ -44,16 +53,13 @@ export class StatusBarController {
   }
 
   private tooltip(): string {
-    const quota = this.quota;
-    if (!quota || quota.remainingPercent === undefined) {
-      return 'MiniMax Agent';
+    const rows = buildUsageRows(this.usage, this.quota);
+    const lines = ['MiniMax Agent'];
+    for (const row of rows) {
+      lines.push(row.label + ': ' + row.value);
     }
-    const lines = ['MiniMax Agent', '5-hour window left: ' + quota.remainingPercent + '%'];
-    if (quota.weeklyRemainingPercent !== undefined) {
-      lines.push('Weekly window left: ' + quota.weeklyRemainingPercent + '%');
-    }
-    if (quota.resetsInMs > 0) {
-      lines.push('The 5-hour window resets in ' + formatDuration(quota.resetsInMs));
+    if (this.quota && this.quota.resetsInMs > 0) {
+      lines.push('The 5-hour window resets in ' + formatDuration(this.quota.resetsInMs));
     }
     return lines.join('\n');
   }
