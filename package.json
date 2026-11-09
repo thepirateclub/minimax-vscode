@@ -87,6 +87,11 @@
         "category": "MiniMax"
       },
       {
+        "command": "minimax.showUsage",
+        "title": "Show Token Spend",
+        "category": "MiniMax"
+      },
+      {
         "command": "minimax.showLogs",
         "title": "Show Logs",
         "category": "MiniMax"
@@ -105,6 +110,12 @@
         "command": "minimax.addFile",
         "title": "Add File to Chat",
         "category": "MiniMax"
+      },
+      {
+        "command": "minimax.generateCommitMessage",
+        "title": "Generate Commit Message",
+        "category": "MiniMax",
+        "icon": "$(sparkle)"
       }
     ],
     "configuration": {
@@ -223,6 +234,12 @@
         {
           "command": "minimax.addFile",
           "group": "0_minimax@1"
+        }
+      ],
+      "scm/title": [
+        {
+          "command": "minimax.generateCommitMessage",
+          "group": "navigation"
         }
       ]
     },

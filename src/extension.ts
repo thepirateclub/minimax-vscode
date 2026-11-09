@@ -9,6 +9,7 @@ import type { AgentEvent } from './agent/agent';
 import { buildWorkspaceSnapshot, renderSnapshot } from './agent/context';
 import { readMentionedFiles } from './agent/mentions';
 import { buildSystemPrompt } from './agent/prompt';
+import { generateCommitMessage } from './agent/commitMessage';
 import { AgentSession } from './agent/session';
 import { AGENT_MODES, MODELS, resolveBaseUrl } from './config/models';
 import {
@@ -17,10 +18,12 @@ import {
   setApiKey
 } from './config/secrets';
 import { getSettings, onSettingsChanged, type MiniMaxSettings } from './config/settings';
+import { collectStagedChanges, gitRepositories, setCommitMessage } from './git/scm';
 import { createLogger, type Logger } from './logger';
 import { ProjectSearch } from './search/project';
 import { InMemoryBackupStore } from './storage/backups';
 import { SessionStore, type StoredSession } from './storage/sessions';
+import { UsageLedger } from './storage/usage';
 import { createExploreTools, isTextFile } from './tools/explore';
 import { createFileTools, resolveWorkspacePath } from './tools/fs';
 import { ToolRegistry } from './tools/registry';
@@ -38,6 +41,8 @@ import type {
   WebToExt
 } from './ui/protocol';
 import { StatusBarController } from './ui/statusbar';
+import { showUsageDetails } from './ui/usageDetails';
+import { buildUsageRows } from './ui/usageRows';
 
 interface RuntimeSession {
   id: string;
@@ -63,6 +68,7 @@ class MiniMaxController {
   private readonly backups = new InMemoryBackupStore();
   private readonly registry = new ToolRegistry();
   private readonly store: SessionStore;
+  private readonly ledger: UsageLedger;
   private readonly panel: AgentPanelProvider;
   private readonly statusBar = new StatusBarController();
   private readonly sessions = new Map<string, RuntimeSession>();
@@ -81,6 +87,7 @@ class MiniMaxController {
     this.channel = channel;
     this.logger = createLogger(channel);
     this.store = new SessionStore(context.globalState);
+    this.ledger = new UsageLedger(context.globalState);
     this.panel = new AgentPanelProvider({
       extensionUri: context.extensionUri,
       onMessage: (message) => {
@@ -133,6 +140,14 @@ class MiniMaxController {
     );
     context.subscriptions.push(
       vscode.commands.registerCommand('minimax.showLogs', () => this.showLogs())
+    );
+    context.subscriptions.push(
+      vscode.commands.registerCommand('minimax.showUsage', () => void this.showUsage())
+    );
+    context.subscriptions.push(
+      vscode.commands.registerCommand('minimax.generateCommitMessage', () =>
+        void this.generateCommitMessage()
+      )
     );
     context.subscriptions.push(
       vscode.commands.registerCommand('minimax.clearApiKey', () => void this.clearApiKey())
@@ -233,6 +248,89 @@ class MiniMaxController {
 
   private showLogs(): void {
     this.channel.show(true);
+  }
+
+  // The panel of the source control asks the model for a commit message.
+  private async generateCommitMessage(): Promise<void> {
+    const repositories = await gitRepositories();
+    const repository = repositories[0];
+    const root = repository?.rootUri.fsPath ?? this.workspaceRoot();
+    const changes = await collectStagedChanges(root);
+    if (changes.diff.trim().length === 0) {
+      void vscode.window.showInformationMessage(
+        'MiniMax: there are no changes to describe.'
+      );
+      return;
+    }
+    const key = await getApiKey(this.context.secrets);
+    if (!key) {
+      void vscode.window.showErrorMessage(
+        'MiniMax: no API key. Run "MiniMax: Add API Key" from the command palette.'
+      );
+      return;
+    }
+    const settings = getSettings();
+    const model = MODELS.find((item) => item.id === settings.model);
+    try {
+      const result = await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Window,
+          title: 'MiniMax writes the commit message'
+        },
+        async () =>
+          await generateCommitMessage({
+            client: new HttpMiniMaxClient({
+              baseUrl: resolveBaseUrl(settings.baseUrl, settings.customBaseUrl),
+              apiKey: key
+            }),
+            model: settings.model,
+            maxTokens: model?.maxTokens ?? 65_536,
+            effort: settings.effort,
+            thinking: this.thinkingMode(settings),
+            context: {
+              files: changes.files,
+              diff: changes.diff,
+              recentSubjects: changes.recentSubjects
+            }
+          })
+      );
+      this.ledger.add({
+        at: Date.now(),
+        input: result.usage.inputTokens,
+        output: result.usage.outputTokens,
+        cacheRead: result.usage.cacheReadTokens ?? 0,
+        cacheCreation: result.usage.cacheCreationTokens ?? 0
+      });
+      this.statusBar.setUsage(this.ledger.lastDay());
+      if (result.message.length === 0) {
+        void vscode.window.showErrorMessage(
+          'MiniMax: the model returned an empty commit message.'
+        );
+        return;
+      }
+      if (repository) {
+        setCommitMessage(repository, result.message);
+        void vscode.window.showInformationMessage(
+          'MiniMax: the commit message is ready.'
+        );
+        return;
+      }
+      await vscode.env.clipboard.writeText(result.message);
+      void vscode.window.showInformationMessage(
+        'MiniMax: the commit message is in the clipboard.'
+      );
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      this.logger.error('the commit message failed', error);
+      void vscode.window.showErrorMessage('MiniMax: ' + reason);
+    }
+  }
+
+  // A click on the badge opens the numbers of the plan.
+  private async showUsage(): Promise<void> {
+    await this.refreshQuota();
+    const rows = buildUsageRows(this.ledger.lastDay(), this.quota);
+    showUsageDetails(rows, () => this.panel.reveal());
   }
 
   private workspaceRoot(): string {
@@ -381,6 +479,14 @@ class MiniMaxController {
       return;
     }
     if (event.type === 'done') {
+      this.ledger.add({
+        at: Date.now(),
+        input: event.usage.inputTokens,
+        output: event.usage.outputTokens,
+        cacheRead: event.usage.cacheReadTokens ?? 0,
+        cacheCreation: event.usage.cacheCreationTokens ?? 0
+      });
+      this.statusBar.setUsage(this.ledger.lastDay());
       runtime.usage.push({
         input: event.usage.inputTokens,
         output: event.usage.outputTokens,
@@ -465,6 +571,7 @@ class MiniMaxController {
         apiKey: key
       });
       this.statusBar.setQuota(this.quota);
+      this.statusBar.setUsage(this.ledger.lastDay());
     } catch (error) {
       this.logger.error('the quota request failed', error);
     }

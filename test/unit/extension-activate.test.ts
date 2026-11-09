@@ -25,7 +25,8 @@ const state = vi.hoisted(() => ({
   theme: 2,
   themeListener: undefined as undefined | (() => void),
   opened: [] as string[],
-  shown: [] as string[]
+  shown: [] as string[],
+  quickPick: undefined as undefined | { title: string; items: unknown[] }
 }));
 
 vi.mock('vscode', () => {
@@ -37,6 +38,10 @@ vi.mock('vscode', () => {
     }
   };
   return {
+    QuickPickItemKind: {
+      Separator: -1,
+      Default: 0
+    },
     window: {
       createOutputChannel: () => ({
         appendLine: () => undefined,
@@ -71,6 +76,20 @@ vi.mock('vscode', () => {
       },
       showInputBox: async () => undefined,
       showQuickPick: async () => undefined,
+      createQuickPick: () => {
+        const quickPick = {
+          title: '',
+          items: [] as unknown[],
+          selectedItems: [] as unknown[],
+          onDidAccept: () => ({ dispose: () => undefined }),
+          onDidHide: () => ({ dispose: () => undefined }),
+          show: () => undefined,
+          hide: () => undefined,
+          dispose: () => undefined
+        };
+        state.quickPick = quickPick;
+        return quickPick;
+      },
       showOpenDialog: async () => undefined,
       showInformationMessage: async () => undefined,
       showErrorMessage: async () => undefined,
@@ -315,7 +334,8 @@ describe('extension activation', () => {
       'minimax.undoLastChange',
       'minimax.refreshContext',
       'minimax.showLogs',
-      'minimax.clearApiKey'
+      'minimax.clearApiKey',
+      'minimax.showUsage'
     ]) {
       expect(ids).toContain(id);
     }
@@ -739,8 +759,32 @@ describe('extension activation', () => {
     await vi.waitFor(() => {
       expect(state.statusBar?.text).toContain('97%');
     });
-    expect(state.statusBar?.tooltip).toContain('5-hour window left: 97%');
+    expect(state.statusBar?.tooltip).toContain('Left in the 5-hour window: 97%');
+    expect(state.statusBar?.tooltip).toContain('Tokens spent in the last 24 hours');
     expect(state.fetched).toContain('https://api.minimax.io/v1/token_plan/remains');
+  });
+
+  it('opens the numbers of the plan on a click of the badge', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.secrets.set('minimax.apiKey', 'test-key');
+    await boot();
+    const command = state.commands.get('minimax.showUsage');
+    expect(command).toBeDefined();
+    command!();
+    await vi.waitFor(() => {
+      expect(state.quickPick?.title).toBe('MiniMax token spend');
+    });
+    const items = (state.quickPick?.items ?? []) as Array<{
+      label: string;
+      description?: string;
+    }>;
+    const labels = items.map((item) => item.label);
+    expect(labels).toContain('Tokens spent in the last 24 hours');
+    expect(labels).toContain('Left this week');
+    expect(labels).toContain('Left in the 5-hour window');
+    expect(labels).toContain('Cache hit in the last 24 hours');
+    expect(items.map((item) => item.description)).toContain('97%');
   });
 
   it('attaches the file mentioned in the request', async () => {
