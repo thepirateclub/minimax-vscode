@@ -257,4 +257,33 @@ describe('the dot of an action', () => {
   it('shows no size for an action without a change', () => {
     expect(card({})).not.toContain('tool-stats');
   });
+
+  it('keeps the time and the dot at the right edge', () => {
+    const markup = card({ durationMs: 12 });
+    expect(markup).toContain('tool-tail');
+    // The tail is pushed to the right, the title keeps the left edge.
+    expect(property(ruleFor(CSS, '.tool-tail'), 'margin-left')).toBe('auto');
+  });
+
+  it('shows a read of a file as numbered lines', () => {
+    const markup = card({
+      name: 'read_file',
+      input: { path: 'demo.txt' },
+      content: '1: alpha\n2: beta'
+    });
+    expect(markup).toContain('file-read-num');
+    expect(markup).toContain('file-read-text');
+    expect(markup).toContain('alpha');
+    // The title of the card names the file, the body does not echo the path.
+    expect(markup).not.toContain('path: demo.txt');
+  });
+
+  it('shows the range of a read in the title', () => {
+    const markup = card({
+      name: 'read_file',
+      input: { path: 'demo.txt', start_line: 10, end_line: 40 },
+      content: '10: alpha'
+    });
+    expect(markup).toContain('Read demo.txt 10-40');
+  });
 });

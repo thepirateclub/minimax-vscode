@@ -17,7 +17,8 @@ export interface PromptContext {
 const TOOL_LINES: Array<{ name: string; line: string }> = [
   {
     name: 'read_file',
-    line: '- read_file(path, start_line?, end_line?) - read a text file with line numbers'
+    line:
+      '- read_file(path, start_line?, end_line?) - read a text file, a single line or a range of lines'
   },
   {
     name: 'write_file',

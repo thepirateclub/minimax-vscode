@@ -584,6 +584,15 @@ input:focus {
   color: var(--diff-remove-fg);
 }
 
+/* the time and the dot stand at the right edge of the header */
+.tool-tail {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
 /* The result of an action is a dot: green for done, red for a failure.
    The dot blinks only while the action runs, a finished result burns steady. */
 .tool-dot {
@@ -738,6 +747,59 @@ input:focus {
 
 .diff-remove .diff-marker {
   color: var(--diff-remove-fg);
+}
+
+/* the read of a file */
+.file-read {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.file-read-block + .file-read-block {
+  border-top: 1px solid var(--border);
+}
+
+.file-read-path {
+  padding: 4px 8px;
+  background: var(--code-bg);
+  color: var(--muted);
+  font-size: calc(var(--mm-font-base) * 0.8);
+}
+
+.file-read-lines {
+  max-height: 300px;
+  overflow: auto;
+}
+
+.file-read-line {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 0 8px;
+  font-family: var(--mono);
+  font-size: calc(var(--mm-font-base) * 0.85);
+  line-height: 1.55;
+}
+
+.file-read-num {
+  flex: 0 0 auto;
+  min-width: 3ch;
+  text-align: right;
+  color: var(--muted);
+  opacity: 0.6;
+  user-select: none;
+}
+
+.file-read-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: pre;
+}
+
+.file-read:hover .tool-copy {
+  opacity: 1;
 }
 
 /* inline icons of the panel */

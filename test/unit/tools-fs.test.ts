@@ -36,6 +36,34 @@ describe('file tools', () => {
     expect(result.content).toContain('2: two');
   });
 
+  it('reads a single line', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-'));
+    await writeFile(join(root, 'a.txt'), 'one\ntwo\nthree\n', 'utf8');
+    const tools = createFileTools({ backups: new InMemoryBackupStore() });
+    const read = tools.find((t) => t.name === 'read_file');
+    const result = await read!.execute(
+      { path: 'a.txt', start_line: 2, end_line: 2 },
+      makeContext(root)
+    );
+    expect(result.content).toContain('2: two');
+    expect(result.content).not.toContain('1: one');
+  });
+
+  it('reads a range of lines', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-'));
+    await writeFile(join(root, 'a.txt'), 'one\ntwo\nthree\nfour\n', 'utf8');
+    const tools = createFileTools({ backups: new InMemoryBackupStore() });
+    const read = tools.find((t) => t.name === 'read_file');
+    const result = await read!.execute(
+      { path: 'a.txt', start_line: 2, end_line: 3 },
+      makeContext(root)
+    );
+    expect(result.content).toContain('2: two');
+    expect(result.content).toContain('3: three');
+    expect(result.content).not.toContain('1: one');
+    expect(result.content).not.toContain('4: four');
+  });
+
   it('reads several files in one call', async () => {
     const root = await mkdtemp(join(tmpdir(), 'mm-'));
     await writeFile(join(root, 'a.txt'), 'one\n', 'utf8');

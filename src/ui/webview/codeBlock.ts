@@ -113,7 +113,7 @@ function extensionOf(name: string): string {
   return name.slice(dot + 1).toLowerCase();
 }
 
-function languageOf(path: string): string {
+export function languageOf(path: string): string {
   return EXTENSION_LANGUAGE[extensionOf(baseName(path))] ?? 'text';
 }
 

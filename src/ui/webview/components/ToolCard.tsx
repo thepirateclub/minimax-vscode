@@ -14,6 +14,7 @@ import { STRINGS } from '../strings';
 import { cardOpen } from '../toolCardState';
 import { diffStats } from '../diffStats';
 import { DiffView } from './DiffView';
+import { FileReadView } from './FileReadView';
 
 interface ToolView {
   icon: ReactNode;
@@ -76,15 +77,35 @@ function describe(tool: UiToolCall): ToolView {
   return view;
 }
 
+// The range of a read stands in the title, the reader sees which lines the
+// agent has taken.
+function readRange(input: Record<string, unknown>): string {
+  const start = Number(input['start_line']);
+  const end = Number(input['end_line']);
+  const hasStart = Number.isFinite(start) && start >= 1;
+  const hasEnd = Number.isFinite(end) && end >= 1;
+  if (!hasStart && !hasEnd) {
+    return '';
+  }
+  const first = hasStart ? Math.floor(start) : 1;
+  if (!hasEnd) {
+    return first + '+';
+  }
+  const last = Math.floor(end);
+  return first === last ? String(first) : first + '-' + last;
+}
+
 function describeTool(tool: UiToolCall): ToolView {
   const input = tool.input;
   const paths = filePaths(input);
   const content = tool.content;
   if (tool.name === 'read_file') {
+    const range = readRange(input);
+    const suffix = range.length > 0 ? ' ' + range : '';
     const title =
       paths.length > 1
-        ? STRINGS.toolRead + ' ' + paths.length + ' ' + STRINGS.toolFiles
-        : STRINGS.toolRead + ' ' + (paths[0] ?? '');
+        ? STRINGS.toolRead + ' ' + paths.length + ' ' + STRINGS.toolFiles + suffix
+        : STRINGS.toolRead + ' ' + (paths[0] ?? '') + suffix;
     return {
       icon: <IconRead />,
       title,
@@ -204,24 +225,28 @@ export function ToolCard({
             ) : null}
           </span>
         ) : null}
-        {tool.durationMs !== undefined ? (
-          <span className="tool-time">
-            {tool.durationMs} {STRINGS.toolElapsed}
-          </span>
-        ) : null}
-        <span
-          className={
-            'tool-dot tool-dot-' +
-            (tool.running ? 'running' : tool.isError ? 'failed' : 'done')
-          }
-          title={status}
-          aria-label={status}
-        />
+        <span className="tool-tail">
+          {tool.durationMs !== undefined ? (
+            <span className="tool-time">
+              {tool.durationMs} {STRINGS.toolElapsed}
+            </span>
+          ) : null}
+          <span
+            className={
+              'tool-dot tool-dot-' +
+              (tool.running ? 'running' : tool.isError ? 'failed' : 'done')
+            }
+            title={status}
+            aria-label={status}
+          />
+        </span>
       </button>
       {open ? (
         <div className="tool-body">
           {diff ? (
             <DiffView path={diff.path} lines={diff.lines} showPath={false} />
+          ) : tool.name === 'read_file' && tool.content ? (
+            <FileReadView content={tool.content} path={filePaths(tool.input)[0] ?? ''} />
           ) : (
             <>
               <pre className="tool-input">{formatInput(tool.input)}</pre>

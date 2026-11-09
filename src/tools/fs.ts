@@ -57,7 +57,7 @@ export function createFileTools(deps: { backups: BackupStore }): ToolEntry[] {
   const readFileTool: ToolEntry = {
     name: 'read_file',
     description:
-      'Read one or several UTF-8 text files from the workspace. Returns content with line numbers. Use start_line and end_line for a range. Pass paths to read several files in one call.',
+      'Read one or several UTF-8 text files from the workspace. Returns content with line numbers. Use start_line and end_line to read a single line or a range of lines. Pass paths to read several files in one call.',
     approval: 'never',
     sideEffect: false,
     inputSchema: {
