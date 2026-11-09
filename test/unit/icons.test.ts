@@ -114,6 +114,52 @@ describe('panel icons', () => {
     expect(Math.abs(angle - 90)).toBeLessThan(0.5);
   });
 
+  it('keeps the silhouette of the send icon from the reference', () => {
+    const { markup } = renderIcon(IconSend);
+    const paths = [...markup.matchAll(/<path d="([^"]+)"/g)].map((match) => match[1] ?? '');
+    expect(paths).toHaveLength(2);
+    // The plane is a closed contour plus a fold that runs from the tail to the nose.
+    expect(paths[0]).toMatch(/z$/i);
+    const box = markupBBox(markup);
+    const ratio = (box.maxY - box.minY) / (box.maxX - box.minX);
+    expect(ratio).toBeGreaterThan(1.2);
+    expect(ratio).toBeLessThan(1.5);
+    const xs = (d: string): number[] =>
+      (d.match(/-?\d*\.?\d+/g) ?? []).map(Number).filter((_, index) => index % 2 === 0);
+    const nose = Math.max(...xs(paths[0] ?? ''));
+    const foldEnd = Math.max(...xs(paths[1] ?? ''));
+    expect(Math.abs(nose - foldEnd)).toBeLessThan(0.2);
+  });
+
+  // The picture the icon was taken from: the ink of the plane is 16.9 pixels
+  // tall and 12.7 pixels wide, the button has to show the same glyph.
+  it('renders the send icon of the reference at the same pixel size', () => {
+    const { markup, viewBox } = renderIcon(IconSend);
+    const size = Number(/width="([\d.]+)"/.exec(markup)?.[1] ?? '0');
+    const stroke = Number(/stroke-width="([\d.]+)"/.exec(markup)?.[1] ?? '0');
+    const box = markupBBox(markup);
+    const scale = size / (viewBox[3] ?? 24);
+    const inkHeight = (box.maxY - box.minY + stroke) * scale;
+    const inkWidth = (box.maxX - box.minX + stroke) * scale;
+    expect(inkHeight).toBeGreaterThan(16.5);
+    expect(inkHeight).toBeLessThan(17.5);
+    expect(inkWidth).toBeGreaterThan(12.5);
+    expect(inkWidth).toBeLessThan(13.5);
+  });
+
+  // The square of the stop button keeps the weight of the plane, so the
+  // button does not shrink when the turn starts.
+  it('keeps the stop square at the weight of the plane', () => {
+    const { markup, viewBox } = renderIcon(IconStop);
+    const size = Number(/width="([\d.]+)"/.exec(markup)?.[1] ?? '0');
+    const stroke = Number(/stroke-width="([\d.]+)"/.exec(markup)?.[1] ?? '0');
+    const box = markupBBox(markup);
+    const scale = size / (viewBox[3] ?? 24);
+    const outer = (box.maxX - box.minX + stroke) * scale;
+    expect(outer).toBeGreaterThan(12.5);
+    expect(outer).toBeLessThan(13.5);
+  });
+
   it('centers the icon inside the square button of the header', () => {
     const css = readFileSync(
       new URL('../../src/ui/webview/styles.css', import.meta.url),

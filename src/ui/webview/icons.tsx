@@ -184,22 +184,25 @@ export function IconCopy(): ReactNode {
   );
 }
 
-// A paper plane with a right angle at the tip. The sharp corner of the
-// classic glyph reads as a knife at the size of the button.
+// The plane of the reference picture, traced pixel by pixel: a narrow
+// dart with a right angle at the tip and a fold from the tip to the tail.
+// The picture is the measure, the glyph is 15.4 pixels tall and the stroke
+// is 1.5 pixels wide, so the button shows exactly that.
 export function IconSend(): ReactNode {
   return (
-    <Svg viewBox="0 0 24 24" strokeWidth={2} size={15}>
-      <path d="M20 8 L14 23 L11 11 L5 2 Z" />
-      <path d="M20 8 L11 11" />
+    <Svg viewBox="0 0 24 24" strokeWidth={1.9} size={19}>
+      <path d="M4.84 2.16 L18.93 7.75 L13.34 21.84 L10.4 10.59 Z" />
+      <path d="M10.4 10.59 L18.93 7.75" />
     </Svg>
   );
 }
 
-// A square, it stops the current turn.
+// A square, it stops the current turn. It keeps the weight of the plane
+// above, so the button does not shrink when the turn starts.
 export function IconStop(): ReactNode {
   return (
-    <Svg viewBox="0 0 24 24" strokeWidth={2} size={15}>
-      <rect x="7" y="7" width="10" height="10" rx="1.5" />
+    <Svg viewBox="0 0 24 24" strokeWidth={1.9} size={19}>
+      <rect x="4.75" y="4.75" width="14.5" height="14.5" rx="2" />
     </Svg>
   );
 }
