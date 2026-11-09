@@ -1,5 +1,8 @@
+import { mkdtemp, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { extractMentionPaths } from '../../src/agent/mentions';
+import { extractMentionPaths, readMentionedFiles } from '../../src/agent/mentions';
 
 describe('mention extraction', () => {
   it('finds a file reference in the text', () => {
@@ -26,5 +29,29 @@ describe('mention extraction', () => {
 
   it('drops the trailing punctuation', () => {
     expect(extractMentionPaths('see @a.ts.')).toEqual(['a.ts']);
+  });
+});
+
+describe('mention attachments', () => {
+  it('reads the files named by the chips', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-mentions-'));
+    await writeFile(join(root, 'a.ts'), 'alpha', 'utf8');
+    await writeFile(join(root, 'b.ts'), 'beta', 'utf8');
+    const files = await readMentionedFiles(root, 'plain text', ['a.ts', 'b.ts']);
+    expect(files.map((file) => file.path)).toEqual(['a.ts', 'b.ts']);
+    expect(files[0]?.content).toBe('alpha');
+  });
+
+  it('reads a file only once when the text and the chip agree', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-mentions-'));
+    await writeFile(join(root, 'a.ts'), 'alpha', 'utf8');
+    const files = await readMentionedFiles(root, 'look at @a.ts', ['a.ts']);
+    expect(files.map((file) => file.path)).toEqual(['a.ts']);
+  });
+
+  it('skips a chip that points outside the workspace', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-mentions-'));
+    const files = await readMentionedFiles(root, 'plain', ['../secret.ts']);
+    expect(files).toHaveLength(0);
   });
 });

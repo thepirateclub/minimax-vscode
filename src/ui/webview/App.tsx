@@ -33,12 +33,12 @@ const EMPTY_STATE: UiState = {
 export function App({ vscode }: { vscode: VsCodeApi }) {
   const [state, setState] = useState<UiState>(EMPTY_STATE);
   const [messages, setMessages] = useState<UiMessage[]>([]);
-  const [text, setText] = useState('');
   const [selections, setSelections] = useState<UiSelection[]>([]);
   const [suggestions, setSuggestions] = useState<UiSuggestion[]>([]);
   const [settings, setSettings] = useState<UiSettings | undefined>(undefined);
   const [tab, setTab] = useState<PanelTab>('chat');
   const [focusToken, setFocusToken] = useState(0);
+  const [resetToken, setResetToken] = useState(0);
   const [insert, setInsert] = useState<InsertRequest | undefined>(undefined);
   const insertToken = useRef(0);
 
@@ -195,61 +195,66 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
       <Header
         tab={tab}
         onTab={openTab}
-        models={state.models}
-        model={state.model}
-        effort={state.effort}
         state={state.state}
         tokens={state.tokens}
         hasApiKey={state.hasApiKey}
-        onModel={(model) => vscode.postMessage({ type: 'set_model', model })}
-        onEffort={(effort) => vscode.postMessage({ type: 'set_effort', effort })}
         onNewChat={() => vscode.postMessage({ type: 'new_session' })}
       />
-      {tab === 'chat' ? (
-        <>
-          {messages.length === 0 ? (
-            <div className="empty">{STRINGS.empty}</div>
-          ) : (
-            <MessageList
-              messages={messages}
-              onApprove={(id, allowForSession) =>
-                vscode.postMessage({ type: 'approve', id, allowForSession })
-              }
-              onReject={(id) => vscode.postMessage({ type: 'reject', id })}
-            />
-          )}
-          <Composer
-            busy={busy}
-            text={text}
-            onTextChange={(updater) => setText((previous) => updater(previous))}
-            selections={selections}
-            focusToken={focusToken}
-            suggestions={suggestions}
-            insert={insert}
-            onInsertHandled={() => setInsert(undefined)}
-            onSend={(sent, sentSelections) => {
-              vscode.postMessage({ type: 'send', text: sent, selections: sentSelections });
-              setText('');
-              setSelections([]);
-            }}
-            onStop={() => vscode.postMessage({ type: 'stop' })}
-            onPickFiles={() => vscode.postMessage({ type: 'pick_files', requestId: 'attach' })}
-            onRemoveSelection={(id) =>
-              setSelections((prev) => prev.filter((item) => item.id !== id))
+      <div className={'view' + (tab === 'chat' ? '' : ' view-hidden')}>
+        {messages.length === 0 ? (
+          <div className="empty">{STRINGS.empty}</div>
+        ) : (
+          <MessageList
+            messages={messages}
+            onApprove={(id, allowForSession) =>
+              vscode.postMessage({ type: 'approve', id, allowForSession })
             }
-            onSuggest={suggest}
+            onReject={(id) => vscode.postMessage({ type: 'reject', id })}
           />
-        </>
-      ) : settings ? (
-        <SettingsView
-          settings={settings}
-          onSave={(values) => vscode.postMessage({ type: 'save_settings', values })}
-          onSetApiKey={(key) => vscode.postMessage({ type: 'set_api_key', key })}
-          onClearApiKey={() => vscode.postMessage({ type: 'clear_api_key' })}
+        )}
+        <Composer
+          busy={busy}
+          selections={selections}
+          focusToken={focusToken}
+          resetToken={resetToken}
+          suggestions={suggestions}
+          insert={insert}
+          onInsertHandled={() => setInsert(undefined)}
+          models={state.models}
+          model={state.model}
+          effort={state.effort}
+          onModel={(model) => vscode.postMessage({ type: 'set_model', model })}
+          onEffort={(effort) => vscode.postMessage({ type: 'set_effort', effort })}
+          onSend={(sent, mentions, sentSelections) => {
+            vscode.postMessage({
+              type: 'send',
+              text: sent,
+              mentions,
+              selections: sentSelections
+            });
+            setResetToken((value) => value + 1);
+            setSelections([]);
+          }}
+          onStop={() => vscode.postMessage({ type: 'stop' })}
+          onPickFiles={() => vscode.postMessage({ type: 'pick_files', requestId: 'attach' })}
+          onRemoveSelection={(id) =>
+            setSelections((prev) => prev.filter((item) => item.id !== id))
+          }
+          onSuggest={suggest}
         />
-      ) : (
-        <div className="empty">{STRINGS.loading}</div>
-      )}
+      </div>
+      <div className={'view' + (tab === 'settings' ? '' : ' view-hidden')}>
+        {settings ? (
+          <SettingsView
+            settings={settings}
+            onSave={(values) => vscode.postMessage({ type: 'save_settings', values })}
+            onSetApiKey={(key) => vscode.postMessage({ type: 'set_api_key', key })}
+            onClearApiKey={() => vscode.postMessage({ type: 'clear_api_key' })}
+          />
+        ) : (
+          <div className="empty">{STRINGS.loading}</div>
+        )}
+      </div>
     </div>
   );
 }

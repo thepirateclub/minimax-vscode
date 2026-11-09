@@ -19,7 +19,8 @@ const state = vi.hoisted(() => ({
   responses: [] as string[],
   editor: undefined as unknown,
   documents: [] as Array<{ uri: { fsPath: string } }>,
-  files: [] as string[]
+  files: [] as string[],
+  statusBar: undefined as undefined | { text: string; tooltip: string }
 }));
 
 vi.mock('vscode', () => {
@@ -37,13 +38,17 @@ vi.mock('vscode', () => {
         show: () => undefined,
         dispose: () => undefined
       }),
-      createStatusBarItem: () => ({
-        text: '',
-        tooltip: '',
-        command: '',
-        show: () => undefined,
-        dispose: () => undefined
-      }),
+      createStatusBarItem: () => {
+        const item = {
+          text: '',
+          tooltip: '',
+          command: '',
+          show: () => undefined,
+          dispose: () => undefined
+        };
+        state.statusBar = item;
+        return item;
+      },
       registerWebviewViewProvider: (id: string, provider: { resolveWebviewView: (v: unknown) => void }) => {
         state.viewProviders.set(id, provider);
         return { dispose: () => undefined };
@@ -98,6 +103,20 @@ vi.mock('vscode', () => {
     ConfigurationTarget: { Global: 1 },
     StatusBarAlignment: { Right: 2 }
   };
+});
+
+const MESSAGES_URL = 'https://api.minimax.io/anthropic/v1/messages';
+
+const QUOTA_JSON = JSON.stringify({
+  model_remains: [
+    {
+      model_name: 'general',
+      current_interval_remaining_percent: 97,
+      current_weekly_remaining_percent: 99,
+      remains_time: 7556954
+    }
+  ],
+  base_resp: { status_code: 0, status_msg: 'success' }
 });
 
 const TEXT_SSE = [
@@ -201,11 +220,21 @@ describe('extension activation', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
-        state.fetched.push(String(url));
+        const href = String(url);
+        state.fetched.push(href);
         state.headers.push((init?.headers ?? {}) as Record<string, string>);
-        state.bodies.push(typeof init?.body === 'string' ? init.body : '');
-        const body = state.responses.shift() ?? TEXT_SSE;
-        return new Response(body, {
+        const body = typeof init?.body === 'string' ? init.body : '';
+        if (body) {
+          state.bodies.push(body);
+        }
+        if (href.includes('/v1/token_plan/remains')) {
+          return new Response(QUOTA_JSON, {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          });
+        }
+        const payload = state.responses.shift() ?? TEXT_SSE;
+        return new Response(payload, {
           status: 200,
           headers: { 'content-type': 'text/event-stream' }
         });
@@ -250,7 +279,7 @@ describe('extension activation', () => {
     state.config.set('root', root);
     await boot();
     state.posted.length = 0;
-    state.receive?.({ type: 'send', text: 'hello', selections: [] });
+    state.receive?.({ type: 'send', text: 'hello', mentions: [], selections: [] });
     await vi.waitFor(() => {
       expect(types()).toContain('error');
     });
@@ -265,7 +294,7 @@ describe('extension activation', () => {
     await boot();
 
     state.posted.length = 0;
-    state.receive?.({ type: 'send', text: 'hello', selections: [] });
+    state.receive?.({ type: 'send', text: 'hello', mentions: [], selections: [] });
 
     await vi.waitFor(() => {
       expect(ofType('text_delta').map((message) => message.text).join('')).toBe('hi from the model');
@@ -277,9 +306,10 @@ describe('extension activation', () => {
       expect(status?.state).toBe('idle');
     });
 
-    expect(state.fetched[0]).toBe('https://api.minimax.io/anthropic/v1/messages');
-    expect(state.headers[0]?.['Authorization']).toBe('Bearer test-key');
-    expect(state.headers[0]?.['anthropic-version']).toBe('2023-06-01');
+    expect(state.fetched).toContain(MESSAGES_URL);
+    const index = state.fetched.indexOf(MESSAGES_URL);
+    expect(state.headers[index]?.['Authorization']).toBe('Bearer test-key');
+    expect(state.headers[index]?.['anthropic-version']).toBe('2023-06-01');
   });
 
   it('asks for an approval before a write and applies it after the answer', async () => {
@@ -290,7 +320,7 @@ describe('extension activation', () => {
     await boot();
 
     state.posted.length = 0;
-    state.receive?.({ type: 'send', text: 'write a note', selections: [] });
+    state.receive?.({ type: 'send', text: 'write a note', mentions: [], selections: [] });
 
     await vi.waitFor(() => {
       expect(ofType('approval_request').length).toBe(1);
@@ -317,7 +347,7 @@ describe('extension activation', () => {
     await boot();
 
     state.posted.length = 0;
-    state.receive?.({ type: 'send', text: 'write a note', selections: [] });
+    state.receive?.({ type: 'send', text: 'write a note', mentions: [], selections: [] });
 
     await vi.waitFor(() => {
       expect(ofType('approval_request').length).toBe(1);
@@ -339,12 +369,12 @@ describe('extension activation', () => {
     state.responses.push(TEXT_SSE, TEXT_SSE);
     await boot();
 
-    state.receive?.({ type: 'send', text: 'first question', selections: [] });
+    state.receive?.({ type: 'send', text: 'first question', mentions: [], selections: [] });
     await vi.waitFor(() => {
       expect(ofType('text_delta').length).toBeGreaterThan(0);
     });
     state.posted.length = 0;
-    state.receive?.({ type: 'send', text: 'second question', selections: [] });
+    state.receive?.({ type: 'send', text: 'second question', mentions: [], selections: [] });
     await vi.waitFor(() => {
       expect(ofType('text_delta').length).toBeGreaterThan(0);
     });
@@ -457,6 +487,7 @@ describe('extension activation', () => {
     state.receive?.({
       type: 'send',
       text: 'explain this',
+      mentions: [],
       selections: [
         {
           id: 'sel-1',
@@ -491,6 +522,18 @@ describe('extension activation', () => {
     expect(ofType('mention')[0]!.path).toBe('src/app.ts');
   });
 
+  it('shows the remaining 5-hour quota in the status bar', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.secrets.set('minimax.apiKey', 'test-key');
+    await boot();
+    await vi.waitFor(() => {
+      expect(state.statusBar?.text).toContain('97%');
+    });
+    expect(state.statusBar?.tooltip).toContain('5-hour window left: 97%');
+    expect(state.fetched).toContain('https://api.minimax.io/v1/token_plan/remains');
+  });
+
   it('attaches the file mentioned in the request', async () => {
     const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
     state.config.set('root', root);
@@ -499,7 +542,7 @@ describe('extension activation', () => {
     await writeFile(join(root, 'context.md'), '# Title\nbody line\n', 'utf8');
     await boot();
 
-    state.receive?.({ type: 'send', text: 'read @context.md please', selections: [] });
+    state.receive?.({ type: 'send', text: 'read @context.md please', mentions: [], selections: [] });
     await vi.waitFor(() => {
       expect(ofType('text_delta').length).toBeGreaterThan(0);
     });
@@ -508,6 +551,31 @@ describe('extension activation', () => {
     };
     const prompt = body.messages[0]?.content[0]?.text ?? '';
     expect(prompt).toContain('read @context.md please');
+    expect(prompt).toContain('Attached file: context.md');
+    expect(prompt).toContain('body line');
+  });
+
+  it('attaches the file named by a chip in the input field', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.secrets.set('minimax.apiKey', 'test-key');
+    state.responses.push(TEXT_SSE);
+    await writeFile(join(root, 'context.md'), '# Title\nbody line\n', 'utf8');
+    await boot();
+
+    state.receive?.({
+      type: 'send',
+      text: 'look at @context.md',
+      mentions: ['context.md'],
+      selections: []
+    });
+    await vi.waitFor(() => {
+      expect(ofType('text_delta').length).toBeGreaterThan(0);
+    });
+    const body = JSON.parse(state.bodies[0]!) as {
+      messages: Array<{ content: Array<{ text: string }> }>;
+    };
+    const prompt = body.messages[0]?.content[0]?.text ?? '';
     expect(prompt).toContain('Attached file: context.md');
     expect(prompt).toContain('body line');
   });

@@ -24,10 +24,17 @@ export function extractMentionPaths(text: string): string[] {
 
 export async function readMentionedFiles(
   root: string,
-  text: string
+  text: string,
+  extraPaths: string[] = []
 ): Promise<Array<{ path: string; content: string }>> {
   const files: Array<{ path: string; content: string }> = [];
-  for (const path of extractMentionPaths(text)) {
+  const candidates: string[] = [];
+  for (const path of [...extractMentionPaths(text), ...extraPaths]) {
+    if (!candidates.includes(path)) {
+      candidates.push(path);
+    }
+  }
+  for (const path of candidates) {
     if (files.length >= MAX_FILES) {
       break;
     }

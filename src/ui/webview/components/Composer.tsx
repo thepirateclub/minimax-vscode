@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import type { KeyboardEvent } from 'react';
+import type { KeyboardEvent, MouseEvent } from 'react';
+import type { EffortLevel } from '../../../api/types';
+import type { ModelInfo } from '../../../config/models';
 import type { UiSelection, UiSuggestion } from '../../protocol';
 import { STRINGS } from '../strings';
 
@@ -8,41 +10,213 @@ export interface InsertRequest {
   token: number;
 }
 
+export interface EditorContent {
+  text: string;
+  mentions: string[];
+}
+
+const BLOCK_TAGS = new Set(['DIV', 'P']);
+
+interface WalkResult extends EditorContent {
+  visible: string;
+}
+
+function fileLabel(path: string): string {
+  return path.split(/[\\/]/).pop() ?? path;
+}
+
+function walk(parent: Node, result: WalkResult): void {
+  for (const child of Array.from(parent.childNodes)) {
+    if (child.nodeType === Node.TEXT_NODE) {
+      const text = child.textContent ?? '';
+      result.visible += text;
+      result.text += text;
+      continue;
+    }
+    if (child.nodeType !== Node.ELEMENT_NODE) {
+      continue;
+    }
+    const element = child as HTMLElement;
+    if (element.classList.contains('mention')) {
+      const path = element.dataset.path ?? '';
+      const label = element.dataset.label ?? path;
+      result.visible += label;
+      result.text += '@' + path;
+      result.mentions.push(path);
+      continue;
+    }
+    if (element.tagName === 'BR') {
+      result.visible += '\n';
+      result.text += '\n';
+      continue;
+    }
+    walk(element, result);
+    if (BLOCK_TAGS.has(element.tagName)) {
+      result.visible += '\n';
+      result.text += '\n';
+    }
+  }
+}
+
+function readContent(root: HTMLElement): EditorContent & { visible: string } {
+  const result: WalkResult = { text: '', visible: '', mentions: [] };
+  walk(root, result);
+  return result;
+}
+
+// The visible text before the caret drives the "@" trigger, a chip counts as
+// its own label so a path never looks like a fresh trigger.
+function visibleBeforeCaret(root: HTMLElement): string {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0) {
+    return '';
+  }
+  const range = selection.getRangeAt(0);
+  if (!root.contains(range.startContainer)) {
+    return '';
+  }
+  const before = document.createRange();
+  before.selectNodeContents(root);
+  try {
+    before.setEnd(range.startContainer, range.startOffset);
+  } catch {
+    return '';
+  }
+  const result: WalkResult = { text: '', visible: '', mentions: [] };
+  walk(before.cloneContents(), result);
+  return result.visible.replace(/\n+$/, '');
+}
+
+function triggerPrefix(value: string): string | undefined {
+  const match = /(?:^|\s)@([^\s@]*)$/.exec(value);
+  return match ? match[1] ?? '' : undefined;
+}
+
+function insertMention(root: HTMLElement, path: string): void {
+  const label = fileLabel(path);
+  const chip = document.createElement('span');
+  chip.className = 'mention';
+  chip.contentEditable = 'false';
+  chip.dataset.path = path;
+  chip.dataset.label = label;
+  chip.title = path;
+
+  const labelElement = document.createElement('span');
+  labelElement.className = 'mention-label';
+  labelElement.textContent = label;
+  chip.appendChild(labelElement);
+
+  const remove = document.createElement('span');
+  remove.className = 'mention-remove';
+  remove.textContent = '×';
+  chip.appendChild(remove);
+
+  const selection = window.getSelection();
+  if (selection && selection.rangeCount > 0 && root.contains(selection.getRangeAt(0).startContainer)) {
+    const range = selection.getRangeAt(0);
+    range.deleteContents();
+    range.insertNode(chip);
+    const spacer = document.createTextNode(' ');
+    chip.after(spacer);
+    range.setStartAfter(spacer);
+    range.collapse(true);
+    selection.removeAllRanges();
+    selection.addRange(range);
+    return;
+  }
+  root.appendChild(chip);
+  root.appendChild(document.createTextNode(' '));
+}
+
+// The typed trigger is cut out of the text node that holds the caret.
+function removeTrigger(): void {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0) {
+    return;
+  }
+  const range = selection.getRangeAt(0);
+  const node = range.startContainer;
+  if (node.nodeType !== Node.TEXT_NODE) {
+    return;
+  }
+  const text = node.textContent ?? '';
+  const offset = range.startOffset;
+  const match = /(?:^|\s)@([^\s@]*)$/.exec(text.slice(0, offset));
+  if (!match) {
+    return;
+  }
+  const start = offset - (match[1]?.length ?? 0) - 1;
+  if (start < 0) {
+    return;
+  }
+  node.textContent = text.slice(0, start) + text.slice(offset);
+  range.setStart(node, start);
+  range.collapse(true);
+  selection.removeAllRanges();
+  selection.addRange(range);
+}
+
+function insertLineBreak(): void {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0) {
+    return;
+  }
+  const range = selection.getRangeAt(0);
+  range.deleteContents();
+  const br = document.createTextNode('\n');
+  range.insertNode(br);
+  range.setStartAfter(br);
+  range.collapse(true);
+  selection.removeAllRanges();
+  selection.addRange(range);
+}
+
 export function Composer({
   busy,
-  text,
-  onTextChange,
   selections,
   focusToken,
   suggestions,
   insert,
   onInsertHandled,
+  resetToken,
+  models,
+  model,
+  effort,
+  onModel,
+  onEffort,
   onSend,
   onStop,
   onPickFiles,
   onRemoveSelection,
-  onSuggest
+  onSuggest,
+  onContentChange
 }: {
   busy: boolean;
-  text: string;
-  onTextChange: (updater: (previous: string) => string) => void;
   selections: UiSelection[];
   focusToken: number;
   suggestions: UiSuggestion[];
   insert: InsertRequest | undefined;
   onInsertHandled: () => void;
-  onSend: (text: string, selections: UiSelection[]) => void;
+  resetToken: number;
+  models: ModelInfo[];
+  model: string;
+  effort: EffortLevel;
+  onModel: (model: string) => void;
+  onEffort: (effort: EffortLevel) => void;
+  onSend: (text: string, mentions: string[], selections: UiSelection[]) => void;
   onStop: () => void;
   onPickFiles: () => void;
   onRemoveSelection: (id: string) => void;
   onSuggest: (prefix: string | undefined) => void;
+  onContentChange?: (content: EditorContent) => void;
 }) {
   const [active, setActive] = useState(0);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const caretRef = useRef<number | undefined>(undefined);
+  const [empty, setEmpty] = useState(true);
+  const editorRef = useRef<HTMLDivElement>(null);
+  const lastReset = useRef(resetToken);
 
   useEffect(() => {
-    textareaRef.current?.focus();
+    editorRef.current?.focus();
   }, [focusToken]);
 
   useEffect(() => {
@@ -50,65 +224,71 @@ export function Composer({
   }, [suggestions]);
 
   useEffect(() => {
+    if (resetToken === lastReset.current) {
+      return;
+    }
+    lastReset.current = resetToken;
+    const root = editorRef.current;
+    if (root) {
+      root.textContent = '';
+      setEmpty(true);
+      onContentChange?.({ text: '', mentions: [] });
+    }
+  }, [resetToken]);
+
+  useEffect(() => {
     if (!insert) {
       return;
     }
-    const node = textareaRef.current;
-    const caret = caretRef.current ?? node?.selectionStart ?? text.length;
-    const mention = insert.paths.map((path) => '@' + path).join(' ') + ' ';
-    onTextChange((previous) => previous.slice(0, caret) + mention + previous.slice(caret));
-    onInsertHandled();
-    const position = caret + mention.length;
-    requestAnimationFrame(() => {
-      placeCaret(node, position);
-    });
-  }, [insert?.token]);
-
-  // The trigger only opens on a standalone "@", so an e-mail address or a
-  // word inside a path never triggers the file list.
-  const triggerOf = (
-    value: string,
-    caret: number
-  ): { prefix: string; start: number } | undefined => {
-    const match = /(?:^|\s)@([^\s@]*)$/.exec(value.slice(0, caret));
-    if (!match) {
-      return undefined;
-    }
-    const prefix = match[1] ?? '';
-    return { prefix, start: caret - prefix.length - 1 };
-  };
-
-  const placeCaret = (node: HTMLTextAreaElement | null, position: number): void => {
-    caretRef.current = position;
-    if (!node) {
+    const root = editorRef.current;
+    if (!root) {
       return;
     }
-    node.focus();
-    node.setSelectionRange(position, position);
+    for (const path of insert.paths) {
+      insertMention(root, path);
+    }
+    onInsertHandled();
+    root.focus();
+    report();
+  }, [insert?.token]);
+
+  const report = (): void => {
+    const root = editorRef.current;
+    if (!root) {
+      return;
+    }
+    const content = readContent(root);
+    setEmpty(content.text.trim().length === 0);
+    onContentChange?.({ text: content.text, mentions: content.mentions });
+    const prefix = triggerPrefix(visibleBeforeCaret(root));
+    onSuggest(prefix);
   };
 
   const pick = (item: UiSuggestion): void => {
-    const node = textareaRef.current;
-    const caret = node?.selectionStart ?? text.length;
-    const trigger = triggerOf(text, caret);
-    const start = trigger ? trigger.start : caret;
-    const mention = '@' + item.path + ' ';
-    onTextChange((previous) => previous.slice(0, start) + mention + previous.slice(caret));
+    const root = editorRef.current;
+    if (!root) {
+      return;
+    }
+    removeTrigger();
+    insertMention(root, item.path);
     onSuggest(undefined);
     setActive(0);
-    requestAnimationFrame(() => {
-      placeCaret(node, start + mention.length);
-    });
+    report();
   };
 
   const submit = (): void => {
-    if (busy || text.trim().length === 0) {
+    const root = editorRef.current;
+    if (!root || busy) {
       return;
     }
-    onSend(text.trim(), selections);
+    const content = readContent(root);
+    if (content.text.trim().length === 0) {
+      return;
+    }
+    onSend(content.text.trim(), content.mentions, selections);
   };
 
-  const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
+  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
     if (suggestions.length > 0) {
       if (event.key === 'ArrowDown') {
         event.preventDefault();
@@ -134,9 +314,28 @@ export function Composer({
         return;
       }
     }
+    if (event.key === 'Enter' && event.shiftKey) {
+      event.preventDefault();
+      insertLineBreak();
+      report();
+      return;
+    }
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
       submit();
+    }
+  };
+
+  const handleMouseDown = (event: MouseEvent<HTMLDivElement>): void => {
+    const target = event.target as HTMLElement;
+    if (!target.classList.contains('mention-remove')) {
+      return;
+    }
+    event.preventDefault();
+    const chip = target.closest('.mention');
+    if (chip) {
+      chip.remove();
+      report();
     }
   };
 
@@ -184,23 +383,37 @@ export function Composer({
           ))}
         </div>
       ) : null}
-      <textarea
-        ref={textareaRef}
-        value={text}
-        placeholder={STRINGS.placeholder}
-        onChange={(event) => {
-          const value = event.target.value;
-          const caret = event.target.selectionStart ?? value.length;
-          caretRef.current = caret;
-          onTextChange(() => value);
-          const trigger = triggerOf(value, caret);
-          onSuggest(trigger ? trigger.prefix : undefined);
-        }}
-        onSelect={(event) => {
-          caretRef.current = event.currentTarget.selectionStart ?? undefined;
-        }}
+      <div
+        ref={editorRef}
+        className={'composer-input' + (empty ? ' is-empty' : '')}
+        contentEditable
+        suppressContentEditableWarning
+        role="textbox"
+        aria-multiline="true"
+        data-placeholder={STRINGS.placeholder}
+        onInput={report}
         onKeyDown={handleKeyDown}
+        onMouseDown={handleMouseDown}
       />
+      <div className="composer-selects">
+        <select value={model} onChange={(event) => onModel(event.target.value)}>
+          {models.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.id}
+            </option>
+          ))}
+        </select>
+        <select
+          value={effort}
+          onChange={(event) => onEffort(event.target.value as EffortLevel)}
+        >
+          {(['low', 'medium', 'high', 'xhigh', 'max'] as const).map((level) => (
+            <option key={level} value={level}>
+              {STRINGS.effort}: {level}
+            </option>
+          ))}
+        </select>
+      </div>
       <div className="composer-actions">
         <button className="secondary" onClick={onPickFiles}>
           {STRINGS.attach}

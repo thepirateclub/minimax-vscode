@@ -114,7 +114,7 @@ export type ExtToWeb =
 
 export type WebToExt =
   | { type: 'ready' }
-  | { type: 'send'; text: string; selections: UiSelection[] }
+  | { type: 'send'; text: string; mentions: string[]; selections: UiSelection[] }
   | { type: 'stop' }
   | { type: 'approve'; id: string; allowForSession: boolean }
   | { type: 'reject'; id: string }

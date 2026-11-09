@@ -1,5 +1,3 @@
-import type { EffortLevel } from '../../../api/types';
-import type { ModelInfo } from '../../../config/models';
 import type { AgentState } from '../../protocol';
 import { STRINGS } from '../strings';
 
@@ -8,26 +6,16 @@ export type PanelTab = 'chat' | 'settings';
 export function Header({
   tab,
   onTab,
-  models,
-  model,
-  effort,
   state,
   tokens,
   hasApiKey,
-  onModel,
-  onEffort,
   onNewChat
 }: {
   tab: PanelTab;
   onTab: (tab: PanelTab) => void;
-  models: ModelInfo[];
-  model: string;
-  effort: EffortLevel;
   state: AgentState;
   tokens: number;
   hasApiKey: boolean;
-  onModel: (model: string) => void;
-  onEffort: (effort: EffortLevel) => void;
   onNewChat: () => void;
 }) {
   return (
@@ -51,24 +39,7 @@ export function Header({
         </button>
       </div>
       {tab === 'chat' ? (
-        <div className="header-row selects">
-          <select value={model} onChange={(event) => onModel(event.target.value)}>
-            {models.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.id}
-              </option>
-            ))}
-          </select>
-          <select
-            value={effort}
-            onChange={(event) => onEffort(event.target.value as EffortLevel)}
-          >
-            {(['low', 'medium', 'high', 'xhigh', 'max'] as const).map((level) => (
-              <option key={level} value={level}>
-                {STRINGS.effort}: {level}
-              </option>
-            ))}
-          </select>
+        <div className="header-row">
           <span className="tokens">
             {tokens} {STRINGS.tokens}
           </span>

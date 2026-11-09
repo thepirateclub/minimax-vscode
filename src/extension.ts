@@ -2,6 +2,7 @@ import { unlink, writeFile } from 'node:fs/promises';
 import { isAbsolute } from 'node:path';
 import * as vscode from 'vscode';
 import { HttpMiniMaxClient } from './api/client';
+import { fetchQuota, type QuotaSnapshot } from './api/quota';
 import type { AnthropicMessage, EffortLevel } from './api/types';
 import type { AgentEvent } from './agent/agent';
 import { buildWorkspaceSnapshot, renderSnapshot } from './agent/context';
@@ -62,6 +63,7 @@ class MiniMaxController {
   private tokens = 0;
   private counter = 0;
   private fileCache: { files: string[]; at: number } | undefined;
+  private quota: QuotaSnapshot | undefined;
 
   constructor(context: vscode.ExtensionContext, channel: vscode.OutputChannel) {
     this.context = context;
@@ -137,6 +139,15 @@ class MiniMaxController {
       })
     );
     context.subscriptions.push(this.statusBar);
+
+    const quotaTimer = setInterval(() => {
+      void this.refreshQuota();
+    }, 300_000);
+    context.subscriptions.push({
+      dispose: () => {
+        clearInterval(quotaTimer);
+      }
+    });
   }
 
   private showLogs(): void {
@@ -300,8 +311,25 @@ class MiniMaxController {
 
   private setState(state: AgentState): void {
     this.agentState = state;
-    this.statusBar.setState(state, this.tokens);
+    this.statusBar.setState(state);
     this.panel.post({ type: 'status', state, tokens: this.tokens });
+  }
+
+  async refreshQuota(): Promise<void> {
+    const key = await getApiKey(this.context.secrets);
+    if (!key) {
+      return;
+    }
+    const settings = getSettings();
+    try {
+      this.quota = await fetchQuota({
+        baseUrl: resolveBaseUrl(settings.baseUrl, settings.customBaseUrl),
+        apiKey: key
+      });
+      this.statusBar.setQuota(this.quota);
+    } catch (error) {
+      this.logger.error('the quota request failed', error);
+    }
   }
 
   private async handleWebviewMessage(message: WebToExt): Promise<void> {
@@ -310,7 +338,7 @@ class MiniMaxController {
       return;
     }
     if (message.type === 'send') {
-      await this.handleSend(message.text, message.selections);
+      await this.handleSend(message.text, message.mentions, message.selections);
       return;
     }
     if (message.type === 'stop') {
@@ -380,7 +408,11 @@ class MiniMaxController {
     }
   }
 
-  private async handleSend(text: string, selections: UiSelection[]): Promise<void> {
+  private async handleSend(
+    text: string,
+    mentions: string[],
+    selections: UiSelection[]
+  ): Promise<void> {
     let runtime = this.activeSession();
     if (!runtime) {
       this.startNewSession();
@@ -421,7 +453,7 @@ class MiniMaxController {
         },
         async (_progress, token) => {
           token.onCancellationRequested(() => agent.stop());
-          await agent.send(await this.buildPromptText(text, selections));
+          await agent.send(await this.buildPromptText(text, mentions, selections));
         }
       );
     } catch (error) {
@@ -435,12 +467,17 @@ class MiniMaxController {
       runtime.busy = false;
       runtime.history = agent.getHistory();
       this.persist(runtime);
+      void this.refreshQuota();
     }
   }
 
-  private async buildPromptText(text: string, selections: UiSelection[]): Promise<string> {
+  private async buildPromptText(
+    text: string,
+    mentions: string[],
+    selections: UiSelection[]
+  ): Promise<string> {
     const blocks: string[] = [];
-    const files = await readMentionedFiles(this.workspaceRoot(), text);
+    const files = await readMentionedFiles(this.workspaceRoot(), text, mentions);
     if (files.length > 0) {
       this.logger.info('attached ' + files.length + ' file(s) mentioned in the request');
     }
@@ -861,6 +898,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   controller = new MiniMaxController(context, channel);
   controller.register(context);
   controller.startNewSession();
+  void controller.refreshQuota();
 }
 
 export function deactivate(): void {
