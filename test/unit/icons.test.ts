@@ -21,6 +21,7 @@ import {
   IconThinking,
   IconWrite
 } from '../../src/ui/webview/icons';
+import { CODICON_DEBUG_STOP, CODICON_SEND } from '../../src/ui/webview/codicons';
 import { markupBBox, pathPoints } from '../helpers/iconGeometry';
 
 const ICONS: Array<[string, () => ReactNode]> = [
@@ -55,20 +56,15 @@ function pathOf(markup: string): string {
   return /<path d="([^"]+)"/.exec(markup)?.[1] ?? '';
 }
 
-// The left edge of a shape on a horizontal line, the polyline is crossed
-// with the line and the leftmost crossing wins.
-function leftEdge(points: Array<[number, number]>, y: number): number {
-  const xs: number[] = [];
-  for (let i = 0; i + 1 < points.length; i++) {
-    const a = points[i]!;
-    const b = points[i + 1]!;
-    if ((a[1] > y) === (b[1] > y)) {
-      continue;
-    }
-    const t = (y - a[1]) / (b[1] - a[1]);
-    xs.push(a[0] + (b[0] - a[0]) * t);
-  }
-  return xs.length > 0 ? Math.min(...xs) : Number.NaN;
+// The width the icon is drawn with, the panel measures the icons in pixels.
+function sizeOf(markup: string): number {
+  return Number(/width="([\d.]+)"/.exec(markup)?.[1] ?? '0');
+}
+
+// The body of a rule of the style sheet, the selector is taken literally.
+function cssRule(css: string, selector: string): string {
+  const match = new RegExp('\\' + selector + '\\s*\\{([^}]*)\\}').exec(css);
+  return match?.[1] ?? '';
 }
 
 // The panel draws the icons in a tiny square, a glyph that hangs to one side
@@ -118,24 +114,31 @@ describe('panel icons', () => {
   });
 });
 
-// The picture the user gave is the measure: a solid arrow that points to
-// the right, with a horizontal slot between the two wings and a tail that
-// folds back to the left.
-describe('send icon of the reference picture', () => {
-  it('fills the arrow instead of stroking it', () => {
+// The send and the stop glyphs are taken from the icon set of VS Code, the
+// font codicon.ttf that ships with the editor. The codicons are contours of
+// a font, so they are filled, not stroked.
+describe('send and stop icons of the codicon set', () => {
+  it('fills the glyph instead of stroking it', () => {
     const { markup } = renderIcon(IconSend);
     expect(markup).toContain('fill="currentColor"');
     expect(markup).toContain('stroke="none"');
   });
 
-  it('keeps the proportions of the arrow from the picture', () => {
-    const { markup } = renderIcon(IconSend);
-    const box = markupBBox(markup);
+  it('draws the arrow of the codicon "send"', () => {
+    expect(pathOf(renderIcon(IconSend).markup)).toBe(CODICON_SEND);
+  });
+
+  it('draws the square of the codicon "debug-stop"', () => {
+    expect(pathOf(renderIcon(IconStop).markup)).toBe(CODICON_DEBUG_STOP);
+  });
+
+  it('keeps the proportions of the arrow from the font', () => {
+    const box = markupBBox(renderIcon(IconSend).markup);
     const width = box.maxX - box.minX;
     const height = box.maxY - box.minY;
-    // The ink of the picture is 246 pixels wide and 222 pixels tall.
-    expect(width / height).toBeGreaterThan(1.05);
-    expect(width / height).toBeLessThan(1.17);
+    // The glyph of the font is 264 units wide and 266 units tall.
+    expect(width / height).toBeGreaterThan(0.95);
+    expect(width / height).toBeLessThan(1.03);
   });
 
   it('points the nose of the arrow to the right and to the middle', () => {
@@ -153,47 +156,41 @@ describe('send icon of the reference picture', () => {
     expect(Math.abs(nose[1] - middleY)).toBeLessThan(0.6);
   });
 
-  it('keeps the slot between the wings horizontal and open to the left', () => {
-    const { markup, viewBox } = renderIcon(IconSend);
-    const points = pathPoints(pathOf(markup));
-    const top = viewBox[1] ?? 0;
-    const height = viewBox[3] ?? 24;
-    const middleY = top + height / 2;
-    // The nose of the slot is the left edge of the shape on the middle line.
-    const slotNose = leftEdge(points, middleY);
-    // A quarter of the way up the shape is the edge of the upper wing.
-    const upperWing = leftEdge(points, top + height * 0.25);
-    const lowerWing = leftEdge(points, top + height * 0.75);
-    expect(slotNose).toBeGreaterThan(upperWing + 5);
-    expect(slotNose).toBeGreaterThan(lowerWing + 5);
-    // The slot is horizontal, it is the widest exactly on the middle line.
-    expect(slotNose).toBeGreaterThan(leftEdge(points, middleY - 0.5) + 2);
-    expect(slotNose).toBeGreaterThan(leftEdge(points, middleY + 0.5) + 2);
-    // The wings of the arrow are mirror images.
-    expect(Math.abs(upperWing - lowerWing)).toBeLessThan(0.2);
+  it('keeps the hole of the arrow open', () => {
+    // The codicon is a contour with a second shape inside, the arrow keeps
+    // the hole between the wings.
+    const d = pathOf(renderIcon(IconSend).markup);
+    expect((d.match(/Z/g) ?? []).length).toBe(2);
   });
 
-  it('renders the arrow of the picture at the same pixel size', () => {
-    const { markup, viewBox } = renderIcon(IconSend);
-    const size = Number(/width="([\d.]+)"/.exec(markup)?.[1] ?? '0');
-    const box = markupBBox(markup);
-    const scale = size / (viewBox[3] ?? 24);
-    const inkWidth = (box.maxX - box.minX) * scale;
-    const inkHeight = (box.maxY - box.minY) * scale;
-    expect(inkWidth).toBeGreaterThan(16.8);
-    expect(inkWidth).toBeLessThan(17.4);
-    expect(inkHeight).toBeGreaterThan(15.2);
-    expect(inkHeight).toBeLessThan(15.7);
+  it('shows the arrow and the paperclip at the same size', () => {
+    const send = sizeOf(renderIcon(IconSend).markup);
+    const attach = sizeOf(renderIcon(IconAttach).markup);
+    expect(send).toBe(attach);
+    expect(send).toBe(14);
   });
 
-  it('keeps the stop square filled and at the weight of the arrow', () => {
-    const { markup, viewBox } = renderIcon(IconStop);
-    expect(markup).toContain('fill="currentColor"');
-    const size = Number(/width="([\d.]+)"/.exec(markup)?.[1] ?? '0');
-    const box = markupBBox(markup);
-    const scale = size / (viewBox[3] ?? 24);
-    const side = (box.maxX - box.minX) * scale;
-    expect(side).toBeGreaterThan(10.5);
-    expect(side).toBeLessThan(11.5);
+  it('shows the square of the stop at the size of the arrow', () => {
+    const stop = sizeOf(renderIcon(IconStop).markup);
+    expect(stop).toBe(sizeOf(renderIcon(IconSend).markup));
+  });
+
+  it('paints the send button like the paperclip', () => {
+    const css = readFileSync(
+      new URL('../../src/ui/webview/styles.css', import.meta.url),
+      'utf8'
+    );
+    expect(cssRule(css, '.composer-send')).toContain('color: var(--muted)');
+    expect(cssRule(css, '.composer-attach')).toContain('color: var(--muted)');
+  });
+
+  it('keeps the red of the stop button when the mouse is over it', () => {
+    const css = readFileSync(
+      new URL('../../src/ui/webview/styles.css', import.meta.url),
+      'utf8'
+    );
+    expect(cssRule(css, '.composer-send.stop:hover')).toContain(
+      'color: var(--vscode-inputValidation-errorForeground'
+    );
   });
 });

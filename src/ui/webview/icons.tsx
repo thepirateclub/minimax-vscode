@@ -1,5 +1,6 @@
 // Inline SVG icons, the panel inherits the theme colors from the host.
 import type { ReactNode } from 'react';
+import { CODICON_DEBUG_STOP, CODICON_SEND } from './codicons';
 
 interface IconProps {
   size?: number;
@@ -186,25 +187,23 @@ export function IconCopy(): ReactNode {
   );
 }
 
-// The plane of the reference picture: a solid arrow that points to the
-// right, with a horizontal slot between the two wings and a tail that
-// folds back. The picture is the measure, the path was fitted to its
-// raster, the ink of the picture is 246 pixels wide and 222 pixels tall,
-// so the button shows 17.1 by 15.4 pixels of it.
+// The arrow of the codicon set of VS Code, the glyph "send". The codicons
+// are contours of a font, so the arrow is filled, not stroked. It keeps the
+// size of the paperclip, both stand in the same field of the prompt.
 export function IconSend(): ReactNode {
   return (
-    <Svg viewBox="0 0 24 24" size={19} filled>
-      <path d="M2.238 2.27 L22.17 11.089 A0.996 0.996 0 0 1 22.17 12.911 L2.238 21.73 A0.726 0.726 0 0 1 1.291 20.749 L4.661 13.8 A0.878 0.878 0 0 1 5.343 13.311 L14.436 12.183 A0.184 0.184 0 0 0 14.436 11.817 L5.343 10.689 A0.878 0.878 0 0 1 4.661 10.2 L1.291 3.251 A0.726 0.726 0 0 1 2.238 2.27 Z" />
+    <Svg filled>
+      <path d={CODICON_SEND} />
     </Svg>
   );
 }
 
-// A square, it stops the current turn. It keeps the weight of the plane
-// above, so the button does not shrink when the turn starts.
+// The square of the codicon set of VS Code, the glyph "debug-stop". It
+// stops the current turn and holds the size of the arrow above.
 export function IconStop(): ReactNode {
   return (
-    <Svg viewBox="0 0 24 24" size={19} filled>
-      <rect x="5" y="5" width="14" height="14" rx="2.5" />
+    <Svg filled>
+      <path d={CODICON_DEBUG_STOP} />
     </Svg>
   );
 }
