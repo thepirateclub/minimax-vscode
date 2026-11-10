@@ -560,6 +560,12 @@ input:focus {
   background: var(--hover);
 }
 
+.goal-error {
+  flex: 0 0 auto;
+  color: var(--err);
+  font-size: var(--fs-sm);
+}
+
 /* messages */
 .messages-wrap {
   position: relative;

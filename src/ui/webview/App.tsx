@@ -313,6 +313,10 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
       <div className={'view' + (tab === 'chat' ? '' : ' view-hidden')}>
         <TaskList todos={todos} />
         <GoalBar
+          // The key of the chat, the form of the goal does not survive a
+          // switch to another chat, otherwise it writes the goal of the
+          // old chat into the new one.
+          key={state.activeSessionId ?? 'none'}
           goal={goal}
           onSet={(values: GoalValues) =>
             vscode.postMessage({

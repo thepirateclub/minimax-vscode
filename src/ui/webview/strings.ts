@@ -87,6 +87,8 @@ export const STRINGS = {
   goalClear: 'Clear',
   goalSave: 'Save',
   goalCancel: 'Cancel',
+  goalEmpty: 'The goal needs an objective.',
+  goalBadLimit: 'The limits must be positive numbers.',
   goalObjective: 'The goal of the session',
   goalTokenLimit: 'Limit of tokens',
   goalRequestLimit: 'Limit of requests',
