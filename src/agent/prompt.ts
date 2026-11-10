@@ -1,5 +1,6 @@
 import type { AgentMode } from '../config/models';
-import type { TodoItem } from './state';
+import type { GoalState, TodoItem } from './state';
+import { formatGoal } from '../tools/goal';
 
 export interface PromptContext {
   workspaceRoot: string;
@@ -97,6 +98,15 @@ const TOOL_LINES: Array<{ name: string; line: string }> = [
     name: 'todo_write',
     line:
       '- todo_write(todos) - write the list of tasks of the session, every task with its state and its priority'
+  },
+  {
+    name: 'get_goal',
+    line: '- get_goal() - read the goal of the session with its limits and the spend'
+  },
+  {
+    name: 'update_goal',
+    line:
+      '- update_goal(status, note?) - mark the goal as complete or blocked, the limits belong to the user'
   }
 ];
 
@@ -121,6 +131,16 @@ export function renderTasksContext(todos: TodoItem[]): string {
       (item) => '- [' + item.status + '] ' + item.content + ' (' + item.priority + ')'
     )
   ].join('\n');
+}
+
+// The goal of the session is a section of its own: the model has to see
+// the limits and the spend before it spends more. The format is the one of
+// the tool, one place decides how the goal is read.
+export function renderGoalContext(goal: GoalState | undefined): string {
+  if (!goal) {
+    return '';
+  }
+  return formatGoal(goal);
 }
 
 export function buildSystemPrompt(context: PromptContext): string {

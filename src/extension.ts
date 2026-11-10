@@ -8,7 +8,12 @@ import type { AnthropicMessage, EffortLevel } from './api/types';
 import type { AgentEvent } from './agent/agent';
 import { buildWorkspaceSnapshot, renderSnapshot } from './agent/context';
 import { readMentionedFiles } from './agent/mentions';
-import { buildSystemPrompt, renderGitContext, renderTasksContext } from './agent/prompt';
+import {
+  buildSystemPrompt,
+  renderGitContext,
+  renderGoalContext,
+  renderTasksContext
+} from './agent/prompt';
 import { generateCommitMessage } from './agent/commitMessage';
 import { AgentSession } from './agent/session';
 import type { GoalState, TodoItem } from './agent/state';
@@ -420,6 +425,10 @@ class MiniMaxController {
     const tasks = renderTasksContext(runtime.todos);
     if (tasks.length > 0) {
       parts.push(tasks);
+    }
+    const goal = renderGoalContext(runtime.goal);
+    if (goal.length > 0) {
+      parts.push(goal);
     }
     return parts.join('\n\n');
   }

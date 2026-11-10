@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { renderGoalContext } from '../../src/agent/prompt';
 import {
   buildSystemPrompt,
   renderGitContext,
@@ -93,5 +94,24 @@ describe('the list of tasks in the prompt', () => {
 
   it('renders nothing when the list is empty', () => {
     expect(renderTasksContext([])).toBe('');
+  });
+});
+
+describe('the goal in the prompt', () => {
+  it('shows the goal with its limits and its spend', () => {
+    const text = renderGoalContext({
+      objective: 'Rewrite the parser',
+      tokenBudget: 12000,
+      requestLimit: 10,
+      status: 'active',
+      used: { tokens: 4300, requests: 2, seconds: 65 }
+    });
+    expect(text).toContain('Goal: Rewrite the parser');
+    expect(text).toContain('Budget: 12000 tokens, 10 requests');
+    expect(text).toContain('Used: 4300 tokens, 2 requests');
+  });
+
+  it('shows nothing when there is no goal', () => {
+    expect(renderGoalContext(undefined)).toBe('');
   });
 });
