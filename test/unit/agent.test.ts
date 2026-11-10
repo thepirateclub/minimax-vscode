@@ -252,7 +252,7 @@ describe('Agent', () => {
     expect(client.requests.length).toBe(5);
   });
 
-  it('merges a new user turn into a trailing user message', async () => {
+  it('keeps the text of the request out of the message with the result of a tool call', async () => {
     const responses = Array.from({ length: 6 }, () => toolResponse('read_file', { path: 'a.ts' }));
     const first = makeAgent(new FakeClient(responses));
     const firstResult = await first.agent.run('loop', []);
@@ -265,8 +265,27 @@ describe('Agent', () => {
     const last = request.messages[request.messages.length - 1]!;
     expect(last.role).toBe('user');
     const types = last.content.map((block) => block.type);
-    expect(types).toContain('tool_result');
-    expect(types).toContain('text');
+    expect(types).toEqual(['text']);
+    // The result of the tool call stays in the message that answers it.
+    const before = request.messages[request.messages.length - 2]!;
+    expect(before.content.map((block) => block.type)).toContain('tool_result');
+  });
+
+  it('repairs a history with a call that nobody answered', async () => {
+    const client = new FakeClient([textResponse('ok')]);
+    const { agent } = makeAgent(client);
+    await agent.run('next question', [
+      { role: 'user', content: [{ type: 'text', text: 'old question' }] },
+      {
+        role: 'assistant',
+        content: [{ type: 'tool_use', id: 'toolu_1', name: 'read_file', input: {} }]
+      }
+    ]);
+    const sent = client.requests[0]?.messages ?? [];
+    const calls = sent
+      .flatMap((message) => message.content)
+      .filter((block) => block.type === 'tool_use');
+    expect(calls).toHaveLength(0);
   });
 
   it('passes the tool definitions to the model', async () => {

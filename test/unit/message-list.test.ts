@@ -59,9 +59,37 @@ describe('the actions of a message', () => {
       { id: 'u1', role: 'user', text: 'the question' },
       { id: 'n1', role: 'notice', text: 'The request failed.', kind: 'error' }
     ]);
-    expect(markup).toContain('message-actions');
-    expect(markup).toContain('message-action');
+    expect(markup).toContain('message-retry');
     expect(markup).toContain('Repeat the request');
+  });
+
+  it('shows only one of the two buttons at a time', () => {
+    const failed = render([
+      { id: 'u1', role: 'user', text: 'the question' },
+      { id: 'n1', role: 'notice', text: 'The request failed.', kind: 'error' }
+    ]);
+    // The request goes back, or it runs again, never both at once.
+    expect(failed).toContain('Repeat the request');
+    expect(failed).not.toContain('Go back to this point');
+    const worked = render([
+      { id: 'u1', role: 'user', text: 'the question' },
+      { id: 'a1', role: 'assistant', text: 'the answer' }
+    ]);
+    expect(worked).toContain('Go back to this point');
+    expect(worked).not.toContain('Repeat the request');
+  });
+
+  it('puts the button of the repeat where the arrow that goes back stands', () => {
+    const markup = render([
+      { id: 'u1', role: 'user', text: 'the question' },
+      { id: 'n1', role: 'notice', text: 'The request failed.', kind: 'error' }
+    ]);
+    const row = markup.indexOf('user-row');
+    const button = markup.indexOf('message-retry');
+    const bubble = markup.indexOf('user-bubble');
+    expect(row).toBeGreaterThan(-1);
+    expect(button).toBeGreaterThan(row);
+    expect(bubble).toBeGreaterThan(button);
   });
 
   it('keeps the button of the repeat away while the turn works', () => {
@@ -103,10 +131,11 @@ describe('the actions of a message', () => {
 
   it('has a rule for the classes of the actions', () => {
     expect(CSS).toMatch(/\.message-actions\s*\{/);
-    expect(CSS).toMatch(/\.message-action\s*\{/);
     expect(CSS).toMatch(/\.message-elapsed\s*\{/);
     expect(CSS).toMatch(/\.user-row\s*\{/);
-    expect(CSS).toMatch(/\.message-rewind\s*\{/);
+    // The two buttons share one rule, they stand in a list.
+    expect(CSS).toMatch(/\.message-rewind\s*,\s*\.message-retry\s*\{/);
+    expect(CSS).toMatch(/\.message-rewind:hover\s*,\s*\.message-retry:hover\s*\{/);
   });
 
   it('keeps the kinds of the notices apart', () => {

@@ -1,3 +1,4 @@
+import { balanceHistory } from '../api/history';
 import type { AnthropicMessage } from '../api/types';
 import type { UiMessage, UiSelection } from '../ui/protocol';
 
@@ -23,9 +24,22 @@ function isRequest(message: AnthropicMessage, text: string): boolean {
   if (message.role !== 'user') {
     return false;
   }
+  // A message that carries the result of a tool call is not a request,
+  // even when it holds the text of one.
+  if (message.content.some((block) => block.type === 'tool_result')) {
+    return false;
+  }
   return message.content.some(
     (block) => block.type === 'text' && block.text.startsWith(text)
   );
+}
+
+// The cut of the history must not split a call of a tool from its result:
+// the model would see a call without the answer and the API would refuse
+// the request.
+export function cutHistory(messages: AnthropicMessage[], cut: number): AnthropicMessage[] {
+  const end = Math.max(0, Math.min(cut, messages.length));
+  return balanceHistory(messages.slice(0, end));
 }
 
 // Where the request sits in the history. The place is known from the turn

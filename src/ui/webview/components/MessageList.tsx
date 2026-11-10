@@ -100,13 +100,13 @@ const MessageRow = memo(function MessageRow({
   onRetry: (id: string) => void;
   onRewind: (id: string) => void;
 }) {
-  // The buttons live only at the messages of the user: the request can
-  // be taken back at any time and repeated after a failure. The answer
-  // of the model shows the time of the step, the card of an approval
-  // shows nothing.
+  // Only one of the two buttons stands at the message of the user: the
+  // request goes back, or it runs again after a failure. The answer of
+  // the model shows the time of the step, the card of an approval shows
+  // nothing.
   const isUser = message.role === 'user';
   const showRetry = isUser && canRetry;
-  const hasActions = !message.approval && (showRetry || message.elapsedMs !== undefined);
+  const hasActions = !message.approval && message.elapsedMs !== undefined;
   return (
     // The notice paints its own bar, the container of a message stays plain.
     <div
@@ -115,17 +115,29 @@ const MessageRow = memo(function MessageRow({
       }
     >
       {message.role === 'user' ? (
-        // The arrow stands on the left of the words, it points at the
-        // message it belongs to.
+        // The button stands on the left of the words, it points at the
+        // message it belongs to. It either takes the chat back to the
+        // request or runs the request again, never both at once.
         <div className="user-row">
-          <button
-            className="message-rewind"
-            title={STRINGS.rewind}
-            aria-label={STRINGS.rewind}
-            onClick={() => onRewind(message.id)}
-          >
-            <IconRewind />
-          </button>
+          {showRetry ? (
+            <button
+              className="message-retry"
+              title={STRINGS.retry}
+              aria-label={STRINGS.retry}
+              onClick={() => onRetry(message.id)}
+            >
+              <IconRetry />
+            </button>
+          ) : (
+            <button
+              className="message-rewind"
+              title={STRINGS.rewind}
+              aria-label={STRINGS.rewind}
+              onClick={() => onRewind(message.id)}
+            >
+              <IconRewind />
+            </button>
+          )}
           <div className="bubble user-bubble">{message.text}</div>
         </div>
       ) : null}
@@ -158,16 +170,6 @@ const MessageRow = memo(function MessageRow({
       ) : null}
       {hasActions ? (
         <div className="message-actions">
-          {showRetry ? (
-            <button
-              className="message-action"
-              title={STRINGS.retry}
-              aria-label={STRINGS.retry}
-              onClick={() => onRetry(message.id)}
-            >
-              <IconRetry />
-            </button>
-          ) : null}
           {message.elapsedMs !== undefined ? (
             <span className="message-elapsed" title={STRINGS.stepTime}>
               {formatDuration(message.elapsedMs)}

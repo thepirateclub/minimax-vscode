@@ -1,4 +1,5 @@
 import type { MiniMaxClient } from '../api/client';
+import { balanceHistory } from '../api/history';
 import { MiniMaxApiError } from '../api/errors';
 import type {
   AnthropicContentBlock,
@@ -36,6 +37,8 @@ export interface AgentRunResult {
   messages: AnthropicMessage[];
   stopReason: StopReason;
   usage: Usage;
+  // The place of the request in the history, the chat rolls back to it.
+  requestIndex: number;
 }
 
 export interface AgentOptions {
@@ -90,9 +93,16 @@ export class Agent {
   }
 
   async run(userText: string, history: AnthropicMessage[]): Promise<AgentRunResult> {
-    const messages: AnthropicMessage[] = [...history];
+    // A history that breaks the rule of the calls and their results is
+    // refused by the API, it is repaired before the request goes out.
+    const messages: AnthropicMessage[] = balanceHistory([...history]);
     const last = messages[messages.length - 1];
-    if (last && last.role === 'user') {
+    // The text of the request goes into its own message. A message that
+    // carries the result of a tool call must not hold it, the API refuses
+    // such a message with "tool call result does not follow tool call".
+    const carriesResult =
+      last?.role === 'user' && last.content.some((block) => block.type === 'tool_result');
+    if (last && last.role === 'user' && !carriesResult) {
       // The protocol combines consecutive user turns, but a single turn keeps
       // the request valid even for a stricter implementation.
       messages[messages.length - 1] = {
@@ -102,6 +112,7 @@ export class Agent {
     } else {
       messages.push({ role: 'user', content: [{ type: 'text', text: userText }] });
     }
+    const requestIndex = messages.length - 1;
     const identicalCalls = new Map<string, number>();
     let usage: Usage = { inputTokens: 0, outputTokens: 0 };
 
@@ -119,7 +130,7 @@ export class Agent {
       );
       if (toolUses.length === 0) {
         this.options.onEvent({ type: 'done', stopReason: streamed.stopReason, usage });
-        return { messages, stopReason: streamed.stopReason, usage };
+        return { messages, stopReason: streamed.stopReason, usage, requestIndex };
       }
 
       const results: AnthropicContentBlock[] = [];
@@ -256,7 +267,7 @@ export class Agent {
     }
 
     this.options.onEvent({ type: 'done', stopReason: 'max_iterations', usage });
-    return { messages, stopReason: 'max_iterations', usage };
+    return { messages, stopReason: 'max_iterations', usage, requestIndex };
   }
 
   // The change of a file, it is taken before the write. A path outside of

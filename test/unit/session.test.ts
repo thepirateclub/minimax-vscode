@@ -201,6 +201,12 @@ describe('AgentSession', () => {
     expect(approvals).toHaveLength(0);
   });
 
+  it('tells the place of the request in the history', async () => {
+    const { session } = makeSession([textResponse('ok')]);
+    const place = await session.send('hello');
+    expect(place).toBe(0);
+  });
+
   it('applies a new auto approve list to the running gate', async () => {
     const registry = new ToolRegistry();
     registry.register({

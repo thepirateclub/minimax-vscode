@@ -1,5 +1,5 @@
 import type { MiniMaxClient } from '../api/client';
-import { fitHistory } from '../api/history';
+import { balanceHistory, fitHistory } from '../api/history';
 import type { AnthropicMessage, EffortLevel } from '../api/types';
 import type { AgentMode } from '../config/models';
 import { Agent, type AgentEvent } from './agent';
@@ -89,7 +89,9 @@ export class AgentSession {
     }
   }
 
-  async send(prompt: string): Promise<void> {
+  // The turn runs and the history comes back. The place of the request in
+  // the history comes with it, the chat rolls back to that place.
+  async send(prompt: string): Promise<number> {
     const context = this.options.contextProvider
       ? await this.options.contextProvider()
       : '';
@@ -112,12 +114,18 @@ export class AgentSession {
     });
 
     const result = await this.agent.run(prompt, this.history);
-    this.history = fitHistory(
-      result.messages,
+    const balanced = balanceHistory(result.messages);
+    const kept = fitHistory(
+      balanced,
       this.options.historyLimit,
       this.options.contextWindow ?? 1_000_000,
       this.options.contextThreshold
     );
+    this.history = kept;
+    // The request is found by itself, the same text can stand in the
+    // history more than once.
+    const request = result.messages[result.requestIndex];
+    return request ? kept.indexOf(request) : -1;
   }
 
   private async requestApproval(

@@ -26,6 +26,60 @@ export function trimHistory(messages: AnthropicMessage[], limit: number): Anthro
   return kept;
 }
 
+// The calls of an assistant message.
+function toolUseIds(message: AnthropicMessage): string[] {
+  return message.content.flatMap((block) => (block.type === 'tool_use' ? [block.id] : []));
+}
+
+// The calls that a user message answers.
+function toolResultIds(message: AnthropicMessage): string[] {
+  return message.content.flatMap((block) =>
+    block.type === 'tool_result' ? [block.tool_use_id] : []
+  );
+}
+
+// The API wants every call of a tool to be answered by its result and every
+// result to stand right behind the call it answers. A history that breaks
+// the rule is refused: "tool call result does not follow tool call".
+// The repair drops the parts that break the rule, a message that is empty
+// after it goes away.
+export function balanceHistory(messages: AnthropicMessage[]): AnthropicMessage[] {
+  const out: AnthropicMessage[] = [];
+  for (let index = 0; index < messages.length; index++) {
+    const message = messages[index]!;
+    if (message.role === 'user') {
+      const previous = out[out.length - 1];
+      const answered = new Set(
+        previous?.role === 'assistant' ? toolUseIds(previous) : []
+      );
+      const content = message.content.filter(
+        (block) => block.type !== 'tool_result' || answered.has(block.tool_use_id)
+      );
+      if (content.length === 0) {
+        continue;
+      }
+      // The message stays as it is when nothing had to be dropped, the
+      // place of a request in the history does not move then.
+      out.push(
+        content.length === message.content.length ? message : { role: 'user', content }
+      );
+      continue;
+    }
+    const next = messages[index + 1];
+    const answered = new Set(next?.role === 'user' ? toolResultIds(next) : []);
+    const content = message.content.filter(
+      (block) => block.type !== 'tool_use' || answered.has(block.id)
+    );
+    if (content.length === 0) {
+      continue;
+    }
+    out.push(
+      content.length === message.content.length ? message : { role: 'assistant', content }
+    );
+  }
+  return out;
+}
+
 // About four characters per token, the estimate is rough but it keeps the
 // request inside the context window of the model.
 export function estimateTokens(messages: AnthropicMessage[]): number {

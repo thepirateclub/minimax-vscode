@@ -465,8 +465,10 @@ input:focus {
   align-items: flex-end;
 }
 
-/* The request stands with the arrow that takes the chat back to it. The
-   arrow points at the message, so it stands on the left of the words. */
+/* The request stands with the button that takes the chat back to it, or
+   with the button that runs it again after a failure. One of the two at
+   a time, the button points at the message, so it stands on the left of
+   the words. */
 .user-row {
   display: flex;
   align-items: center;
@@ -475,7 +477,8 @@ input:focus {
   width: 100%;
 }
 
-.message-rewind {
+.message-rewind,
+.message-retry {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -490,8 +493,10 @@ input:focus {
   cursor: pointer;
 }
 
-.message-rewind:hover {
-  background: var(--row-hover);
+.message-rewind:hover,
+.message-retry:hover {
+  /* an icon button, the same hover as the buttons of the header */
+  background: var(--hover);
   color: var(--fg);
 }
 
@@ -588,32 +593,13 @@ input:focus {
   border-left-color: var(--err);
 }
 
-/* The actions of a message: repeat the request, go back to it. The row
-   is quiet, the button takes the color of the text on a hover. */
+/* The actions of a message: the time of the step. The row is quiet,
+   it holds the time of the last message of the turn. */
 .message-actions {
   display: flex;
   align-items: center;
   gap: 4px;
   min-height: var(--control-h);
-}
-
-.message-action {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--control-h);
-  height: var(--control-h);
-  padding: 0;
-  border: none;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-}
-
-.message-action:hover {
-  background: var(--row-hover);
-  color: var(--fg);
 }
 
 /* The time of the step stands in the right edge of the row. */

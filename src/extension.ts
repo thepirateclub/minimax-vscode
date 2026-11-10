@@ -12,7 +12,7 @@ import { buildSystemPrompt, renderGitContext } from './agent/prompt';
 import { generateCommitMessage } from './agent/commitMessage';
 import { AgentSession } from './agent/session';
 import { isAbortMessage, stopNotice } from './agent/stopReason';
-import { findRequestIndex, turnOfMessage, type TurnAnchor } from './agent/turns';
+import { cutHistory, findRequestIndex, turnOfMessage, type TurnAnchor } from './agent/turns';
 import { AGENT_MODES, MODELS, resolveBaseUrl } from './config/models';
 import {
   clearApiKey as clearStoredApiKey,
@@ -767,6 +767,9 @@ class MiniMaxController {
 
     runtime.busy = true;
     runtime.errorReported = false;
+    // The place of the request in the history of the model, the anchor
+    // of the turn takes it when the turn is over.
+    let requestPlace = -1;
     const userId = this.nextId('user');
     runtime.uiMessages.push({ id: userId, role: 'user', text });
     this.panel.post({ type: 'user_message', id: userId, text });
@@ -786,7 +789,9 @@ class MiniMaxController {
         },
         async (_progress, token) => {
           token.onCancellationRequested(() => agent.stop());
-          await agent.send(await this.buildPromptText(text, mentions, selections));
+          requestPlace = await agent.send(
+            await this.buildPromptText(text, mentions, selections)
+          );
         }
       );
     } catch (error) {
@@ -803,7 +808,7 @@ class MiniMaxController {
       runtime.turns.push({
         uiId: userId,
         text,
-        historyIndex: findRequestIndex(runtime.history, text),
+        historyIndex: requestPlace,
         mentions,
         selections
       });
@@ -944,7 +949,10 @@ class MiniMaxController {
           ? Math.min(hint, runtime.history.length)
           : runtime.history.length;
     }
-    runtime.history = runtime.history.slice(0, cut);
+    // The cut must not split a call of a tool from its result, the model
+    // would see a call without the answer and the API would refuse the
+    // request.
+    runtime.history = cutHistory(runtime.history, cut);
     runtime.agent?.setHistory(runtime.history);
   }
 
