@@ -15,8 +15,9 @@
 - The version lives in `package.json`, a new feature raises it by a minor: this plan ends at `0.12.0`.
 - The commit message is a Conventional Commit in Russian, the files are staged with explicit paths: `git add -- <path>`, never `git add -A`.
 - `npm run typecheck` and `npm test` have to be green before every commit.
-- The working tree holds the changes of a parallel session (voice input, composer toolbar): `src/extension.ts`, `src/ui/protocol.ts`, `src/ui/webview/App.tsx`, `src/ui/webview/strings.ts`, `src/ui/webview/styles.css`, `package.json`, `AGENTS.md` and `test/unit/extension-activate.test.ts` are touched by it. Those changes must not land in the commits of this plan. Stage only your own hunks:
-  `git diff -U3 -- <file> > C:\jtmp\<file>.patch`, cut the wanted hunks out of the patch, `git apply --cached C:\jtmp\<file>.patch`. If a foreign hunk sticks to yours, build the blob by hand: `git show HEAD:<file>` into a file, edit it, `git hash-object -w`, `git update-index --cacheinfo 100644,<sha>,<file>`.
+- The working tree holds the changes of a parallel session (voice input, composer toolbar): `src/extension.ts`, `src/ui/protocol.ts`, `src/ui/webview/App.tsx`, `src/ui/webview/strings.ts`, `src/ui/webview/styles.css`, `package.json`, `AGENTS.md` and `test/unit/extension-activate.test.ts` are touched by it. Those changes must not land in the commits of this plan. Stage your own hunks only, with the helper:
+  `python C:\jtmp\mm-stage.py --repo 'H:\personal_project\minimax-vscode' --file <file> --keep '<a text of your change>' --apply`
+  The helper takes the hunks of the file that hold the given text and puts them into the index, the rest of the file stays in the working tree. Several `--keep` markers are allowed, each of them keeps the hunks that hold it. After the commit `git show --stat HEAD` has to show your own files and your own hunks only.
 - `core.autocrlf=true`: the working copy is CRLF, the anchors of a multiline `tools.edit` have to contain `\r\n`. A single line anchor works always.
 - Every class of the markup has a rule in the style sheet, a class without a rule is a dead end.
 - The host is the only owner of the state of the session. A tool never changes the state itself, it returns a snapshot.
@@ -718,6 +719,7 @@ Expected: no errors. The imports `Agent`, `AgentEvent`, `HttpMiniMaxClient`, `MO
 - [ ] **Step 8: Commit**
 
 ```bash
+python C:\jtmp\mm-stage.py --repo 'H:\personal_project\minimax-vscode' --file src/extension.ts --keep 'spawnTask' --keep 'childApprovals' --keep 'registryForRole' --apply
 git add -- src/agent/session.ts src/tools/goal.ts test/unit/session.test.ts test/unit/goal-tool.test.ts
 git commit -m "feat(агенты): подтверждения под-агента и роль в промпте"
 ```
@@ -957,7 +959,12 @@ Expected: green.
 - [ ] **Step 12: Commit**
 
 ```bash
-git add -- src/ui/protocol.ts src/ui/webview/components/AgentView.tsx src/ui/webview/components/ToolCard.tsx src/ui/webview/strings.ts test/unit/tool-card.test.ts
+python C:\jtmp\mm-stage.py --repo 'H:\personal_project\minimax-vscode' --file src/extension.ts --keep "'tool_progress'" --apply
+python C:\jtmp\mm-stage.py --repo 'H:\personal_project\minimax-vscode' --file src/ui/protocol.ts --keep "'tool_progress'" --apply
+python C:\jtmp\mm-stage.py --repo 'H:\personal_project\minimax-vscode' --file src/ui/webview/App.tsx --keep "'tool_progress'" --apply
+python C:\jtmp\mm-stage.py --repo 'H:\personal_project\minimax-vscode' --file src/ui/webview/styles.css --keep '.agent-log' --apply
+python C:\jtmp\mm-stage.py --repo 'H:\personal_project\minimax-vscode' --file src/ui/webview/strings.ts --keep 'toolTask' --apply
+git add -- src/ui/webview/components/AgentView.tsx src/ui/webview/components/ToolCard.tsx test/unit/tool-card.test.ts
 git commit -m "feat(панель): карточка под-агента с журналом и ответом"
 ```
 
@@ -1014,7 +1021,9 @@ Expected: green.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add -- package.json package-lock.json
+python C:\jtmp\mm-stage.py --repo 'H:\personal_project\minimax-vscode' --file package.json --keep '"version": "0.12.0"' --apply
+python C:\jtmp\mm-stage.py --repo 'H:\personal_project\minimax-vscode' --file AGENTS.md --keep 'под-агент' --apply
+git add -- package-lock.json README.md
 git commit -m "chore: версия расширения 0.12.0"
 ```
 
