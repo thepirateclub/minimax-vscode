@@ -18,6 +18,66 @@ function resolveCwd(root: string, candidate: string | undefined): string {
   return target;
 }
 
+// The git commands have tools of their own: the tools read the output of git
+// in the code, the shell only guesses the format of the text. The model must
+// not run git in the shell, the refusal names the tool it has to use.
+const GIT_TOOLS: Record<string, string> = {
+  status: 'git_status',
+  diff: 'git_diff',
+  log: 'git_log',
+  show: 'git_show',
+  branch: 'git_branch',
+  blame: 'git_blame',
+  add: 'git_stage',
+  commit: 'git_commit',
+  checkout: 'git_checkout',
+  switch: 'git_checkout'
+};
+
+// The global flags of git that take a value.
+const GIT_FLAGS_WITH_VALUE = new Set([
+  '-C',
+  '-c',
+  '--git-dir',
+  '--work-tree',
+  '--namespace',
+  '--exec-path'
+]);
+
+// The tool that has to serve the command, if the command is a git command
+// that the tools cover.
+export function gitToolFor(command: string): string | undefined {
+  for (const segment of command.split(/&&|\|\||;|\||\r?\n/)) {
+    const tokens = segment
+      .trim()
+      .split(/\s+/)
+      .filter((token) => token.length > 0);
+    if (tokens.length < 2) {
+      continue;
+    }
+    const first = tokens[0] ?? '';
+    if (!/(^|[\\/])git(\.exe)?$/i.test(first)) {
+      continue;
+    }
+    let index = 1;
+    while (index < tokens.length) {
+      const token = tokens[index] ?? '';
+      if (!token.startsWith('-')) {
+        break;
+      }
+      index += 1;
+      if (GIT_FLAGS_WITH_VALUE.has(token)) {
+        index += 1;
+      }
+    }
+    const sub = tokens[index];
+    if (sub !== undefined && GIT_TOOLS[sub] !== undefined) {
+      return GIT_TOOLS[sub];
+    }
+  }
+  return undefined;
+}
+
 export function createTerminalTools(): ToolEntry[] {
   const runTerminal: ToolEntry = {
     name: 'run_terminal',
@@ -43,6 +103,16 @@ export function createTerminalTools(): ToolEntry[] {
       const command = String(input['command'] ?? '');
       if (command.trim().length === 0) {
         return { content: 'run_terminal failed: command must not be empty', isError: true };
+      }
+      const gitTool = gitToolFor(command);
+      if (gitTool) {
+        return {
+          content:
+            '[stderr] The git commands do not run in the shell, use the ' +
+            gitTool +
+            ' tool instead, it reads the output of git in the code.',
+          isError: true
+        };
       }
       const timeout = Math.min(
         MAX_TIMEOUT_MS,

@@ -29,6 +29,29 @@ describe('run_terminal', () => {
     expect(result.content).toContain('3');
   });
 
+  it('refuses a git command that has its own tool', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-'));
+    const tool = createTerminalTools().find((t) => t.name === 'run_terminal');
+    const result = await tool!.execute({ command: 'git status' }, makeContext(root));
+    expect(result.isError).toBe(true);
+    expect(result.content).toContain('git_status');
+  });
+
+  it('refuses a git command behind another command', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-'));
+    const tool = createTerminalTools().find((t) => t.name === 'run_terminal');
+    const result = await tool!.execute({ command: 'cd sub && git log -5' }, makeContext(root));
+    expect(result.isError).toBe(true);
+    expect(result.content).toContain('git_log');
+  });
+
+  it('runs a git command that has no tool of its own', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-'));
+    const tool = createTerminalTools().find((t) => t.name === 'run_terminal');
+    const result = await tool!.execute({ command: 'git --version' }, makeContext(root));
+    expect(result.isError).toBeFalsy();
+  });
+
   it('runs in the workspace root', async () => {
     const root = await mkdtemp(join(tmpdir(), 'mm-'));
     const tool = createTerminalTools().find((t) => t.name === 'run_terminal');

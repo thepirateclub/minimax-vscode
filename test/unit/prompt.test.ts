@@ -42,6 +42,15 @@ describe('system prompt', () => {
     expect(prompt).toContain('git_commit');
   });
 
+  it('keeps the git commands out of the terminal', () => {
+    const prompt = buildSystemPrompt({
+      ...context,
+      tools: ['read_file', 'git_status', 'run_terminal']
+    });
+    expect(prompt).toMatch(/never run a git command/i);
+    expect(prompt).toContain('git_status');
+  });
+
   it('adds the state of the repository as a section', () => {
     expect(renderGitContext(['Branch main, 2 changed files'])).toContain('Repository:');
     expect(renderGitContext(['Branch main, 2 changed files'])).toContain('- Branch main');

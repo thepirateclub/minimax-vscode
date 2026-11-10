@@ -34,10 +34,6 @@ const TOOL_LINES: Array<{ name: string; line: string }> = [
     line: '- search_code(query, path?, max_results?) - search for a literal string'
   },
   {
-    name: 'run_terminal',
-    line: '- run_terminal(command, cwd?, timeout_ms?) - run a shell command in the workspace root'
-  },
-  {
     name: 'git_status',
     line: '- git_status() - the branch and the changed files of the repository'
   },
@@ -76,7 +72,11 @@ const TOOL_LINES: Array<{ name: string; line: string }> = [
   {
     name: 'git_checkout',
     line: '- git_checkout(ref) - switch to another branch or a commit'
-  }
+  },
+  {
+    name: 'run_terminal',
+    line: '- run_terminal(command, cwd?, timeout_ms?) - run a shell command in the workspace root'
+  },
 ];
 
 // The state of the repository is a section of its own, it changes between the
@@ -103,7 +103,7 @@ export function buildSystemPrompt(context: PromptContext): string {
     plan
       ? '- Answer with a concrete plan: name the files you would change and the exact edits, step by step. The user applies the plan after switching to code mode.'
       : '- Make the smallest change that solves the task. Prefer edit_file over write_file when only part of a file changes.',
-    '- Use the git tools for the work with the repository, they are safer and faster than a git command in the terminal.',
+    '- Never run a git command in the terminal, the git tools do the same work and read the output of git in the code: git_status, git_diff, git_log, git_show, git_branch, git_blame, git_stage, git_commit, git_branch_create, git_checkout.',
     '- After a tool returns, use its output. Never guess the content of a file you have not read.',
     '- Report what you changed and what you verified. State plainly when something failed.',
     '- Answer in the language of the user request.',
