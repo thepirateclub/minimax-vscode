@@ -1,0 +1,65 @@
+import { describe, expect, it } from 'vitest';
+import { createTodoTools, normalizeTodos } from '../../src/tools/todo';
+import type { ToolContext } from '../../src/tools/types';
+
+function makeContext(depth?: number): ToolContext {
+  return {
+    workspaceRoot: '/tmp/root',
+    signal: new AbortController().signal,
+    logger: { info: () => undefined, error: () => undefined },
+    depth
+  };
+}
+
+describe('the list of tasks', () => {
+  it('normalizes the list of the model', () => {
+    expect(
+      normalizeTodos([
+        { content: ' Read the parser ', status: 'in_progress', priority: 'high' },
+        { content: '', status: 'completed' },
+        { content: 'Add tests', status: 'done', priority: 'urgent' },
+        'not an object'
+      ])
+    ).toEqual([
+      { content: 'Read the parser', status: 'in_progress', priority: 'high' },
+      { content: 'Add tests', status: 'pending', priority: 'medium' }
+    ]);
+  });
+
+  it('writes the whole list as a snapshot', async () => {
+    const tools = createTodoTools();
+    const write = tools.find((tool) => tool.name === 'todo_write');
+    const result = await write!.execute(
+      {
+        todos: [
+          { content: 'Read the parser', status: 'completed', priority: 'high' },
+          { content: 'Add tests', status: 'pending', priority: 'medium' }
+        ]
+      },
+      makeContext()
+    );
+    expect(result.state).toEqual({
+      kind: 'todos',
+      todos: [
+        { content: 'Read the parser', status: 'completed', priority: 'high' },
+        { content: 'Add tests', status: 'pending', priority: 'medium' }
+      ]
+    });
+    expect(result.isError).toBeUndefined();
+  });
+
+  it('empties the list when the model sends nothing', async () => {
+    const tools = createTodoTools();
+    const write = tools.find((tool) => tool.name === 'todo_write');
+    const result = await write!.execute({ todos: [] }, makeContext());
+    expect(result.state).toEqual({ kind: 'todos', todos: [] });
+  });
+
+  it('refuses the call of a sub-agent', async () => {
+    const tools = createTodoTools();
+    const write = tools.find((tool) => tool.name === 'todo_write');
+    const result = await write!.execute({ todos: [] }, makeContext(1));
+    expect(result.isError).toBe(true);
+    expect(result.state).toBeUndefined();
+  });
+});
