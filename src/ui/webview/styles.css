@@ -820,16 +820,28 @@ input:focus {
   overflow: hidden;
 }
 
+/* The command stands on its own line, a click opens a long one. */
 .term-command {
+  appearance: none;
   display: flex;
   gap: 8px;
-  padding: 4px 8px;
+  width: 100%;
+  text-align: left;
+  /* The room on the right belongs to the copy button. */
+  padding: 4px 36px 4px 8px;
   background: var(--code-bg);
+  border: none;
   border-bottom: 1px solid var(--border);
+  border-radius: 0;
   font-family: var(--mono);
   font-size: calc(var(--mm-font-base) * 0.85);
   color: var(--muted);
-  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.term-command:hover {
+  background: var(--surface);
+  color: var(--vscode-foreground);
 }
 
 .term-prompt {
@@ -840,6 +852,32 @@ input:focus {
 .term-cmd-text {
   flex: 1 1 auto;
   min-width: 0;
+  overflow-wrap: anywhere;
+  /* A long command takes three lines, the rest of it opens on a click. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+
+.term-command-open .term-cmd-text {
+  -webkit-line-clamp: none;
+  overflow: visible;
+}
+
+/* the stream of the error is marked, the red text alone says nothing */
+.term-chip {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 0 4px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--muted);
+  font-family: var(--vscode-font-family);
+  font-size: calc(var(--mm-font-base) * 0.72);
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  vertical-align: 1px;
 }
 
 .term-body {

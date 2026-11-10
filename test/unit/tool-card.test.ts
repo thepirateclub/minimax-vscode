@@ -174,6 +174,41 @@ describe('the dot of an action', () => {
     expect(markup).not.toContain('diff-path');
   });
 
+  it('shows an old edit as a diff', () => {
+    const markup = card({
+      name: 'edit_file',
+      input: {
+        path: 'src/app.ts',
+        old_string: 'const a = 1;',
+        new_string: 'const a = 2;'
+      },
+      content: 'Edited src/app.ts'
+    });
+    // The chat of an old session keeps the arguments of an edit, not its diff.
+    expect(markup).toContain('diff-line');
+    expect(markup).toContain('const a = 1;');
+    expect(markup).toContain('const a = 2;');
+    expect(markup).not.toContain('old_string:');
+    expect(addedOf(markup)).toBe('+1');
+    expect(removedOf(markup)).toBe('-1');
+  });
+
+  it('keeps the arguments of a failed edit', () => {
+    const markup = card({
+      name: 'edit_file',
+      input: {
+        path: 'src/app.ts',
+        old_string: 'const a = 1;',
+        new_string: 'const a = 2;'
+      },
+      content: 'edit_file failed: old_string not found in the file',
+      isError: true
+    });
+    // A failed edit changed nothing, a diff of it would lie.
+    expect(markup).toContain('tool-input');
+    expect(markup).not.toContain('diff-line');
+  });
+
   it('marks a failed action with a straight bar in the color of the failed dot', () => {
     const error = ruleFor(CSS, '.tool-card.tool-error');
     expect(property(error, 'border-left')).toBe(
@@ -319,6 +354,30 @@ describe('the dot of an action', () => {
     });
     expect(markup).toContain('term-line-error');
     expect(markup).toContain('not recognized');
+  });
+
+  it('marks the stream of the error in the terminal', () => {
+    const markup = card({
+      name: 'run_terminal',
+      input: { command: 'bad' },
+      content: 'Command failed with exit code 255\n[stderr] not recognized',
+      isError: true
+    });
+    expect(markup).toContain('term-chip');
+    expect(markup).toContain('stderr');
+  });
+
+  it('holds a long command in three lines', () => {
+    const markup = card({
+      name: 'run_terminal',
+      input: { command: 'npm run build -- --watch --mode production --outDir dist' },
+      content: 'done'
+    });
+    // The command opens on a click, the style sheet holds it in three lines.
+    expect(markup).toContain('term-command');
+    expect(CSS).toMatch(/\.term-cmd-text\s*\{[^}]*-webkit-line-clamp:\s*3/);
+    // The copy button stands in the corner, the command keeps room for it.
+    expect(property(ruleFor(CSS, '.term-command'), 'padding')).toContain('36px');
   });
 
   it('keeps the summary of a finished command empty', () => {

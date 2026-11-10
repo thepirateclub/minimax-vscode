@@ -32,6 +32,11 @@ describe('the output of a command', () => {
     expect(lines[1]?.text).toBe('something went wrong');
   });
 
+  it('marks the stream of the error', () => {
+    const lines = parseTerminalOutput('bad', '[stderr] something went wrong');
+    expect(lines[1]?.stream).toBe('stderr');
+  });
+
   it('keeps a note of the tool', () => {
     const lines = parseTerminalOutput('bad', '[no output]');
     expect(lines[1]?.kind).toBe('note');

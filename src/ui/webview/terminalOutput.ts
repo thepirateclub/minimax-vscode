@@ -3,6 +3,8 @@ export type TerminalLineKind = 'command' | 'output' | 'error' | 'note';
 export interface TerminalLine {
   kind: TerminalLineKind;
   text: string;
+  // The stream of the line, the panel marks the error stream.
+  stream?: 'stderr';
 }
 
 const FAILED = /^Command failed with exit code (\d+)/;
@@ -31,7 +33,11 @@ export function parseTerminalOutput(command: string, content: string): TerminalL
     }
     if (STDERR.test(line)) {
       failed = true;
-      lines.push({ kind: 'error', text: line.replace(STDERR, '') });
+      lines.push({
+        kind: 'error',
+        text: line.replace(STDERR, ''),
+        stream: 'stderr'
+      });
       continue;
     }
     if (NOTE.test(line)) {

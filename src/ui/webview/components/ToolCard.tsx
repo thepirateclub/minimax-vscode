@@ -13,6 +13,7 @@ import {
 import { STRINGS } from '../strings';
 import { cardOpen } from '../toolCardState';
 import { diffStats } from '../diffStats';
+import { editDiff } from '../editDiff';
 import { DiffView } from './DiffView';
 import { FileReadView } from './FileReadView';
 import { TerminalView } from './TerminalView';
@@ -192,9 +193,15 @@ export function ToolCard({
   const open = cardOpen(collapsed, verbose, override);
   // A write without a change has nothing to show, the plain result stays.
   const diff = tool.diff && tool.diff.lines.length > 0 ? tool.diff : undefined;
+  // The chats of the old sessions keep the arguments of an edit, not its diff.
+  // The panel still shows what the edit did.
+  const fallback = diff ? undefined : editDiff(tool);
+  const changes =
+    diff ??
+    (fallback ? { path: filePaths(tool.input)[0] ?? '', lines: fallback } : undefined);
   // The header shows the size of the change, the body shows the change itself.
   // An empty half stays out, a zero in red looks like a mistake.
-  const stats = diff ? diffStats(diff.lines) : { added: 0, removed: 0 };
+  const stats = changes ? diffStats(changes.lines) : { added: 0, removed: 0 };
   const statsLabel = [
     stats.added > 0 ? stats.added + ' ' + STRINGS.toolAdded : '',
     stats.removed > 0 ? stats.removed + ' ' + STRINGS.toolRemoved : ''
@@ -246,8 +253,8 @@ export function ToolCard({
       </button>
       {open ? (
         <div className="tool-body">
-          {diff ? (
-            <DiffView path={diff.path} lines={diff.lines} showPath={false} />
+          {changes ? (
+            <DiffView path={changes.path} lines={changes.lines} showPath={false} />
           ) : tool.name === 'read_file' && tool.content ? (
             <FileReadView content={tool.content} path={filePaths(tool.input)[0] ?? ''} />
           ) : tool.name === 'run_terminal' ? (
