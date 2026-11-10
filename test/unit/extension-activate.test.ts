@@ -1473,10 +1473,7 @@ describe('extension activation', () => {
     // The clock of the test: every request takes five seconds.
     let clock = 1_000_000;
     const now = vi.spyOn(Date, 'now').mockImplementation(() => clock);
-    const base = globalThis.fetch as (
-      url: string | URL | Request,
-      init?: RequestInit
-    ) => Promise<Response>;
+    const base = globalThis.fetch;
     vi.stubGlobal(
       'fetch',
       vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
@@ -1499,7 +1496,9 @@ describe('extension activation', () => {
       state.receive?.({
         type: 'set_goal',
         objective: 'Rewrite the parser',
-        tokenBudget: 12000
+        // The idle minute between the turns would cross this limit if the
+        // waiting were charged as work.
+        secondsLimit: 30
       });
       await vi.waitFor(() => {
         expect(ofType('goal').length).toBe(1);
@@ -1517,6 +1516,13 @@ describe('extension activation', () => {
       // The user waits a minute between the turns, the waiting is not work.
       clock += 60_000;
       state.receive?.({ type: 'send', text: 'second', mentions: [], selections: [] });
+      // The second turn was not refused: the idle minute is not work.
+      await vi.waitFor(() => {
+        expect(state.fetched.filter((url) => url === MESSAGES_URL)).toHaveLength(2);
+      });
+      expect(
+        ofType('notice').filter((message) => message.message.includes('budget'))
+      ).toHaveLength(0);
       await vi.waitFor(() => {
         expect(idleCount()).toBeGreaterThan(idleBefore + 1);
       });
@@ -1526,7 +1532,67 @@ describe('extension activation', () => {
       expect(storedGoal()?.used.requests).toBe(2);
     } finally {
       now.mockRestore();
+      vi.stubGlobal('fetch', base);
     }
+    // The global is the stub of the file again, the next test is not
+    // touched by this one.
+    expect(globalThis.fetch).toBe(base);
+  });
+
+  it('adds the time of a turn that ended with an error to the goal', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.secrets.set('minimax.apiKey', 'test-key');
+    // The clock of the test: the failed request takes five seconds.
+    let clock = 2_000_000;
+    const now = vi.spyOn(Date, 'now').mockImplementation(() => clock);
+    const base = globalThis.fetch;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+        if (String(url).includes('/v1/messages')) {
+          clock += 5000;
+          return new Response(
+            JSON.stringify({ error: { message: 'bad request' } }),
+            { status: 400, headers: { 'content-type': 'application/json' } }
+          );
+        }
+        return base(url, init);
+      })
+    );
+    const storedGoal = () => {
+      const stored = state.globalState.get('minimax.sessions') as Array<{
+        goal?: { used: { tokens: number; requests: number; seconds: number } };
+      }>;
+      return stored[0]?.goal;
+    };
+    try {
+      await boot();
+      state.receive?.({
+        type: 'set_goal',
+        objective: 'Rewrite the parser',
+        secondsLimit: 60
+      });
+      await vi.waitFor(() => {
+        expect(ofType('goal').length).toBe(1);
+      });
+
+      state.posted.length = 0;
+      state.receive?.({ type: 'send', text: 'hello', mentions: [], selections: [] });
+      await vi.waitFor(() => {
+        expect(ofType('error').length).toBe(1);
+      });
+      // The failed turn took five seconds, they are in the goal.
+      await vi.waitFor(() => {
+        expect(storedGoal()?.used.seconds).toBe(5);
+      });
+    } finally {
+      now.mockRestore();
+      vi.stubGlobal('fetch', base);
+    }
+    // The global is the stub of the file again, the next test is not
+    // touched by this one.
+    expect(globalThis.fetch).toBe(base);
   });
 
 });

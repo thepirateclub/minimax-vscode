@@ -637,6 +637,13 @@ class MiniMaxController {
     }
     if (event.type === 'error') {
       runtime.errorReported = true;
+      // A turn that ended with an error has no event `done`, its time is
+      // added here, otherwise the limit of the time is evaded by failing
+      // turns.
+      const goal = runtime.goal;
+      if (goal && runtime.turnStartedAt > 0) {
+        goal.used.seconds += (Date.now() - runtime.turnStartedAt) / 1000;
+      }
       if (isAbortMessage(event.message)) {
         // The user stopped the turn, it is not a failure of the server.
         this.panel.post({
