@@ -25,6 +25,8 @@ export interface SessionOptions {
   contextThreshold: number;
   mode: AgentMode;
   systemPrompt: string;
+  // How deep the agent is. Undefined is the main agent.
+  depth?: number;
   // The state of the repository is read before every turn, the prompt of
   // the model carries the fresh one.
   contextProvider?: () => Promise<string>;
@@ -109,6 +111,7 @@ export class AgentSession {
       mode: this.options.mode,
       systemPrompt,
       workspaceRoot: this.options.workspaceRoot,
+      depth: this.options.depth,
       logger: this.options.logger,
       onEvent: (event) => this.options.onEvent(event)
     });

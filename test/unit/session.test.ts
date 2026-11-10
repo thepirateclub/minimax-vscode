@@ -51,12 +51,14 @@ function toolResponse(name: string, input: Record<string, unknown>): StreamEvent
 function makeSession(
   responses: StreamEvent[][] = [textResponse('ok')],
   autoApprove: string[] = [],
-  contextProvider?: () => Promise<string>
+  contextProvider?: () => Promise<string>,
+  depth?: number
 ): {
   session: AgentSession;
   events: unknown[];
   approvals: UiApproval[];
   client: FakeClient;
+  registry: ToolRegistry;
 } {
   const registry = new ToolRegistry();
   const events: unknown[] = [];
@@ -77,10 +79,11 @@ function makeSession(
     logger: { info: () => undefined, error: () => undefined },
     autoApprove,
     contextProvider,
+    depth,
     onEvent: (event) => events.push(event),
     onApproval: (approval) => approvals.push(approval)
   };
-  return { session: new AgentSession(options), events, approvals, client };
+  return { session: new AgentSession(options), events, approvals, client, registry };
 }
 
 describe('AgentSession', () => {
@@ -239,5 +242,51 @@ describe('AgentSession', () => {
     session.setAutoApprove(['write_file']);
     await session.send('write it');
     expect(approvals).toHaveLength(0);
+  });
+
+  it('gives the depth of the agent to the tool', async () => {
+    const depths: Array<number | undefined> = [];
+    const { session, registry } = makeSession(
+      [toolResponse('probe', {}), textResponse('done')],
+      [],
+      undefined,
+      1
+    );
+    registry.register({
+      name: 'probe',
+      description: 'probe',
+      approval: 'never',
+      sideEffect: false,
+      inputSchema: { type: 'object', properties: {} },
+      execute: async (_input, ctx) => {
+        depths.push(ctx.depth);
+        return { content: 'probed' };
+      }
+    });
+
+    await session.send('probe it');
+    expect(depths).toEqual([1]);
+  });
+
+  it('gives no depth to the tool of the main agent', async () => {
+    const depths: Array<number | undefined> = [];
+    const { session, registry } = makeSession([
+      toolResponse('probe', {}),
+      textResponse('done')
+    ]);
+    registry.register({
+      name: 'probe',
+      description: 'probe',
+      approval: 'never',
+      sideEffect: false,
+      inputSchema: { type: 'object', properties: {} },
+      execute: async (_input, ctx) => {
+        depths.push(ctx.depth);
+        return { content: 'probed' };
+      }
+    });
+
+    await session.send('probe it');
+    expect(depths).toEqual([undefined]);
   });
 });
