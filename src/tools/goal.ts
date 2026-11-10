@@ -92,10 +92,12 @@ export function createGoalTools(): ToolEntry[] {
           isError: true
         };
       }
+      const keys = Object.keys(input);
       // The limits belong to the user. A tool that changes them would let
-      // the model walk around the stop of the budget.
+      // the model walk around the stop of the budget. The key matters, not
+      // its value: an empty value is still an attempt to change a limit.
       for (const key of ['tokenBudget', 'requestLimit', 'secondsLimit']) {
-        if (input[key] !== undefined) {
+        if (keys.includes(key)) {
           return {
             content:
               'The limits of the goal belong to the user, the model cannot change them.',
@@ -103,15 +105,26 @@ export function createGoalTools(): ToolEntry[] {
           };
         }
       }
+      // A note of the wrong type is not dropped silently: the model must not
+      // believe that a note was recorded.
+      if (keys.includes('note') && typeof input['note'] !== 'string') {
+        return {
+          content:
+            'The note of the goal must be a string, not ' +
+            typeof input['note'] +
+            '.',
+          isError: true
+        };
+      }
       // A key that the tool does not know must not look like an accepted
-      // change: the goal has only the status and the note.
-      for (const key of Object.keys(input)) {
+      // change: the tool takes only the status and the note.
+      for (const key of keys) {
         if (key !== 'status' && key !== 'note') {
           return {
             content:
-              'The goal has only the status and the note, the key "' +
+              'The tool takes only the status and the note, the key "' +
               key +
-              '" is not part of it.',
+              '" is not part of the input.',
             isError: true
           };
         }

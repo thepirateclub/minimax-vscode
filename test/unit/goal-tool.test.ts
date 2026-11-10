@@ -105,8 +105,39 @@ describe('the goal of the session', () => {
     );
     expect(result.isError).toBe(true);
     expect(result.state).toBeUndefined();
-    expect(result.content).toContain('objective');
-    expect(result.content).toContain('status');
-    expect(result.content).toContain('note');
+    expect(result.content).toContain(
+      'The tool takes only the status and the note, the key "objective" is not part of the input.'
+    );
+  });
+
+  it('refuses a limit key with an empty value', async () => {
+    const tools = createGoalTools();
+    const update = tools.find((tool) => tool.name === 'update_goal');
+    for (const key of ['tokenBudget', 'requestLimit', 'secondsLimit']) {
+      const input: Record<string, unknown> = { status: 'complete' };
+      input[key] = undefined;
+      const result = await update!.execute(input, makeContext(GOAL));
+      expect(result.isError).toBe(true);
+      expect(result.state).toBeUndefined();
+      expect(result.content).toContain(
+        'The limits of the goal belong to the user, the model cannot change them.'
+      );
+    }
+  });
+
+  it('refuses a note that is not a string', async () => {
+    const tools = createGoalTools();
+    const update = tools.find((tool) => tool.name === 'update_goal');
+    for (const note of [42, {}, true]) {
+      const result = await update!.execute(
+        { status: 'complete', note },
+        makeContext(GOAL)
+      );
+      expect(result.isError).toBe(true);
+      expect(result.state).toBeUndefined();
+      expect(result.content).toContain(
+        'The note of the goal must be a string'
+      );
+    }
   });
 });
