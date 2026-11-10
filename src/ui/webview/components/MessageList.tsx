@@ -2,6 +2,8 @@ import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import type { MouseEvent } from 'react';
 import type { UiMessage } from '../../protocol';
 import { collectFileSources, type CodeSource } from '../codeBlock';
+import { commandHints, type CommandHint } from '../commandHistory';
+import { failedRequests } from '../failedRequests';
 import { IconRetry, IconRewind } from '../icons';
 import { contentChanged, isAtBottom, measure, shouldFollow } from '../listScroll';
 import { formatDuration } from '../../format';
@@ -74,8 +76,10 @@ function copyCode(event: MouseEvent<HTMLDivElement>): void {
 const MessageRow = memo(function MessageRow({
   message,
   sources,
+  command,
   collapseTools,
   collapseCode,
+  canRetry,
   onApprove,
   onReject,
   onOpenFile,
@@ -84,8 +88,12 @@ const MessageRow = memo(function MessageRow({
 }: {
   message: UiMessage;
   sources: CodeSource[];
+  // The command that ran before the message, a block can be named after it.
+  command?: CommandHint;
   collapseTools: boolean;
   collapseCode: boolean;
+  // The turn of the request failed, the request can be repeated.
+  canRetry: boolean;
   onApprove: (id: string, allowForSession: boolean) => void;
   onReject: (id: string) => void;
   onOpenFile: (path: string, line?: number) => void;
@@ -93,10 +101,12 @@ const MessageRow = memo(function MessageRow({
   onRewind: (id: string) => void;
 }) {
   // The buttons live only at the messages of the user: the request can
-  // be repeated or taken back. The answer of the model shows the time
-  // of the step, the card of an approval shows nothing.
+  // be taken back at any time and repeated after a failure. The answer
+  // of the model shows the time of the step, the card of an approval
+  // shows nothing.
   const isUser = message.role === 'user';
-  const hasActions = !message.approval && (isUser || message.elapsedMs !== undefined);
+  const showRetry = isUser && canRetry;
+  const hasActions = !message.approval && (showRetry || message.elapsedMs !== undefined);
   return (
     // The notice paints its own bar, the container of a message stays plain.
     <div
@@ -105,7 +115,19 @@ const MessageRow = memo(function MessageRow({
       }
     >
       {message.role === 'user' ? (
-        <div className="bubble user-bubble">{message.text}</div>
+        // The arrow stands on the left of the words, it points at the
+        // message it belongs to.
+        <div className="user-row">
+          <button
+            className="message-rewind"
+            title={STRINGS.rewind}
+            aria-label={STRINGS.rewind}
+            onClick={() => onRewind(message.id)}
+          >
+            <IconRewind />
+          </button>
+          <div className="bubble user-bubble">{message.text}</div>
+        </div>
       ) : null}
       {message.role === 'assistant' ? (
         <div className="assistant-body">
@@ -115,7 +137,7 @@ const MessageRow = memo(function MessageRow({
               className="markdown"
               onClick={(event) => handleMarkdownClick(event, onOpenFile)}
               dangerouslySetInnerHTML={{
-                __html: renderMarkdown(message.text, sources, { collapseCode })
+                __html: renderMarkdown(message.text, sources, { collapseCode, command })
               }}
             />
           ) : null}
@@ -136,25 +158,15 @@ const MessageRow = memo(function MessageRow({
       ) : null}
       {hasActions ? (
         <div className="message-actions">
-          {isUser ? (
-            <>
-              <button
-                className="message-action"
-                title={STRINGS.retry}
-                aria-label={STRINGS.retry}
-                onClick={() => onRetry(message.id)}
-              >
-                <IconRetry />
-              </button>
-              <button
-                className="message-action"
-                title={STRINGS.rewind}
-                aria-label={STRINGS.rewind}
-                onClick={() => onRewind(message.id)}
-              >
-                <IconRewind />
-              </button>
-            </>
+          {showRetry ? (
+            <button
+              className="message-action"
+              title={STRINGS.retry}
+              aria-label={STRINGS.retry}
+              onClick={() => onRetry(message.id)}
+            >
+              <IconRetry />
+            </button>
           ) : null}
           {message.elapsedMs !== undefined ? (
             <span className="message-elapsed" title={STRINGS.stepTime}>
@@ -264,6 +276,10 @@ export function MessageList({
   // The files the agent has read, a snippet of one of them gets the name
   // of the file in its header.
   const sources = collectFileSources(messages);
+  // The request can be repeated only when the turn of it failed.
+  const failed = failedRequests(messages);
+  // The command that ran before every message of the chat.
+  const commands = commandHints(messages);
 
   const shown = messages.length > visible ? messages.slice(-visible) : messages;
   const hidden = messages.length - shown.length;
@@ -276,13 +292,15 @@ export function MessageList({
             {STRINGS.showEarlier} ({hidden})
           </button>
         ) : null}
-        {shown.map((message) => (
+        {shown.map((message, offset) => (
           <MessageRow
             key={message.id}
             message={message}
             sources={sources}
+            command={commands[messages.length - shown.length + offset]}
             collapseTools={collapseTools}
             collapseCode={collapseCode}
+            canRetry={failed.has(message.id)}
             onApprove={onApprove}
             onReject={onReject}
             onOpenFile={onOpenFile}

@@ -1,4 +1,5 @@
 import MarkdownIt from 'markdown-it';
+import type { CommandHint } from './commandHistory';
 import { describeCodeBlock, type CodeSource } from './codeBlock';
 import { CARET_SVG, CHECK_SVG, COPY_SVG } from './iconPaths';
 import { highlight } from './highlight';
@@ -15,12 +16,16 @@ interface MarkdownEnv {
   sources?: CodeSource[];
   // The code blocks start folded when the setting asks for it.
   collapseCode?: boolean;
+  // The command that ran before the answer.
+  command?: CommandHint;
 }
 
 // The options of the renderer, they come from the settings of the host.
 export interface MarkdownOptions {
   // The code blocks start folded, only their header stays.
   collapseCode: boolean;
+  // The command that ran before the answer, a block can be named after it.
+  command?: CommandHint;
 }
 
 const md = new MarkdownIt({
@@ -37,7 +42,11 @@ md.renderer.rules.fence = (tokens, idx, _options, env): string => {
   const options = env as MarkdownEnv | undefined;
   const sources = options?.sources;
   const collapse = options?.collapseCode === true;
-  const block = describeCodeBlock(token.info, { content: token.content, sources });
+  const block = describeCodeBlock(token.info, {
+    content: token.content,
+    sources,
+    command: options?.command
+  });
   const code = highlight(token.content, block.language);
   const label = block.file
     ? '<button type="button" class="code-lang code-file" data-path="' +
@@ -163,14 +172,16 @@ export function renderMarkdown(
   options: MarkdownOptions = { collapseCode: false }
 ): string {
   const collapse = options.collapseCode === true;
+  const command = options.command?.command ?? '';
   const key =
     (sources.length > 0 ? text + '\u0000' + sourceSignature(sources) : text) +
-    (collapse ? '\u0001' : '');
+    (collapse ? '\u0001' : '') +
+    (command.length > 0 ? '\u0002' + command : '');
   const cached = cache.get(key);
   if (cached !== undefined) {
     return cached;
   }
-  const html = md.render(text, { sources, collapseCode: collapse });
+  const html = md.render(text, { sources, collapseCode: collapse, command: options.command });
   if (cache.size >= CACHE_LIMIT) {
     const oldest = cache.keys().next().value;
     if (oldest !== undefined) {

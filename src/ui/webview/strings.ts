@@ -110,6 +110,7 @@ export const STRINGS = {
   collapseCode: 'Collapse code blocks',
   collapseCodeHint:
     'A code block shows only its header with the file name, the code opens on a click.',
+  codeOutput: 'Output',
   codeShow: 'Show code',
   codeHide: 'Hide code',
   search: 'Search',

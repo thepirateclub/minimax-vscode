@@ -230,12 +230,15 @@ export function IconRetry(): ReactNode {
   );
 }
 
-// An arrow that turns back to the left, the chat goes to an earlier point.
+// The arrow that takes the chat back to a request. It points at the
+// message it belongs to, so it stands on the left of the words. The
+// shape comes from the drawing of the reader: a loop on the left and
+// the nose to the right.
 export function IconRewind(): ReactNode {
   return (
-    <Svg viewBox="0 0 24 24" strokeWidth={2}>
-      <path d="M9 14 4 9l5-5" />
-      <path d="M20 20v-7a4 4 0 0 0-4-4H4" />
+    <Svg viewBox="0 0 24 24" strokeWidth={1.73} size={16}>
+      <path d="M20.07 22.11H5.01A3.19 3.19 0 0 1 1.82 18.92V10.58A3.19 3.19 0 0 1 5.01 7.39H22.1" />
+      <path d="M16.57 1.84 22.1 7.37 16.57 12.9" />
     </Svg>
   );
 }

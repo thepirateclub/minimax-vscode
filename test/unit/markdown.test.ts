@@ -33,6 +33,38 @@ describe('renderMarkdown', () => {
     expect(html).toContain('history.ts:1');
   });
 
+  it('names a block without a name', () => {
+    const html = renderMarkdown('```\n8: hp: 58, atk: 13\n```');
+    // The header of a block must not be empty.
+    expect(html).toContain('class="code-lang">Output<');
+  });
+
+  it('names a block by the command it quotes', () => {
+    const html = renderMarkdown('```\nall tests passed\n```', [], {
+      collapseCode: false,
+      command: { command: 'npm test', output: 'all tests passed\n' }
+    });
+    expect(html).toContain('npm test');
+  });
+
+  it('keeps the word Output when the block quotes another command', () => {
+    const html = renderMarkdown('```\nsomething else\n```', [], {
+      collapseCode: false,
+      command: { command: 'npm test', output: 'all tests passed\n' }
+    });
+    expect(html).toContain('class="code-lang">Output<');
+  });
+
+  it('keeps the name of the command apart in the cache', () => {
+    const text = '```\nall tests passed\n```';
+    const plain = renderMarkdown(text);
+    const named = renderMarkdown(text, [], {
+      collapseCode: false,
+      command: { command: 'npm test', output: 'all tests passed\n' }
+    });
+    expect(plain).not.toBe(named);
+  });
+
   it('renders a checklist item with a box', () => {
     const html = renderMarkdown('- [x] done\n- [ ] todo');
     expect(html).toContain('task-item');

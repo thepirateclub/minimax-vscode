@@ -54,16 +54,37 @@ describe('the notices of the panel', () => {
 });
 
 describe('the actions of a message', () => {
-  it('offers to repeat the request of the user', () => {
-    const markup = render([{ id: 'u1', role: 'user', text: 'the question' }]);
+  it('offers to repeat the request of the user when the turn failed', () => {
+    const markup = render([
+      { id: 'u1', role: 'user', text: 'the question' },
+      { id: 'n1', role: 'notice', text: 'The request failed.', kind: 'error' }
+    ]);
     expect(markup).toContain('message-actions');
     expect(markup).toContain('message-action');
     expect(markup).toContain('Repeat the request');
   });
 
+  it('keeps the button of the repeat away while the turn works', () => {
+    const markup = render([
+      { id: 'u1', role: 'user', text: 'the question' },
+      { id: 'a1', role: 'assistant', text: 'the answer' }
+    ]);
+    expect(markup).not.toContain('Repeat the request');
+  });
+
   it('offers to go back to the request of the user', () => {
     const markup = render([{ id: 'u1', role: 'user', text: 'the question' }]);
     expect(markup).toContain('Go back to this point');
+  });
+
+  it('puts the arrow that goes back on the left of the message', () => {
+    const markup = render([{ id: 'u1', role: 'user', text: 'the question' }]);
+    const row = markup.indexOf('user-row');
+    const arrow = markup.indexOf('message-rewind');
+    const bubble = markup.indexOf('user-bubble');
+    expect(row).toBeGreaterThan(-1);
+    expect(arrow).toBeGreaterThan(row);
+    expect(bubble).toBeGreaterThan(arrow);
   });
 
   it('gives the buttons only to the messages of the user', () => {
@@ -84,6 +105,8 @@ describe('the actions of a message', () => {
     expect(CSS).toMatch(/\.message-actions\s*\{/);
     expect(CSS).toMatch(/\.message-action\s*\{/);
     expect(CSS).toMatch(/\.message-elapsed\s*\{/);
+    expect(CSS).toMatch(/\.user-row\s*\{/);
+    expect(CSS).toMatch(/\.message-rewind\s*\{/);
   });
 
   it('keeps the kinds of the notices apart', () => {

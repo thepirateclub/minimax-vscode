@@ -73,7 +73,24 @@ describe('describeCodeBlock', () => {
 
   it('survives an empty info', () => {
     expect(describeCodeBlock('').language).toBe('text');
-    expect(describeCodeBlock('').title).toBe('');
+    // The header of a block must not be empty.
+    expect(describeCodeBlock('').title).toBe('Output');
+  });
+
+  it('names a block after the command it quotes', () => {
+    const block = describeCodeBlock('', {
+      content: 'all tests passed',
+      command: { command: 'npm test', output: 'all tests passed\n' }
+    });
+    expect(block.title).toBe('npm test');
+  });
+
+  it('keeps the word Output when the block quotes another command', () => {
+    const block = describeCodeBlock('', {
+      content: 'something else',
+      command: { command: 'npm test', output: 'all tests passed\n' }
+    });
+    expect(block.title).toBe('Output');
   });
 
   it('names a snippet that the model did not name', () => {

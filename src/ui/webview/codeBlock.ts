@@ -1,5 +1,7 @@
 import type { UiMessage } from '../protocol';
+import type { CommandHint } from './commandHistory';
 import { supportsLanguage } from './highlight';
+import { STRINGS } from './strings';
 
 // The header of a code block shows the name of the file when the snippet is
 // a quote from a file, and the language when the model wrote the code.
@@ -29,6 +31,8 @@ export interface CodeBlockOptions {
   content?: string;
   // The files the agent has read.
   sources?: CodeSource[];
+  // The command that ran before the block, the header can take its name.
+  command?: CommandHint;
 }
 
 export interface CodeMatch {
@@ -381,10 +385,43 @@ export function describeCodeBlock(
     };
   }
   const language = (tokens[0] ?? '').toLowerCase();
+  if (language.length > 0) {
+    return {
+      title: language,
+      language,
+      file: '',
+      line: 0
+    };
+  }
+  // The header of a block must not be empty: without a name the reader
+  // does not know what the block is. The name of the command is better
+  // when the block quotes its output, the word "Output" is the last
+  // resort.
   return {
-    title: language,
-    language: language.length > 0 ? language : 'text',
+    title: commandTitle(options?.command, options?.content),
+    language: 'text',
     file: '',
     line: 0
   };
+}
+
+// The name of the command, when the block quotes its output. The text of
+// the block has to be a part of the output, otherwise the name belongs
+// to another command.
+function commandTitle(
+  command: CommandHint | undefined,
+  content: string | undefined
+): string {
+  if (command && quotesOutput(command.output, content)) {
+    return command.command;
+  }
+  return STRINGS.codeOutput;
+}
+
+function quotesOutput(output: string, content: string | undefined): boolean {
+  const text = (content ?? '').trim();
+  if (text.length === 0) {
+    return false;
+  }
+  return output.includes(text);
 }

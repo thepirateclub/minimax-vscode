@@ -465,10 +465,42 @@ input:focus {
   align-items: flex-end;
 }
 
+/* The request stands with the arrow that takes the chat back to it. The
+   arrow points at the message, so it stands on the left of the words. */
+.user-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  width: 100%;
+}
+
+.message-rewind {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: var(--control-h);
+  height: var(--control-h);
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.message-rewind:hover {
+  background: var(--row-hover);
+  color: var(--fg);
+}
+
 /* The words of the user sit on a quiet plate. A fill in the color of the
    button made the question louder than the answer. */
 .bubble.user-bubble {
   max-width: 92%;
+  /* The arrow takes its place, the words of the request give way. */
+  min-width: 0;
   background: var(--vscode-textBlockQuote-background, rgba(128, 128, 128, 0.12));
   border: 1px solid var(--border);
   color: var(--fg);
