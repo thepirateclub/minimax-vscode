@@ -11,6 +11,7 @@ import { readMentionedFiles } from './agent/mentions';
 import { buildSystemPrompt, renderGitContext } from './agent/prompt';
 import { generateCommitMessage } from './agent/commitMessage';
 import { AgentSession } from './agent/session';
+import type { TodoItem } from './agent/state';
 import { isAbortMessage, stopNotice } from './agent/stopReason';
 import { cutHistory, findRequestIndex, turnOfMessage, type TurnAnchor } from './agent/turns';
 import { AGENT_MODES, MODELS, resolveBaseUrl } from './config/models';
@@ -32,6 +33,7 @@ import { createFileTools, resolveWorkspacePath } from './tools/fs';
 import { ToolRegistry } from './tools/registry';
 import { createGitTools } from './tools/git';
 import { createTerminalTools } from './tools/terminal';
+import { createTodoTools } from './tools/todo';
 import { fileErrorMessage } from './ui/fileError';
 import { AgentPanelProvider } from './ui/panel';
 import { themeKind } from './ui/theme';
@@ -63,6 +65,8 @@ interface RuntimeSession {
   // The anchors of the requests, they tell where a request sits in the
   // history and let the chat roll back to it.
   turns: TurnAnchor[];
+  // The list of tasks of the session, the model writes it.
+  todos: TodoItem[];
   // When the turn of this moment started, the panel shows how long it
   // took.
   turnStartedAt: number;
@@ -110,7 +114,8 @@ class MiniMaxController {
       ...createFileTools({ backups: this.backups }),
       ...createExploreTools({ search: (root) => this.searchFor(root) }),
       ...createGitTools(),
-      ...createTerminalTools()
+      ...createTerminalTools(),
+      ...createTodoTools()
     ]) {
       this.registry.register(tool);
     }
@@ -490,6 +495,11 @@ class MiniMaxController {
             message.tool.durationMs = durationMs;
           }
         }
+      }
+      if (event.state?.kind === 'todos') {
+        runtime.todos = event.state.todos;
+        this.panel.post({ type: 'todos', todos: runtime.todos });
+        this.persist(runtime);
       }
       this.panel.post({
         type: 'tool_end',
@@ -1174,7 +1184,8 @@ class MiniMaxController {
       messages: runtime.history,
       uiMessages: runtime.uiMessages,
       usage: runtime.usage,
-      turns: runtime.turns
+      turns: runtime.turns,
+      todos: runtime.todos
     };
     // A full state of the host must not break the turn, the chat stays in
     // memory and the failure goes to the log.
@@ -1213,6 +1224,7 @@ class MiniMaxController {
         cache: turn.cache ?? 0
       })),
       turns: stored.turns ?? [],
+      todos: [...(stored.todos ?? [])],
       turnStartedAt: 0
     };
   }
@@ -1234,6 +1246,7 @@ class MiniMaxController {
       errorReported: false,
       usage: [],
       turns: [],
+      todos: [],
       turnStartedAt: 0
     });
     this.activeSessionId = id;
@@ -1313,6 +1326,7 @@ class MiniMaxController {
         state: this.agentState,
         tokens: this.usageTotal(runtime),
         usage: runtime ? [...runtime.usage] : [],
+        todos: runtime ? [...runtime.todos] : [],
         hasApiKey: Boolean(key),
         theme: themeKind(),
         fontSize: settings.fontSize,

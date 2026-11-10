@@ -37,7 +37,8 @@ const EMPTY_STATE: UiState = {
   fontSize: 13,
   collapseTools: false,
   collapseCode: false,
-  version: ''
+  version: '',
+  todos: []
 };
 
 export function App({ vscode }: { vscode: VsCodeApi }) {

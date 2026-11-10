@@ -57,7 +57,8 @@ const STATE: UiState = {
   fontSize: 13,
   collapseTools: params.get('collapse') === '1',
   collapseCode: params.get('collapse') === '1',
-  version: manifest.version
+  version: manifest.version,
+  todos: []
 };
 
 const SETTINGS: UiSettings = {

@@ -1,3 +1,4 @@
+import type { TodoItem } from '../agent/state';
 import type { EffortLevel } from '../api/types';
 import type { AgentMode, BaseUrlPreset, ModelInfo } from '../config/models';
 
@@ -133,6 +134,8 @@ export interface UiState {
   collapseCode: boolean;
   // The version of the running extension, the panel shows it in the header.
   version: string;
+  // The list of tasks of the session.
+  todos: TodoItem[];
 }
 
 export type ExtToWeb =
@@ -156,6 +159,8 @@ export type ExtToWeb =
   | { type: 'status'; state: AgentState; tokens?: number }
   | { type: 'theme'; kind: ThemeKind }
   | { type: 'usage'; turns: UiUsageTurn[] }
+  // The list of tasks of the session, the model writes it.
+  | { type: 'todos'; todos: TodoItem[] }
   | { type: 'error'; message: string }
   | { type: 'notice'; message: string; kind: NoticeKind }
   | { type: 'step_time'; id: string; elapsedMs: number }

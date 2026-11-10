@@ -5,6 +5,7 @@ import {
   MAX_STORED_DIFF_LINES,
   MAX_STORED_MESSAGES,
   MAX_STORED_SESSIONS,
+  MAX_STORED_TODOS,
   SessionStore,
   capSession,
   type SessionStorage,
@@ -128,6 +129,39 @@ describe('capSession', () => {
     const diff = stored.uiMessages[0]?.tool?.diff;
     expect(diff?.lines.length).toBeLessThanOrEqual(MAX_STORED_DIFF_LINES + 1);
     expect(diff?.lines.some((line) => line.text.includes('cut'))).toBe(true);
+  });
+
+  it('keeps the list of tasks of a session', () => {
+    const capped = capSession({
+      id: 's-1',
+      title: 'chat',
+      updatedAt: 1,
+      messages: [],
+      uiMessages: [],
+      usage: [],
+      todos: [{ content: 'Read the parser', status: 'pending', priority: 'high' }]
+    });
+    expect(capped.todos).toEqual([
+      { content: 'Read the parser', status: 'pending', priority: 'high' }
+    ]);
+  });
+
+  it('cuts a list of tasks that is too long', () => {
+    const todos = Array.from({ length: MAX_STORED_TODOS + 10 }, (_, index) => ({
+      content: 'task ' + index,
+      status: 'pending' as const,
+      priority: 'medium' as const
+    }));
+    const capped = capSession({
+      id: 's-1',
+      title: 'chat',
+      updatedAt: 1,
+      messages: [],
+      uiMessages: [],
+      usage: [],
+      todos
+    });
+    expect(capped.todos).toHaveLength(MAX_STORED_TODOS);
   });
 });
 
