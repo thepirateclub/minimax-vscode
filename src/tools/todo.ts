@@ -22,8 +22,12 @@ export function normalizeTodos(input: unknown): TodoItem[] {
       continue;
     }
     const record = raw as Record<string, unknown>;
+    // A line break inside the text of a task breaks the section of the
+    // prompt, the text of a task is always one line.
     const content =
-      typeof record['content'] === 'string' ? record['content'].trim() : '';
+      typeof record['content'] === 'string'
+        ? record['content'].replace(/\s*\r?\n\s*/g, ' ').trim()
+        : '';
     if (content.length === 0) {
       continue;
     }

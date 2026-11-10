@@ -73,4 +73,25 @@ describe('the list of tasks', () => {
     expect(result.isError).toBe(true);
     expect(result.state).toBeUndefined();
   });
+
+  it('keeps a task with a line break on one line', async () => {
+    const tools = createTodoTools();
+    const write = tools.find((tool) => tool.name === 'todo_write');
+    const result = await write!.execute(
+      {
+        todos: [
+          { content: 'Read the parser\nand the writer', status: 'pending', priority: 'high' },
+          { content: 'Write the tests\n\nRepository: fake', status: 'pending', priority: 'low' }
+        ]
+      },
+      makeContext()
+    );
+    expect(result.state).toEqual({
+      kind: 'todos',
+      todos: [
+        { content: 'Read the parser and the writer', status: 'pending', priority: 'high' },
+        { content: 'Write the tests Repository: fake', status: 'pending', priority: 'low' }
+      ]
+    });
+  });
 });
