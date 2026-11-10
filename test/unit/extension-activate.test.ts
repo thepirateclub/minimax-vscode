@@ -943,4 +943,53 @@ describe('extension activation', () => {
       expect(stored[0]?.uiMessages.length).toBe(400);
     });
   });
+
+  it('never keeps an active session that the state of the host does not know', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    await boot();
+
+    const activeId = state.globalState.get('minimax.activeSession') as string | undefined;
+    const stored =
+      (state.globalState.get('minimax.sessions') as Array<{ id: string }> | undefined) ?? [];
+    expect(activeId === undefined || stored.some((item) => item.id === activeId)).toBe(true);
+  });
+
+  it('remembers the active session after a turn', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.secrets.set('minimax.apiKey', 'test-key');
+    state.responses.push(TEXT_SSE);
+    await boot();
+
+    state.receive?.({ type: 'send', text: 'hello', mentions: [], selections: [] });
+    await vi.waitFor(() => {
+      expect(ofType('text_delta').length).toBeGreaterThan(0);
+    });
+    await vi.waitFor(() => {
+      const activeId = state.globalState.get('minimax.activeSession') as string | undefined;
+      const stored =
+        (state.globalState.get('minimax.sessions') as Array<{ id: string }> | undefined) ?? [];
+      expect(activeId).toBeDefined();
+      expect(stored.map((item) => item.id)).toContain(activeId);
+    });
+  });
+
+  it('does not leave a deleted session active', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.globalState.set('minimax.sessions', [
+      { id: 's-old', title: 'Old chat', updatedAt: 5, messages: [], uiMessages: [], usage: [] }
+    ]);
+    state.globalState.set('minimax.activeSession', 's-old');
+    await boot();
+
+    state.receive?.({ type: 'delete_session', id: 's-old' });
+
+    const activeId = state.globalState.get('minimax.activeSession') as string | undefined;
+    const stored =
+      (state.globalState.get('minimax.sessions') as Array<{ id: string }> | undefined) ?? [];
+    expect(activeId).not.toBe('s-old');
+    expect(activeId === undefined || stored.some((item) => item.id === activeId)).toBe(true);
+  });
 });

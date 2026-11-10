@@ -979,6 +979,10 @@ class MiniMaxController {
     void this.store.save(stored).then((saved) => {
       if (!saved) {
         this.logger.error('the chat was not saved to the state of the host');
+      } else if (this.activeSessionId === runtime.id) {
+        // The id of the active session goes to the state of the host after
+        // the session itself. A lonely id would point to nothing.
+        this.store.setActiveId(runtime.id);
       }
       this.panel.post({ type: 'sessions', sessions: this.store.summaryList() });
     });
@@ -1027,7 +1031,8 @@ class MiniMaxController {
       usage: []
     });
     this.activeSessionId = id;
-    this.store.setActiveId(id);
+    // The id of the new chat goes to the state of the host together with the
+    // chat itself. A lonely id would point to nothing after a restart.
     this.setState('idle');
     void this.sendInit();
   }
@@ -1075,6 +1080,9 @@ class MiniMaxController {
     this.sessions.delete(id);
     if (this.activeSessionId === id) {
       this.activeSessionId = undefined;
+      // The removed chat must not stay active, its id would point to nothing
+      // after a restart.
+      this.store.setActiveId(undefined);
       this.startNewSession();
       return;
     }
