@@ -892,6 +892,10 @@ class MiniMaxController {
       return at !== -1 && at < index;
     });
     runtime.uiMessages = runtime.uiMessages.slice(0, index);
+    // The list of the tasks belongs to the turn that goes away, it goes
+    // away with it.
+    runtime.todos = [];
+    this.panel.post({ type: 'todos', todos: runtime.todos });
     // The panel gets a copy, the chat grows right after this line.
     this.panel.post({ type: 'session_loaded', messages: [...runtime.uiMessages] });
     // The request comes back to the input field, the agent waits.
@@ -937,6 +941,10 @@ class MiniMaxController {
     });
     this.cutHistoryBefore(runtime, turn, turn.text);
     runtime.uiMessages = runtime.uiMessages.slice(0, userIndex);
+    // The list of the tasks belongs to the turn that goes away, it goes
+    // away with it.
+    runtime.todos = [];
+    this.panel.post({ type: 'todos', todos: runtime.todos });
     // The panel gets a copy, the chat grows right after this line.
     this.panel.post({ type: 'session_loaded', messages: [...runtime.uiMessages] });
     await this.handleSend(turn.text, turn.mentions, turn.selections);
@@ -1177,6 +1185,14 @@ class MiniMaxController {
 
   private persist(runtime: RuntimeSession): void {
     runtime.updatedAt = Date.now();
+    // While the turn runs the messages of the panel and the history of the
+    // model do not match. A saved state has to be a state the agent can
+    // continue from, so the session waits for the end of the turn and only
+    // the list of the tasks is written in the meantime.
+    if (runtime.busy) {
+      this.persistTodos(runtime);
+      return;
+    }
     const stored: StoredSession = {
       id: runtime.id,
       title: runtime.title,
@@ -1198,6 +1214,28 @@ class MiniMaxController {
         this.store.setActiveId(runtime.id);
       }
       this.panel.post({ type: 'sessions', sessions: this.store.summaryList() });
+    });
+  }
+
+  // The list of the tasks is written at once. The session keeps the last
+  // complete turn, so the state that comes back after a crash is a state the
+  // agent can continue from.
+  private persistTodos(runtime: RuntimeSession): void {
+    const saved = this.store.get(runtime.id);
+    const stored: StoredSession = {
+      id: runtime.id,
+      title: runtime.title,
+      updatedAt: Date.now(),
+      messages: saved?.messages ?? [],
+      uiMessages: saved?.uiMessages ?? [],
+      usage: saved?.usage ?? [],
+      turns: saved?.turns ?? [],
+      todos: runtime.todos
+    };
+    void this.store.save(stored).then((ok) => {
+      if (!ok) {
+        this.logger.error('the list of tasks was not saved to the state of the host');
+      }
     });
   }
 
