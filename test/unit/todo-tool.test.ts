@@ -55,6 +55,17 @@ describe('the list of tasks', () => {
     expect(result.state).toEqual({ kind: 'todos', todos: [] });
   });
 
+  it('refuses a broken list and keeps the old one', async () => {
+    const tools = createTodoTools();
+    const write = tools.find((tool) => tool.name === 'todo_write');
+    const missing = await write!.execute({}, makeContext());
+    expect(missing.isError).toBe(true);
+    expect(missing.state).toBeUndefined();
+    const broken = await write!.execute({ todos: 'nope' }, makeContext());
+    expect(broken.isError).toBe(true);
+    expect(broken.state).toBeUndefined();
+  });
+
   it('refuses the call of a sub-agent', async () => {
     const tools = createTodoTools();
     const write = tools.find((tool) => tool.name === 'todo_write');

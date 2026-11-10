@@ -81,7 +81,16 @@ export function createTodoTools(): ToolEntry[] {
           isError: true
         };
       }
-      const todos = normalizeTodos(input['todos']);
+      // A broken payload must not wipe the list of the user: only an empty
+      // array clears it.
+      const raw = input['todos'];
+      if (!Array.isArray(raw)) {
+        return {
+          content: 'todo_write failed: todos must be an array',
+          isError: true
+        };
+      }
+      const todos = normalizeTodos(raw);
       const state: ToolStateUpdate = { kind: 'todos', todos };
       const done = todos.filter((item) => item.status === 'completed').length;
       return {
