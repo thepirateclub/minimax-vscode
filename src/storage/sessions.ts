@@ -1,6 +1,6 @@
 import { MAX_HISTORY_MESSAGES, trimHistory } from '../api/history';
 import type { AnthropicMessage } from '../api/types';
-import type { TodoItem } from '../agent/state';
+import type { GoalState, TodoItem } from '../agent/state';
 import type { TurnAnchor } from '../agent/turns';
 import type { UiDiffLine, UiMessage, UiUsageTurn } from '../ui/protocol';
 
@@ -15,6 +15,8 @@ export interface StoredSession {
   turns?: TurnAnchor[];
   // The list of tasks of the session, the model writes it.
   todos?: TodoItem[];
+  // The goal of the session, the user sets it.
+  goal?: GoalState;
 }
 
 // The state of the host. The type is structural, so the store stays testable
@@ -83,7 +85,8 @@ export function capSession(session: StoredSession): StoredSession {
     uiMessages: session.uiMessages.slice(-MAX_STORED_MESSAGES).map(capMessage),
     usage: session.usage.slice(-MAX_STORED_USAGE_TURNS),
     turns: (session.turns ?? []).slice(-MAX_STORED_TURNS),
-    todos: (session.todos ?? []).slice(-MAX_STORED_TODOS)
+    todos: (session.todos ?? []).slice(-MAX_STORED_TODOS),
+    goal: session.goal
   };
 }
 

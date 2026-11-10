@@ -11,7 +11,8 @@ import { readMentionedFiles } from './agent/mentions';
 import { buildSystemPrompt, renderGitContext, renderTasksContext } from './agent/prompt';
 import { generateCommitMessage } from './agent/commitMessage';
 import { AgentSession } from './agent/session';
-import type { TodoItem } from './agent/state';
+import type { GoalState, TodoItem } from './agent/state';
+import { budgetOver } from './agent/goalBudget';
 import { isAbortMessage, stopNotice } from './agent/stopReason';
 import { cutHistory, findRequestIndex, turnOfMessage, type TurnAnchor } from './agent/turns';
 import { AGENT_MODES, MODELS, resolveBaseUrl } from './config/models';
@@ -30,6 +31,7 @@ import { SessionStore, type StoredSession } from './storage/sessions';
 import { UsageLedger } from './storage/usage';
 import { createExploreTools, isTextFile } from './tools/explore';
 import { createFileTools, resolveWorkspacePath } from './tools/fs';
+import { createGoalTools } from './tools/goal';
 import { ToolRegistry } from './tools/registry';
 import { createGitTools } from './tools/git';
 import { createTerminalTools } from './tools/terminal';
@@ -67,6 +69,8 @@ interface RuntimeSession {
   turns: TurnAnchor[];
   // The list of tasks of the session, the model writes it.
   todos: TodoItem[];
+  // The goal of the session, the user sets it.
+  goal: GoalState | undefined;
   // When the turn of this moment started, the panel shows how long it
   // took.
   turnStartedAt: number;
@@ -115,7 +119,8 @@ class MiniMaxController {
       ...createExploreTools({ search: (root) => this.searchFor(root) }),
       ...createGitTools(),
       ...createTerminalTools(),
-      ...createTodoTools()
+      ...createTodoTools(),
+      ...createGoalTools()
     ]) {
       this.registry.register(tool);
     }
@@ -419,6 +424,28 @@ class MiniMaxController {
     return parts.join('\n\n');
   }
 
+  // The limits of the goal. The agent stops when one of them is over, the
+  // status of the goal stays active: the user raises the limit and the work
+  // continues.
+  private goalBudgetOk(runtime: RuntimeSession): boolean {
+    const goal = runtime.goal;
+    if (!goal || goal.status !== 'active') {
+      return true;
+    }
+    // The time of the running turn counts too. The time of a turn that is
+    // over is already in the spend of the goal, the time between the turns
+    // is not the work.
+    const running =
+      runtime.busy && runtime.turnStartedAt > 0
+        ? (Date.now() - runtime.turnStartedAt) / 1000
+        : 0;
+    return !budgetOver(goal, {
+      tokens: goal.used.tokens,
+      requests: goal.used.requests,
+      seconds: goal.used.seconds + running
+    });
+  }
+
   private async ensureAgent(runtime: RuntimeSession): Promise<AgentSession | undefined> {
     if (runtime.agent) {
       return runtime.agent;
@@ -451,6 +478,15 @@ class MiniMaxController {
       contextThreshold: settings.contextThreshold,
       systemPrompt: await this.buildPrompt(),
       contextProvider: async () => await this.sessionContext(runtime),
+      sessionState: {
+        get todos() {
+          return runtime.todos;
+        },
+        get goal() {
+          return runtime.goal;
+        }
+      },
+      budget: () => this.goalBudgetOk(runtime),
       workspaceRoot: this.workspaceRoot(),
       logger: this.logger,
       autoApprove: settings.autoApprove,
@@ -516,6 +552,23 @@ class MiniMaxController {
         this.panel.post({ type: 'todos', todos: runtime.todos });
         this.persist(runtime);
       }
+      if (event.state?.kind === 'goal') {
+        const goal = runtime.goal;
+        if (goal) {
+          goal.status = event.state.status;
+          this.panel.post({ type: 'goal', goal: { ...goal } });
+          if (event.state.note) {
+            // The reason of the model reaches the user, the status of the
+            // goal alone says nothing about why it stopped.
+            this.panel.post({
+              type: 'notice',
+              message: event.state.note,
+              kind: 'info'
+            });
+          }
+          this.persist(runtime);
+        }
+      }
       this.panel.post({
         type: 'tool_end',
         id: event.id,
@@ -528,6 +581,19 @@ class MiniMaxController {
       return;
     }
     if (event.type === 'approval_resolved') {
+      return;
+    }
+    if (event.type === 'usage') {
+      const goal = runtime.goal;
+      if (goal && goal.status === 'active') {
+        goal.used.tokens +=
+          event.usage.inputTokens +
+          event.usage.outputTokens +
+          (event.usage.cacheReadTokens ?? 0) +
+          (event.usage.cacheCreationTokens ?? 0);
+        goal.used.requests += 1;
+        this.panel.post({ type: 'goal', goal: { ...goal } });
+      }
       return;
     }
     if (event.type === 'done') {
@@ -552,7 +618,11 @@ class MiniMaxController {
       // The last message of the step tells how long the step took, and
       // the reason of the stop is named, a silent stop confuses.
       this.markStepTime(runtime);
-      const notice = stopNotice(event.stopReason, getSettings().maxIterations);
+      const goal = runtime.goal;
+      if (goal && goal.status === 'active' && runtime.turnStartedAt > 0) {
+        goal.used.seconds += (Date.now() - runtime.turnStartedAt) / 1000;
+      }
+      const notice = stopNotice(event.stopReason, getSettings().maxIterations, goal);
       if (notice) {
         this.panel.post({ type: 'notice', message: notice.message, kind: notice.kind });
       }
@@ -716,6 +786,42 @@ class MiniMaxController {
       this.deleteSession(message.id);
       return;
     }
+    if (message.type === 'set_goal') {
+      const runtime = this.activeSession();
+      const objective = message.objective.trim();
+      if (!runtime) {
+        return;
+      }
+      if (objective.length === 0) {
+        this.panel.post({
+          type: 'notice',
+          message: 'The goal is empty.',
+          kind: 'error'
+        });
+        return;
+      }
+      runtime.goal = {
+        objective,
+        tokenBudget: message.tokenBudget,
+        requestLimit: message.requestLimit,
+        secondsLimit: message.secondsLimit,
+        status: 'active',
+        used: { tokens: 0, requests: 0, seconds: 0 }
+      };
+      this.panel.post({ type: 'goal', goal: { ...runtime.goal } });
+      this.persist(runtime);
+      return;
+    }
+    if (message.type === 'clear_goal') {
+      const runtime = this.activeSession();
+      if (!runtime) {
+        return;
+      }
+      runtime.goal = undefined;
+      this.panel.post({ type: 'goal', goal: undefined });
+      this.persist(runtime);
+      return;
+    }
     if (message.type === 'set_model') {
       await this.updateSetting('model', message.model);
       return;
@@ -782,6 +888,21 @@ class MiniMaxController {
       this.panel.post({
         type: 'error',
         message: 'The agent is busy. Stop the current turn before sending a new request.'
+      });
+      return;
+    }
+    // The budget of the goal is over, the request does not go out. The user
+    // raises the limit and the work continues.
+    if (!this.goalBudgetOk(runtime)) {
+      const notice = stopNotice(
+        'goal_limit',
+        getSettings().maxIterations,
+        runtime.goal
+      );
+      this.panel.post({
+        type: 'notice',
+        message: notice?.message ?? 'The budget of the goal is exhausted.',
+        kind: 'warn'
       });
       return;
     }
@@ -1216,7 +1337,8 @@ class MiniMaxController {
       uiMessages: runtime.uiMessages,
       usage: runtime.usage,
       turns: runtime.turns,
-      todos: runtime.todos
+      todos: runtime.todos,
+      goal: runtime.goal
     };
     // A full state of the host must not break the turn, the chat stays in
     // memory and the failure goes to the log.
@@ -1245,7 +1367,8 @@ class MiniMaxController {
       uiMessages: saved?.uiMessages ?? [],
       usage: saved?.usage ?? [],
       turns: saved?.turns ?? [],
-      todos: runtime.todos
+      todos: runtime.todos,
+      goal: runtime.goal
     };
     void this.store.save(stored).then((ok) => {
       if (!ok) {
@@ -1278,6 +1401,7 @@ class MiniMaxController {
       })),
       turns: stored.turns ?? [],
       todos: [...(stored.todos ?? [])],
+      goal: stored.goal,
       turnStartedAt: 0
     };
   }
@@ -1300,6 +1424,7 @@ class MiniMaxController {
       usage: [],
       turns: [],
       todos: [],
+      goal: undefined,
       turnStartedAt: 0
     });
     this.activeSessionId = id;
@@ -1380,6 +1505,7 @@ class MiniMaxController {
         tokens: this.usageTotal(runtime),
         usage: runtime ? [...runtime.usage] : [],
         todos: runtime ? [...runtime.todos] : [],
+        goal: runtime?.goal,
         hasApiKey: Boolean(key),
         theme: themeKind(),
         fontSize: settings.fontSize,

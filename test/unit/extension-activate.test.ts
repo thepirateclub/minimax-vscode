@@ -1227,4 +1227,101 @@ describe('extension activation', () => {
     expect(body.system).toContain('\nTasks:\n- [pending] Read the parser (high)');
   });
 
+  it('keeps the goal of the session in the state of the host', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    await boot();
+
+    state.receive?.({
+      type: 'set_goal',
+      objective: 'Rewrite the parser',
+      tokenBudget: 12000,
+      requestLimit: 8,
+      secondsLimit: 600
+    });
+    await vi.waitFor(() => {
+      expect(ofType('goal').length).toBe(1);
+    });
+    const goal = ofType('goal')[0]!.goal!;
+    expect(goal.objective).toBe('Rewrite the parser');
+    expect(goal.tokenBudget).toBe(12000);
+    expect(goal.requestLimit).toBe(8);
+    expect(goal.secondsLimit).toBe(600);
+    expect(goal.status).toBe('active');
+
+    // The goal is in the saved session.
+    await vi.waitFor(() => {
+      const stored = state.globalState.get('minimax.sessions') as Array<{
+        goal?: { objective: string };
+      }>;
+      expect(stored[0]?.goal?.objective).toBe('Rewrite the parser');
+    });
+
+    // The goal comes back after a restart of the extension.
+    await boot();
+    const inits = ofType('init');
+    expect(inits[inits.length - 1]!.state.goal?.objective).toBe('Rewrite the parser');
+  });
+
+  it('counts the spend of a request into the goal', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.secrets.set('minimax.apiKey', 'test-key');
+    state.responses.push(TEXT_SSE);
+    await boot();
+
+    state.receive?.({
+      type: 'set_goal',
+      objective: 'Rewrite the parser',
+      tokenBudget: 12000
+    });
+    await vi.waitFor(() => {
+      expect(ofType('goal').length).toBe(1);
+    });
+
+    state.posted.length = 0;
+    state.receive?.({ type: 'send', text: 'hello', mentions: [], selections: [] });
+    await vi.waitFor(() => {
+      expect(ofType('goal').length).toBeGreaterThan(0);
+    });
+    const goal = ofType('goal').pop()!.goal!;
+    // The request spent 11 input tokens and 7 output tokens.
+    expect(goal.used.tokens).toBe(18);
+    expect(goal.used.requests).toBe(1);
+  });
+
+  it('refuses a turn while the budget of the goal is over', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.secrets.set('minimax.apiKey', 'test-key');
+    state.responses.push(TEXT_SSE);
+    await boot();
+
+    state.receive?.({
+      type: 'set_goal',
+      objective: 'Rewrite the parser',
+      tokenBudget: 10
+    });
+    await vi.waitFor(() => {
+      expect(ofType('goal').length).toBe(1);
+    });
+
+    state.posted.length = 0;
+    state.receive?.({ type: 'send', text: 'hello', mentions: [], selections: [] });
+    await vi.waitFor(() => {
+      expect(ofType('text_delta').length).toBeGreaterThan(0);
+    });
+    // The spend of the request (18 tokens) broke the limit of 10 tokens.
+    state.posted.length = 0;
+    state.receive?.({ type: 'send', text: 'again', mentions: [], selections: [] });
+    await vi.waitFor(() => {
+      expect(ofType('notice').length).toBeGreaterThan(0);
+    });
+    const notice = ofType('notice')[0]!;
+    expect(notice.message).toContain('budget');
+    expect(notice.message).toContain('Rewrite the parser');
+    // The request did not go out.
+    expect(state.fetched.filter((url) => url === MESSAGES_URL)).toHaveLength(1);
+  });
+
 });

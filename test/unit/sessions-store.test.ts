@@ -146,6 +146,25 @@ describe('capSession', () => {
     ]);
   });
 
+  it('keeps the goal of a session', () => {
+    const capped = capSession({
+      id: 's-1',
+      title: 'chat',
+      updatedAt: 1,
+      messages: [],
+      uiMessages: [],
+      usage: [],
+      goal: {
+        objective: 'Rewrite the parser',
+        tokenBudget: 12000,
+        status: 'active',
+        used: { tokens: 4300, requests: 2, seconds: 65 }
+      }
+    });
+    expect(capped.goal?.objective).toBe('Rewrite the parser');
+    expect(capped.goal?.used.tokens).toBe(4300);
+  });
+
   it('cuts a list of tasks that is too long', () => {
     const todos = Array.from({ length: MAX_STORED_TODOS + 10 }, (_, index) => ({
       content: 'task ' + index,

@@ -3,6 +3,7 @@ import { balanceHistory, fitHistory } from '../api/history';
 import type { AnthropicMessage, EffortLevel } from '../api/types';
 import type { AgentMode } from '../config/models';
 import { Agent, type AgentEvent } from './agent';
+import type { SessionState } from './state';
 import type { Logger } from '../logger';
 import { buildPreview } from '../tools/preview';
 import type { ToolRegistry } from '../tools/registry';
@@ -27,6 +28,10 @@ export interface SessionOptions {
   systemPrompt: string;
   // How deep the agent is. Undefined is the main agent.
   depth?: number;
+  // The budget of the goal. The agent stops when the guard says no.
+  budget?: () => boolean;
+  // The state of the session, the tools read it.
+  sessionState?: SessionState;
   // The state of the repository is read before every turn, the prompt of
   // the model carries the fresh one.
   contextProvider?: () => Promise<string>;
@@ -112,6 +117,8 @@ export class AgentSession {
       systemPrompt,
       workspaceRoot: this.options.workspaceRoot,
       depth: this.options.depth,
+      budget: this.options.budget,
+      sessionState: this.options.sessionState,
       logger: this.options.logger,
       onEvent: (event) => this.options.onEvent(event)
     });

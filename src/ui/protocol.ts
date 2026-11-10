@@ -1,4 +1,4 @@
-import type { TodoItem } from '../agent/state';
+import type { GoalState, TodoItem } from '../agent/state';
 import type { EffortLevel } from '../api/types';
 import type { AgentMode, BaseUrlPreset, ModelInfo } from '../config/models';
 
@@ -136,6 +136,8 @@ export interface UiState {
   version: string;
   // The list of tasks of the session.
   todos: TodoItem[];
+  // The goal of the session.
+  goal?: GoalState;
 }
 
 export type ExtToWeb =
@@ -161,6 +163,8 @@ export type ExtToWeb =
   | { type: 'usage'; turns: UiUsageTurn[] }
   // The list of tasks of the session, the model writes it.
   | { type: 'todos'; todos: TodoItem[] }
+  // The goal of the session, the host owns it.
+  | { type: 'goal'; goal?: GoalState }
   | { type: 'error'; message: string }
   | { type: 'notice'; message: string; kind: NoticeKind }
   | { type: 'step_time'; id: string; elapsedMs: number }
@@ -185,6 +189,14 @@ export type WebToExt =
   | { type: 'new_session' }
   | { type: 'select_session'; id: string }
   | { type: 'delete_session'; id: string }
+  | {
+      type: 'set_goal';
+      objective: string;
+      tokenBudget?: number;
+      requestLimit?: number;
+      secondsLimit?: number;
+    }
+  | { type: 'clear_goal' }
   | { type: 'set_model'; model: string }
   | { type: 'set_effort'; effort: EffortLevel }
   | { type: 'set_mode'; mode: AgentMode }
