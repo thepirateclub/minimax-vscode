@@ -325,4 +325,93 @@ describe('Agent', () => {
     const block = last.content[0]!;
     expect(block.type === 'tool_result' && block.is_error).toBe(true);
   });
+
+  it('carries the snapshot of the state of the tool to the event of the action', async () => {
+    const client = new FakeClient([
+      toolResponse('todo_write', { todos: [] }),
+      textResponse('done')
+    ]);
+    const events: AgentEvent[] = [];
+    const registry = new ToolRegistry();
+    registry.register({
+      name: 'todo_write',
+      description: 'write the list of tasks',
+      approval: 'never',
+      sideEffect: false,
+      inputSchema: { type: 'object', properties: {} },
+      execute: async () => ({
+        content: 'The list of tasks has 1 items.',
+        state: {
+          kind: 'todos',
+          todos: [{ content: 'Read the parser', status: 'pending', priority: 'high' }]
+        }
+      })
+    });
+    const agent = new Agent({
+      client,
+      registry,
+      approval: new ApprovalGate({
+        autoApprove: [],
+        request: async () => ({ approved: true, allowForSession: false })
+      }),
+      model: 'MiniMax-M3.1-Flash',
+      maxTokens: 32000,
+      maxIterations: 5,
+      effort: 'max',
+      mode: 'code',
+      systemPrompt: 'system',
+      workspaceRoot: '/tmp/root',
+      logger: { info: () => undefined, error: () => undefined },
+      onEvent: (event) => events.push(event)
+    });
+    await agent.run('make a plan', []);
+    const end = events.find(
+      (event): event is Extract<AgentEvent, { type: 'tool_end' }> =>
+        event.type === 'tool_end'
+    );
+    expect(end?.state).toEqual({
+      kind: 'todos',
+      todos: [{ content: 'Read the parser', status: 'pending', priority: 'high' }]
+    });
+  });
+
+  it('gives the depth of the agent to the tool', async () => {
+    const client = new FakeClient([
+      toolResponse('todo_write', { todos: [] }),
+      textResponse('done')
+    ]);
+    const depths: Array<number | undefined> = [];
+    const registry = new ToolRegistry();
+    registry.register({
+      name: 'todo_write',
+      description: 'write the list of tasks',
+      approval: 'never',
+      sideEffect: false,
+      inputSchema: { type: 'object', properties: {} },
+      execute: async (_input, ctx) => {
+        depths.push(ctx.depth);
+        return { content: 'ok' };
+      }
+    });
+    const agent = new Agent({
+      client,
+      registry,
+      approval: new ApprovalGate({
+        autoApprove: [],
+        request: async () => ({ approved: true, allowForSession: false })
+      }),
+      model: 'MiniMax-M3.1-Flash',
+      maxTokens: 32000,
+      maxIterations: 5,
+      effort: 'max',
+      mode: 'code',
+      systemPrompt: 'system',
+      workspaceRoot: '/tmp/root',
+      depth: 1,
+      logger: { info: () => undefined, error: () => undefined },
+      onEvent: () => undefined
+    });
+    await agent.run('make a plan', []);
+    expect(depths).toEqual([1]);
+  });
 });

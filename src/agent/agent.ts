@@ -14,6 +14,7 @@ import type { Logger } from '../logger';
 import type { ToolRegistry } from '../tools/registry';
 import { buildPreview } from '../tools/preview';
 import type { ApprovalGate, DiffPreview } from '../ui/approvals';
+import type { ToolStateUpdate } from './state';
 
 export type AgentEvent =
   | { type: 'assistant_start' }
@@ -28,6 +29,8 @@ export type AgentEvent =
       isError: boolean;
       // The change of a file, it is taken before the write.
       diff?: DiffPreview;
+      // The change of the state of the session, the host applies it.
+      state?: ToolStateUpdate;
     }
   | { type: 'approval_resolved'; id: string; approved: boolean }
   | { type: 'done'; stopReason: StopReason; usage: Usage }
@@ -53,6 +56,8 @@ export interface AgentOptions {
   mode: AgentMode;
   systemPrompt: string;
   workspaceRoot: string;
+  // How deep the agent is. Undefined is the main agent.
+  depth?: number;
   logger: Logger;
   onEvent: (event: AgentEvent) => void;
 }
@@ -234,14 +239,17 @@ export class Agent {
 
         let content: string;
         let isError = false;
+        let state: ToolStateUpdate | undefined;
         try {
           const result = await entry.execute(toolUse.input, {
             workspaceRoot: this.options.workspaceRoot,
             signal: this.controller.signal,
-            logger: this.options.logger
+            logger: this.options.logger,
+            depth: this.options.depth
           });
           content = result.content;
           isError = result.isError === true;
+          state = result.state;
         } catch (error) {
           content = error instanceof Error ? error.message : String(error);
           isError = true;
@@ -253,7 +261,8 @@ export class Agent {
           name: toolUse.name,
           content,
           isError,
-          diff
+          diff,
+          state
         });
         results.push({
           type: 'tool_result',
