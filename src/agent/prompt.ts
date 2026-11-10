@@ -36,8 +36,57 @@ const TOOL_LINES: Array<{ name: string; line: string }> = [
   {
     name: 'run_terminal',
     line: '- run_terminal(command, cwd?, timeout_ms?) - run a shell command in the workspace root'
+  },
+  {
+    name: 'git_status',
+    line: '- git_status() - the branch and the changed files of the repository'
+  },
+  {
+    name: 'git_diff',
+    line: '- git_diff(staged?, ref?, paths?, context_lines?) - the changes as a diff'
+  },
+  {
+    name: 'git_log',
+    line: '- git_log(limit?, paths?, grep?) - the commits of the repository'
+  },
+  {
+    name: 'git_show',
+    line: '- git_show(ref, paths?) - one commit with its changes'
+  },
+  {
+    name: 'git_branch',
+    line: '- git_branch(all?) - the branches of the repository'
+  },
+  {
+    name: 'git_blame',
+    line: '- git_blame(path, start_line?, end_line?) - who changed every line of a file'
+  },
+  {
+    name: 'git_stage',
+    line: '- git_stage(paths, unstage?) - stage the files for the next commit'
+  },
+  {
+    name: 'git_commit',
+    line: '- git_commit(message, amend?) - commit the staged files'
+  },
+  {
+    name: 'git_branch_create',
+    line: '- git_branch_create(name, base?, checkout?) - create a branch and switch to it'
+  },
+  {
+    name: 'git_checkout',
+    line: '- git_checkout(ref) - switch to another branch or a commit'
   }
 ];
+
+// The state of the repository is a section of its own, it changes between the
+// turns and the model has to see the fresh one.
+export function renderGitContext(lines: string[]): string {
+  if (lines.length === 0) {
+    return '';
+  }
+  return ['Repository:', ...lines.map((line) => '- ' + line)].join('\n');
+}
 
 export function buildSystemPrompt(context: PromptContext): string {
   const plan = context.mode === 'plan';
@@ -54,6 +103,7 @@ export function buildSystemPrompt(context: PromptContext): string {
     plan
       ? '- Answer with a concrete plan: name the files you would change and the exact edits, step by step. The user applies the plan after switching to code mode.'
       : '- Make the smallest change that solves the task. Prefer edit_file over write_file when only part of a file changes.',
+    '- Use the git tools for the work with the repository, they are safer and faster than a git command in the terminal.',
     '- After a tool returns, use its output. Never guess the content of a file you have not read.',
     '- Report what you changed and what you verified. State plainly when something failed.',
     '- Answer in the language of the user request.',

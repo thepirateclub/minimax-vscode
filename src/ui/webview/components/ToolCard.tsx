@@ -4,6 +4,7 @@ import type { UiToolCall } from '../../protocol';
 import {
   Chevron,
   IconEdit,
+  IconGit,
   IconList,
   IconRead,
   IconSearch,
@@ -158,6 +159,82 @@ function describeTool(tool: UiToolCall, folded: boolean): ToolView {
       title: folded ? STRINGS.toolTerminal + ' ' + command : STRINGS.toolTerminal,
       // The output speaks for itself, the summary keeps only the failure.
       summary: failed ? STRINGS.toolExitCode + ' ' + failed[1] : ''
+    };
+  }
+  if (tool.name === 'git_status') {
+    return {
+      icon: <IconGit />,
+      title: STRINGS.toolGitStatus,
+      summary: firstLine(content)
+    };
+  }
+  if (tool.name === 'git_diff') {
+    const staged = input['staged'] === true;
+    return {
+      icon: <IconGit />,
+      title:
+        STRINGS.toolGitDiff + (staged ? ' (' + STRINGS.toolGitStaged + ')' : ''),
+      summary: countLines(content) + ' ' + STRINGS.toolLines
+    };
+  }
+  if (tool.name === 'git_log') {
+    return {
+      icon: <IconGit />,
+      title: STRINGS.toolGitLog,
+      summary: countLines(content) + ' ' + STRINGS.toolGitCommits
+    };
+  }
+  if (tool.name === 'git_show') {
+    return {
+      icon: <IconGit />,
+      title: STRINGS.toolGitShow + ' ' + text(input['ref']),
+      summary: firstLine(content)
+    };
+  }
+  if (tool.name === 'git_branch') {
+    return {
+      icon: <IconGit />,
+      title: STRINGS.toolGitBranch,
+      summary: countLines(content) + ' ' + STRINGS.toolGitBranches
+    };
+  }
+  if (tool.name === 'git_blame') {
+    return {
+      icon: <IconGit />,
+      title: STRINGS.toolGitBlame + ' ' + (paths[0] ?? ''),
+      summary: countLines(content) + ' ' + STRINGS.toolLines
+    };
+  }
+  if (tool.name === 'git_stage') {
+    const title =
+      paths.length > 1
+        ? STRINGS.toolGitStage + ' ' + paths.length + ' ' + STRINGS.toolFiles
+        : STRINGS.toolGitStage + ' ' + (paths[0] ?? '');
+    return {
+      icon: <IconGit />,
+      title,
+      summary: firstLine(content)
+    };
+  }
+  if (tool.name === 'git_commit') {
+    return {
+      icon: <IconGit />,
+      title: STRINGS.toolGitCommit,
+      summary: firstLine(content)
+    };
+  }
+  if (tool.name === 'git_branch_create') {
+    return {
+      icon: <IconGit />,
+      title: STRINGS.toolGitBranchCreate + ' ' + text(input['name']),
+      summary: firstLine(content)
+    };
+  }
+  if (tool.name === 'git_checkout') {
+    return {
+      icon: <IconGit />,
+      title: STRINGS.toolGitCheckout + ' ' + text(input['ref']),
+      summary: firstLine(content)
     };
   }
   return {

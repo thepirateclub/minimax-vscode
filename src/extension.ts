@@ -8,7 +8,7 @@ import type { AnthropicMessage, EffortLevel } from './api/types';
 import type { AgentEvent } from './agent/agent';
 import { buildWorkspaceSnapshot, renderSnapshot } from './agent/context';
 import { readMentionedFiles } from './agent/mentions';
-import { buildSystemPrompt } from './agent/prompt';
+import { buildSystemPrompt, renderGitContext } from './agent/prompt';
 import { generateCommitMessage } from './agent/commitMessage';
 import { AgentSession } from './agent/session';
 import { AGENT_MODES, MODELS, resolveBaseUrl } from './config/models';
@@ -19,6 +19,7 @@ import {
 } from './config/secrets';
 import { getSettings, onSettingsChanged, type MiniMaxSettings } from './config/settings';
 import { collectStagedChanges, gitRepositories, setCommitMessage } from './git/scm';
+import { readRepositoryState, summarizeState } from './git/status';
 import { createLogger, type Logger } from './logger';
 import { ProjectSearch } from './search/project';
 import { InMemoryBackupStore } from './storage/backups';
@@ -27,6 +28,7 @@ import { UsageLedger } from './storage/usage';
 import { createExploreTools, isTextFile } from './tools/explore';
 import { createFileTools, resolveWorkspacePath } from './tools/fs';
 import { ToolRegistry } from './tools/registry';
+import { createGitTools } from './tools/git';
 import { createTerminalTools } from './tools/terminal';
 import { fileErrorMessage } from './ui/fileError';
 import { AgentPanelProvider } from './ui/panel';
@@ -99,6 +101,7 @@ class MiniMaxController {
     for (const tool of [
       ...createFileTools({ backups: this.backups }),
       ...createExploreTools({ search: (root) => this.searchFor(root) }),
+      ...createGitTools(),
       ...createTerminalTools()
     ]) {
       this.registry.register(tool);
@@ -378,6 +381,16 @@ class MiniMaxController {
     });
   }
 
+  // The state of the repository changes between the turns, the prompt of the
+  // model carries the fresh one.
+  private async gitContext(): Promise<string> {
+    const state = await readRepositoryState(this.workspaceRoot());
+    if (!state) {
+      return '';
+    }
+    return renderGitContext(summarizeState(state));
+  }
+
   private async ensureAgent(runtime: RuntimeSession): Promise<AgentSession | undefined> {
     if (runtime.agent) {
       return runtime.agent;
@@ -409,6 +422,7 @@ class MiniMaxController {
       historyLimit: settings.historyMaxMessages,
       contextThreshold: settings.contextThreshold,
       systemPrompt: await this.buildPrompt(),
+      contextProvider: async () => await this.gitContext(),
       workspaceRoot: this.workspaceRoot(),
       logger: this.logger,
       autoApprove: settings.autoApprove,

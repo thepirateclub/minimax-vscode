@@ -1,7 +1,7 @@
-import { execFile } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import * as vscode from 'vscode';
+import { runGit } from './cli';
 
 export interface GitChange {
   path: string;
@@ -144,14 +144,6 @@ async function readNewFile(root: string, path: string): Promise<string> {
 
 // A missing git or an empty repository must not throw at the caller.
 export async function git(root: string, args: string[]): Promise<string> {
-  return await new Promise<string>((resolve) => {
-    execFile(
-      'git',
-      ['-C', root, ...args],
-      { maxBuffer: 32 * 1024 * 1024, windowsHide: true },
-      (error, stdout) => {
-        resolve(error ? '' : stdout);
-      }
-    );
-  });
+  const result = await runGit(root, args);
+  return result.code === 0 ? result.stdout : '';
 }

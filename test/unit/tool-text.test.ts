@@ -19,6 +19,13 @@ describe('the question of an approval', () => {
   it('lists the arguments instead of a json dump', () => {
     expect(formatInput({ path: 'a.ts', empty: '' })).toBe('path: a.ts');
   });
+
+  it('names the git action in the question of an approval', () => {
+    expect(approvalTitle('git_stage', { paths: ['src/app.ts'] })).toBe('Stage src/app.ts?');
+    expect(approvalTitle('git_commit', { message: 'feat: version' })).toBe('Commit feat: version?');
+    expect(approvalTitle('git_branch_create', { name: 'feature/x' })).toBe('Create branch feature/x?');
+    expect(approvalTitle('git_checkout', { ref: 'main' })).toBe('Checkout main?');
+  });
 });
 
 describe('the copy button of a code block', () => {

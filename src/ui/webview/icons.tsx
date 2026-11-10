@@ -208,6 +208,18 @@ export function IconHistory(): ReactNode {
   );
 }
 
+// A branch of git, the tools of the repository.
+export function IconGit(): ReactNode {
+  return (
+    <Svg viewBox="0 0 24 24" strokeWidth={2}>
+      <path d="M6 3v12" />
+      <path d="M18 3a3 3 0 1 0 0 6a3 3 0 1 0 0-6" />
+      <path d="M6 15a3 3 0 1 0 0 6a3 3 0 1 0 0-6" />
+      <path d="M18 9a9 9 0 0 1-9 9" />
+    </Svg>
+  );
+}
+
 // Two sheets, the copy button.
 export function IconCopy(): ReactNode {
   return (

@@ -25,6 +25,9 @@ export interface SessionOptions {
   contextThreshold: number;
   mode: AgentMode;
   systemPrompt: string;
+  // The state of the repository is read before every turn, the prompt of
+  // the model carries the fresh one.
+  contextProvider?: () => Promise<string>;
   workspaceRoot: string;
   logger: Logger;
   autoApprove: string[];
@@ -87,6 +90,11 @@ export class AgentSession {
   }
 
   async send(prompt: string): Promise<void> {
+    const context = this.options.contextProvider
+      ? await this.options.contextProvider()
+      : '';
+    const systemPrompt =
+      context.length > 0 ? this.systemPrompt + '\n\n' + context : this.systemPrompt;
     this.agent = new Agent({
       client: this.options.client,
       registry: this.options.registry,
@@ -97,7 +105,7 @@ export class AgentSession {
       effort: this.options.effort,
       thinking: this.options.thinking,
       mode: this.options.mode,
-      systemPrompt: this.systemPrompt,
+      systemPrompt,
       workspaceRoot: this.options.workspaceRoot,
       logger: this.options.logger,
       onEvent: (event) => this.options.onEvent(event)

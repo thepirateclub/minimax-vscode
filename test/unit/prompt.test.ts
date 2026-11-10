@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildSystemPrompt, type PromptContext } from '../../src/agent/prompt';
+import { buildSystemPrompt, renderGitContext, type PromptContext } from '../../src/agent/prompt';
 
 const context: PromptContext = {
   workspaceRoot: 'C:\\work',
@@ -31,5 +31,20 @@ describe('system prompt', () => {
     const prompt = buildSystemPrompt(context);
     expect(prompt).toContain('read_file');
     expect(prompt).not.toContain('write_file');
+  });
+
+  it('lists the git tools for the model', () => {
+    const prompt = buildSystemPrompt({
+      ...context,
+      tools: ['read_file', 'git_status', 'git_commit']
+    });
+    expect(prompt).toContain('git_status');
+    expect(prompt).toContain('git_commit');
+  });
+
+  it('adds the state of the repository as a section', () => {
+    expect(renderGitContext(['Branch main, 2 changed files'])).toContain('Repository:');
+    expect(renderGitContext(['Branch main, 2 changed files'])).toContain('- Branch main');
+    expect(renderGitContext([])).toBe('');
   });
 });

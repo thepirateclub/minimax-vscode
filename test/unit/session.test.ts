@@ -50,7 +50,8 @@ function toolResponse(name: string, input: Record<string, unknown>): StreamEvent
 
 function makeSession(
   responses: StreamEvent[][] = [textResponse('ok')],
-  autoApprove: string[] = []
+  autoApprove: string[] = [],
+  contextProvider?: () => Promise<string>
 ): {
   session: AgentSession;
   events: unknown[];
@@ -75,6 +76,7 @@ function makeSession(
     workspaceRoot: '/tmp/root',
     logger: { info: () => undefined, error: () => undefined },
     autoApprove,
+    contextProvider,
     onEvent: (event) => events.push(event),
     onApproval: (approval) => approvals.push(approval)
   };
@@ -82,6 +84,18 @@ function makeSession(
 }
 
 describe('AgentSession', () => {
+  it('adds the state of the repository to the prompt of every turn', async () => {
+    const { session, client } = makeSession(
+      [textResponse('ok'), textResponse('ok')],
+      [],
+      async () => 'Repository:\n- Branch main'
+    );
+    await session.send('hello');
+    await session.send('again');
+    expect(client.requests[0]?.system).toContain('Branch main');
+    expect(client.requests[1]?.system).toContain('Branch main');
+  });
+
   it('appends the user message and the assistant answer to the history', async () => {
     const { session } = makeSession();
     await session.send('hello');

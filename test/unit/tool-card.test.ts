@@ -124,6 +124,21 @@ describe('the dot of an action', () => {
     expect(card({}, false)).toContain('tool-body');
   });
 
+  it('names the git action in the header of the card', () => {
+    expect(titleOf(card({ name: 'git_status', input: {}, content: 'branch: main' }))).toBe(
+      'Git status'
+    );
+    expect(titleOf(card({ name: 'git_commit', input: { message: 'feat: x' }, content: 'committed' }))).toBe(
+      'Commit'
+    );
+    expect(
+      titleOf(card({ name: 'git_stage', input: { paths: ['src/app.ts'] }, content: 'staged' }))
+    ).toBe('Stage src/app.ts');
+    expect(
+      titleOf(card({ name: 'git_branch_create', input: { name: 'feature/x' }, content: 'created' }))
+    ).toBe('Create branch feature/x');
+  });
+
   it('does not repeat the path of the file in the summary', () => {
     const markup = card({
       name: 'write_file',
