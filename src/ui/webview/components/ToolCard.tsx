@@ -250,10 +250,11 @@ export function ToolCard({
             <DiffView path={diff.path} lines={diff.lines} showPath={false} />
           ) : tool.name === 'read_file' && tool.content ? (
             <FileReadView content={tool.content} path={filePaths(tool.input)[0] ?? ''} />
-          ) : tool.name === 'run_terminal' && tool.content ? (
+          ) : tool.name === 'run_terminal' ? (
             <TerminalView
               command={String(tool.input['command'] ?? '')}
-              content={tool.content}
+              content={tool.content ?? ''}
+              running={tool.running === true}
             />
           ) : (
             <>

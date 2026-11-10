@@ -296,6 +296,20 @@ describe('the dot of an action', () => {
     expect(markup).not.toContain('command: dir tmp-demo.txt');
   });
 
+  it('shows the command as a terminal while it runs', () => {
+    const markup = card({
+      name: 'run_terminal',
+      input: { command: 'npm test' },
+      // The command runs, it has no output yet.
+      content: undefined,
+      running: true
+    });
+    expect(markup).toContain('term-command');
+    expect(markup).toContain('npm test');
+    // The raw arguments of the tool do not show while the command runs.
+    expect(markup).not.toContain('tool-input');
+  });
+
   it('marks the failure of a command', () => {
     const markup = card({
       name: 'run_terminal',

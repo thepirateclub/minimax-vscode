@@ -21,6 +21,32 @@ describe('the failure of an opened file', () => {
     expect(message).not.toContain('Detail:');
   });
 
+  it('says that the access to the file is denied', () => {
+    const message = fileErrorMessage(
+      'src/app.ts',
+      "Unable to read file 'src/app.ts' (Error: EACCES: permission denied, open 'src/app.ts')"
+    );
+    expect(message).toBe('Cannot open src/app.ts: the access is denied.');
+  });
+
+  it('says that the file is locked by another program', () => {
+    const message = fileErrorMessage(
+      'src/app.ts',
+      "Unable to read file 'src/app.ts' (Error: EBUSY: resource busy or locked, open 'src/app.ts')"
+    );
+    expect(message).toBe(
+      'Cannot open src/app.ts: the file is locked by another program.'
+    );
+  });
+
+  it('does not call a file missing when the reason is unknown', () => {
+    const message = fileErrorMessage(
+      'src/app.ts',
+      "Unable to read file 'src/app.ts' (Error: EIO)"
+    );
+    expect(message).not.toContain('does not exist');
+  });
+
   it('keeps a short reason of another failure', () => {
     const message = fileErrorMessage('a.ts', 'the file is locked by another program');
     expect(message).toBe('Cannot open a.ts: the file is locked by another program');

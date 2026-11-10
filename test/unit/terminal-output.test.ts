@@ -20,6 +20,12 @@ describe('the output of a command', () => {
     expect(lines.some((line) => line.text.includes('exit code'))).toBe(false);
   });
 
+  it('keeps a line of the output that looks like a wrapper', () => {
+    const lines = parseTerminalOutput('ok', 'done\nCommand failed with exit code 2');
+    expect(lines[1]?.kind).toBe('output');
+    expect(lines[2]?.text).toBe('Command failed with exit code 2');
+  });
+
   it('marks the stderr of a command', () => {
     const lines = parseTerminalOutput('bad', '[stderr] something went wrong');
     expect(lines[1]?.kind).toBe('error');

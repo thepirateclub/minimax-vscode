@@ -16,14 +16,16 @@ export function parseTerminalOutput(command: string, content: string): TerminalL
   const lines: TerminalLine[] = [{ kind: 'command', text: command }];
   // The stderr comes after the stdout, the lines after it belong to it too.
   let failed = false;
-  for (const raw of content.split('\n')) {
+  const rows = content.split('\n');
+  for (let index = 0; index < rows.length; index++) {
+    const raw = rows[index] ?? '';
     const line = raw.endsWith('\r') ? raw.slice(0, -1) : raw;
     if (line.length === 0) {
       continue;
     }
-    // The tool wraps a failure with the exit code, the header of the card
-    // shows it. The transcript keeps the output of the command itself.
-    if (FAILED.test(line)) {
+    // The tool writes the wrapper of a failure as the first line of the
+    // result. A line of the output that looks the same stays in the output.
+    if (index === 0 && FAILED.test(line)) {
       failed = true;
       continue;
     }

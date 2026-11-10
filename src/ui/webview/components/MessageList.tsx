@@ -102,7 +102,12 @@ const MessageRow = memo(function MessageRow({
   onOpenFile: (path: string, line?: number) => void;
 }) {
   return (
-    <div className={'message message-' + message.role}>
+    // The notice paints its own bar, the container of a message stays plain.
+    <div
+      className={
+        message.role === 'notice' ? 'message' : 'message message-' + message.role
+      }
+    >
       {message.role === 'user' ? (
         <div className="bubble user-bubble">{message.text}</div>
       ) : null}
@@ -121,7 +126,7 @@ const MessageRow = memo(function MessageRow({
         </div>
       ) : null}
       {message.role === 'notice' ? (
-        <div className="notice-text">{message.text}</div>
+        <div className="message-notice">{message.text}</div>
       ) : null}
       {message.role === 'tool' && message.tool ? (
         <ToolCard tool={message.tool} collapsed={collapseTools} />

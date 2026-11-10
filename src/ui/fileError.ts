@@ -1,6 +1,8 @@
 // The editor writes the failures of a file as a dump with URIs and a
 // detail line, a person needs one sentence.
-const MISSING = /nonexistent file|enoent|unable to read file|file not found/i;
+const MISSING = /nonexistent file|enoent|no such file or directory|file not found/i;
+const PERMISSION = /permission denied|eacces|eperm|access is denied/i;
+const LOCKED = /ebusy|resource busy or locked|being used by another process/i;
 const OUTSIDE = /escapes the workspace root|outside the workspace/i;
 const DIRECTORY = /eisdir|is a directory/i;
 
@@ -16,6 +18,12 @@ function shortReason(reason: string): string {
 export function fileErrorMessage(path: string, reason: string): string {
   if (OUTSIDE.test(reason)) {
     return 'Cannot open ' + path + ': the path is outside the workspace.';
+  }
+  if (LOCKED.test(reason)) {
+    return 'Cannot open ' + path + ': the file is locked by another program.';
+  }
+  if (PERMISSION.test(reason)) {
+    return 'Cannot open ' + path + ': the access is denied.';
   }
   if (MISSING.test(reason)) {
     return 'Cannot open ' + path + ': the file does not exist.';
