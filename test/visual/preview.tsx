@@ -6,6 +6,9 @@ import { createRoot } from 'react-dom/client';
 import { App } from '../../src/ui/webview/App';
 import styles from '../../src/ui/webview/styles.css';
 import { MODELS } from '../../src/config/models';
+// The version comes from the manifest, the stand shows the same badge as the
+// panel and never falls behind the build.
+import manifest from '../../package.json';
 import type { ExtToWeb, UiSettings, UiState } from '../../src/ui/protocol';
 import { MESSAGES, USAGE, sessions } from './fixture';
 import dark from './themes/dark.json';
@@ -54,7 +57,7 @@ const STATE: UiState = {
   fontSize: 13,
   collapseTools: params.get('collapse') === '1',
   collapseCode: params.get('collapse') === '1',
-  version: '0.1.0'
+  version: manifest.version
 };
 
 const SETTINGS: UiSettings = {

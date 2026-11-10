@@ -199,8 +199,10 @@ npm run package
 Открыть расширение в VS Code по F5 или поставить собранный файл:
 
 ```bash
-code --install-extension minimax-agent-0.1.0.vsix --force
+code --install-extension minimax-agent-0.2.0.vsix --force
 ```
+
+Имя файла повторяет версию из `package.json`.
 
 Расширение в редакторе грузится из установленного `.vsix`, рабочая копия сама не подхватывается. После установки нужно перезагрузить окно.
 
