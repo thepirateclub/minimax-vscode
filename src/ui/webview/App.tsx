@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { TodoItem } from '../../agent/state';
 import type {
   ExtToWeb,
   UiMessage,
@@ -13,6 +14,7 @@ import { EmptyState } from './components/EmptyState';
 import { Header, type PanelTab } from './components/Header';
 import { MessageList } from './components/MessageList';
 import { SettingsView } from './components/SettingsView';
+import { TaskList } from './components/TaskList';
 import { appendNotice } from './notices';
 import { STRINGS } from './strings';
 
@@ -44,6 +46,7 @@ const EMPTY_STATE: UiState = {
 export function App({ vscode }: { vscode: VsCodeApi }) {
   const [state, setState] = useState<UiState>(EMPTY_STATE);
   const [messages, setMessages] = useState<UiMessage[]>([]);
+  const [todos, setTodos] = useState<TodoItem[]>([]);
   const [selections, setSelections] = useState<UiSelection[]>([]);
   const [suggestions, setSuggestions] = useState<UiSuggestion[]>([]);
   const [settings, setSettings] = useState<UiSettings | undefined>(undefined);
@@ -62,6 +65,7 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
       if (message.type === 'init') {
         setState(message.state);
         setMessages(message.state.messages);
+        setTodos(message.state.todos);
         return;
       }
       if (message.type === 'user_message') {
@@ -135,6 +139,10 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
       }
       if (message.type === 'usage') {
         setState((prev) => ({ ...prev, usage: message.turns }));
+        return;
+      }
+      if (message.type === 'todos') {
+        setTodos(message.todos);
         return;
       }
       if (message.type === 'session_loaded') {
@@ -296,6 +304,7 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
         version={state.version}
       />
       <div className={'view' + (tab === 'chat' ? '' : ' view-hidden')}>
+        <TaskList todos={todos} />
         {messages.length === 0 ? (
           <EmptyState />
         ) : (

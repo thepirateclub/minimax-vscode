@@ -78,6 +78,7 @@ export const STRINGS = {
   usageGraph: 'Token spend per action',
   usageAction: 'Action',
   usageCached: 'cached',
+  taskTitle: 'Tasks',
   selection: 'Selection',
   remove: 'Remove',
   cancel: 'Cancel',

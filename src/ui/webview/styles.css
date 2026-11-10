@@ -389,6 +389,98 @@ input:focus {
   display: none;
 }
 
+/* the list of tasks over the feed */
+/* The root of the widget is scoped to the chat view: the markdown of an
+   answer draws its own checklist with the class task-list, an unscoped
+   rule would put a frame around it. */
+.view > .task-list {
+  flex: 0 0 auto;
+  margin: 8px 12px 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.task-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 8px;
+  background: none;
+  border: none;
+  color: var(--fg);
+  cursor: pointer;
+  font-size: var(--fs-md);
+  text-align: left;
+}
+
+.task-head:hover {
+  background: var(--hover);
+}
+
+.task-title {
+  font-weight: 600;
+}
+
+.task-count {
+  margin-left: auto;
+  color: var(--muted);
+}
+
+.task-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 6px;
+}
+
+.task-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 2px 8px;
+  color: var(--fg);
+  font-size: var(--fs-md);
+}
+
+.task-marker {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border: 1px solid var(--muted);
+  border-radius: var(--radius-sm);
+}
+
+.task-in_progress .task-marker {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.task-completed .task-marker {
+  border-color: var(--ok);
+  background: var(--ok);
+}
+
+.task-completed .task-text {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.task-text {
+  flex: 1 1 auto;
+}
+
+.task-priority {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: var(--fs-xs);
+}
+
+.task-high .task-priority {
+  color: var(--accent);
+}
+
 /* messages */
 .messages-wrap {
   position: relative;
