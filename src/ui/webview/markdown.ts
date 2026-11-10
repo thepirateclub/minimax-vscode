@@ -1,5 +1,6 @@
 import MarkdownIt from 'markdown-it';
-import { CODE_CARET_CLOSED, describeCodeBlock, type CodeSource } from './codeBlock';
+import { describeCodeBlock, type CodeSource } from './codeBlock';
+import { CARET_SVG } from './iconPaths';
 import { highlight } from './highlight';
 import { STRINGS } from './strings';
 
@@ -58,7 +59,7 @@ md.renderer.rules.fence = (tokens, idx, _options, env): string => {
       ? '<button type="button" class="code-toggle" aria-expanded="false" aria-label="' +
         md.utils.escapeHtml(STRINGS.codeShow) +
         '">' +
-        CODE_CARET_CLOSED +
+        CARET_SVG +
         '</button>'
       : '') +
     '<button type="button" class="code-copy">Copy</button>' +

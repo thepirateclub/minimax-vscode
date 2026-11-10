@@ -1,12 +1,7 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import type { MouseEvent } from 'react';
 import type { UiMessage } from '../../protocol';
-import {
-  CODE_CARET_CLOSED,
-  CODE_CARET_OPEN,
-  collectFileSources,
-  type CodeSource
-} from '../codeBlock';
+import { collectFileSources, type CodeSource } from '../codeBlock';
 import { contentChanged, isAtBottom, measure, shouldFollow } from '../listScroll';
 import { renderMarkdown } from '../markdown';
 import { STRINGS } from '../strings';
@@ -63,8 +58,8 @@ function toggleCodeBlock(event: MouseEvent<HTMLDivElement>): void {
   if (!(block instanceof HTMLElement)) {
     return;
   }
+  // The chevron turns with the class of the block, the icon stays in place.
   const collapsed = block.classList.toggle('collapsed');
-  toggle.textContent = collapsed ? CODE_CARET_CLOSED : CODE_CARET_OPEN;
   toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
   toggle.setAttribute('aria-label', collapsed ? STRINGS.codeShow : STRINGS.codeHide);
 }

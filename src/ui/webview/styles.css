@@ -1,17 +1,13 @@
+/* The panel follows docs/styleguide.md: every size, radius, shadow and color
+   below is a token of the body block or a variable of the host theme. The
+   test test/unit/styleguide.test.ts keeps the sheet on the scale. */
+
 * {
   box-sizing: border-box;
 }
 
 :root {
   --mm-font-base: 13px;
-  --gap: 8px;
-  --radius: 6px;
-  --muted: var(--vscode-descriptionForeground, #9d9d9d);
-  --border: var(--vscode-widget-border, var(--vscode-panel-border, rgba(128, 128, 128, 0.3)));
-  --accent: var(--vscode-textLink-foreground, #4daafc);
-  --code-bg: var(--vscode-textCodeBlock-background, rgba(128, 128, 128, 0.12));
-  --surface: var(--vscode-editorWidget-background, rgba(128, 128, 128, 0.06));
-  --mono: var(--vscode-editor-font-family, ui-monospace, monospace);
   /* the palette of the tokens, the kind of the theme picks the shades */
   --tok-comment: #6a9955;
   --tok-string: #ce9178;
@@ -77,13 +73,49 @@ body.mm-theme-high-contrast-light {
   --diff-remove-bg: rgba(248, 81, 73, 0.12);
 }
 
+/* The tokens live on the body: the panel sets --mm-font-base on the body,
+   a size counted on the root would keep the old base. */
 body {
+  /* type scale */
+  --fs-xs: calc(var(--mm-font-base) * 0.77);
+  --fs-sm: calc(var(--mm-font-base) * 0.85);
+  --fs-md: calc(var(--mm-font-base) * 0.92);
+  --fs-base: var(--mm-font-base);
+  --lh: 1.5;
+  --lh-tight: 1.3;
+  /* sizes */
+  --control-h: 22px;
+  --icon: 14px;
+  --dot: 8px;
+  --radius-sm: 4px;
+  --radius: 6px;
+  /* colors */
+  --fg: var(--vscode-foreground);
+  --muted: var(--vscode-descriptionForeground, #9d9d9d);
+  --border: var(--vscode-widget-border, var(--vscode-panel-border, rgba(128, 128, 128, 0.3)));
+  --accent: var(--vscode-textLink-foreground, #4daafc);
+  --ok: var(--vscode-testing-iconPassed, #3fb950);
+  --err: var(--vscode-testing-iconFailed, #f14c4c);
+  --warn: var(--vscode-inputValidation-warningBorder, #cca700);
+  --hover: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.16));
+  --row-hover: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.12));
+  --selected: var(--vscode-list-activeSelectionBackground, rgba(128, 128, 128, 0.24));
+  --selected-fg: var(--vscode-list-activeSelectionForeground, var(--vscode-foreground));
+  --code-bg: var(--vscode-textCodeBlock-background, rgba(128, 128, 128, 0.12));
+  --surface: var(--vscode-editorWidget-background, rgba(128, 128, 128, 0.06));
+  --popup-bg: var(--vscode-dropdown-background, var(--vscode-editorWidget-background, #252526));
+  --bg: var(--vscode-sideBar-background, #181818);
+  --mono: var(--vscode-editor-font-family, ui-monospace, monospace);
+  --shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  --ease: 120ms ease-out;
+
   margin: 0;
   padding: 0;
   font-family: var(--vscode-font-family);
-  font-size: var(--mm-font-base);
-  color: var(--vscode-foreground);
-  background: var(--vscode-sideBar-background);
+  font-size: var(--fs-base);
+  line-height: var(--lh);
+  color: var(--fg);
+  background: var(--bg);
   overflow: hidden;
 }
 
@@ -96,12 +128,13 @@ body {
 button {
   appearance: none;
   font-family: inherit;
-  font-size: calc(var(--mm-font-base) * 0.92);
-  padding: 4px 10px;
-  border-radius: 4px;
+  font-size: var(--fs-md);
+  line-height: var(--lh-tight);
+  padding: 4px 12px;
+  border-radius: var(--radius-sm);
   border: 1px solid transparent;
   background: var(--vscode-button-background, #0078d4);
-  color: var(--vscode-button-foreground, #fff);
+  color: var(--vscode-button-foreground, #ffffff);
   cursor: pointer;
 }
 
@@ -109,18 +142,23 @@ button:hover {
   background: var(--vscode-button-hoverBackground, #026ec1);
 }
 
+/* the keyboard sees where it is, the mouse does not get a frame */
+button:focus {
+  outline: none;
+}
+
+button:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder, #007fd4);
+  outline-offset: -1px;
+}
+
 button.secondary {
   background: var(--vscode-button-secondaryBackground, rgba(128, 128, 128, 0.16));
-  color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
+  color: var(--vscode-button-secondaryForeground, var(--fg));
 }
 
 button.secondary:hover {
   background: var(--vscode-button-secondaryHoverBackground, rgba(128, 128, 128, 0.26));
-}
-
-button.stop {
-  background: var(--vscode-button-secondaryBackground, rgba(128, 128, 128, 0.16));
-  color: var(--vscode-foreground);
 }
 
 button:disabled {
@@ -135,12 +173,12 @@ input[type='number'] {
   flex: 1;
   min-width: 0;
   font-family: inherit;
-  font-size: calc(var(--mm-font-base) * 0.92);
-  color: var(--vscode-input-foreground, var(--vscode-foreground));
+  font-size: var(--fs-md);
+  color: var(--vscode-input-foreground, var(--fg));
   background: var(--vscode-dropdown-background, var(--vscode-input-background, #3c3c3c));
   border: 1px solid var(--vscode-input-border, var(--border));
-  border-radius: 4px;
-  padding: 3px 6px;
+  border-radius: var(--radius-sm);
+  padding: 4px 6px;
   outline: none;
 }
 
@@ -149,56 +187,66 @@ input:focus {
   border-color: var(--vscode-focusBorder, #007fd4);
 }
 
+/* inline icons of the panel */
+.icon {
+  flex: 0 0 auto;
+  display: block;
+}
+
+/* The chevron of a folding block points down when it is open. One icon
+   serves the card of an action, the reasoning and the code block. */
+.chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  color: var(--muted);
+  transform: rotate(-90deg);
+  transition: transform var(--ease);
+}
+
+.chevron.chevron-open {
+  transform: none;
+}
+
 /* header */
 .header {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 10px 12px 8px;
+  padding: 8px 12px;
   border-bottom: 1px solid var(--border);
 }
 
 .header-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   justify-content: flex-end;
-}
-
-.title {
-  flex: 1;
-  font-weight: 600;
-  font-size: calc(var(--mm-font-base) * 1);
-  letter-spacing: 0.2px;
 }
 
 /* The state of the agent is a dot, the word stays in the tooltip. */
 .state-dot {
   flex: 0 0 auto;
-  width: 9px;
-  height: 9px;
+  width: var(--dot);
+  height: var(--dot);
   border-radius: 50%;
   background: var(--muted);
-  opacity: 0.7;
 }
 
 .state-dot.state-idle {
-  background: var(--vscode-testing-iconPassed, #3fb950);
-  opacity: 1;
+  background: var(--ok);
 }
 
 .state-dot.state-thinking,
 .state-dot.state-streaming,
 .state-dot.state-tool {
   background: var(--accent);
-  opacity: 1;
   animation: mm-pulse 1.2s ease-in-out infinite;
 }
 
 .state-dot.state-error {
-  background: var(--vscode-inputValidation-errorForeground, #f14c4c);
-  opacity: 1;
-  animation: mm-pulse 0.8s ease-in-out infinite;
+  background: var(--err);
 }
 
 @keyframes mm-pulse {
@@ -227,75 +275,76 @@ input:focus {
   position: relative;
   background: transparent;
   border: none;
+  border-radius: var(--radius-sm);
   color: var(--muted);
-  font-size: calc(var(--mm-font-base) * 0.92);
-  padding: 4px 10px 8px;
+  font-size: var(--fs-md);
+  padding: 4px 8px 6px;
 }
 
 .tab:hover {
-  color: var(--vscode-foreground);
+  color: var(--fg);
   background: transparent;
 }
 
 .tab.active {
-  color: var(--vscode-foreground);
+  color: var(--fg);
 }
 
 .tab.active::after {
   content: '';
   position: absolute;
-  left: 10px;
-  right: 10px;
+  left: 8px;
+  right: 8px;
   bottom: 0;
   height: 2px;
-  border-radius: 2px;
+  border-radius: 999px;
   background: var(--accent);
 }
 
 .tokens {
-  margin-left: auto;
-  padding-left: 6px;
-  font-size: calc(var(--mm-font-base) * 0.85);
+  flex: 0 0 auto;
+  font-size: var(--fs-xs);
   color: var(--muted);
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
 .tabs .state-dot {
   margin-left: auto;
+  margin-right: 4px;
 }
 
-.tabs .icon-button {
-  margin-left: 4px;
-}
-
+/* A square button with an icon, it has no frame until the mouse points at
+   it, like the toolbar of VS Code. */
 .icon-button {
   appearance: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 4px;
-  border: 1px solid var(--border);
-  background: transparent;
-  color: var(--vscode-foreground);
-  cursor: pointer;
-  font-size: calc(var(--mm-font-base) * 1.08);
-  line-height: 1;
+  flex: 0 0 auto;
+  width: var(--control-h);
+  height: var(--control-h);
   padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
 }
 
-.icon-button:hover {
-  background: var(--vscode-toolbar-hoverBackground, rgba(90, 90, 90, 0.2));
+.icon-button:hover,
+.icon-button.open {
+  background: var(--hover);
+  color: var(--fg);
 }
 
 .warning {
-  font-size: calc(var(--mm-font-base) * 0.85);
+  font-size: var(--fs-sm);
   padding: 6px 8px;
-  border-radius: 4px;
-  color: var(--vscode-inputValidation-warningForeground, #cca700);
+  border-radius: var(--radius-sm);
+  color: var(--vscode-inputValidation-warningForeground, var(--fg));
   background: var(--vscode-inputValidation-warningBackground, rgba(204, 167, 0, 0.1));
-  border: 1px solid var(--vscode-inputValidation-warningBorder, #cca700);
+  border: 1px solid var(--warn);
 }
 
 /* views */
@@ -325,42 +374,47 @@ input:focus {
   padding: 12px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
+}
+
+/* The actions of one step stand together, a row of cards reads as a group. */
+.message-tool + .message-tool {
+  margin-top: -8px;
 }
 
 .load-earlier {
   align-self: center;
-  margin-bottom: 4px;
-  padding: 3px 10px;
+  padding: 2px 12px;
   border-radius: 999px;
   border: 1px solid var(--border);
   background: transparent;
   color: var(--muted);
-  font-size: calc(var(--mm-font-base) * 0.85);
+  font-size: var(--fs-sm);
 }
 
 .load-earlier:hover {
-  background: var(--surface);
-  color: var(--vscode-foreground);
+  background: var(--hover);
+  color: var(--fg);
 }
 
 .jump-latest {
   position: absolute;
-  bottom: 10px;
+  bottom: 12px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 6;
   padding: 4px 12px;
   border-radius: 999px;
   border: 1px solid var(--border);
-  background: var(--vscode-editorWidget-background, #252526);
-  color: var(--vscode-foreground);
-  font-size: calc(var(--mm-font-base) * 0.85);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  background: var(--popup-bg);
+  color: var(--fg);
+  font-size: var(--fs-sm);
+  box-shadow: var(--shadow);
 }
 
 .jump-latest:hover {
-  background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.16));
+  background: var(--popup-bg);
+  border-color: var(--vscode-focusBorder, #007fd4);
 }
 
 .message {
@@ -370,21 +424,24 @@ input:focus {
 }
 
 .bubble {
-  padding: 8px 10px;
+  padding: 6px 12px;
   border-radius: var(--radius);
   white-space: pre-wrap;
   word-break: break-word;
-  background: var(--vscode-textBlockQuote-background, rgba(128, 128, 128, 0.12));
+  font-size: var(--fs-md);
 }
 
 .message-user {
   align-items: flex-end;
 }
 
-.message-user .bubble {
-  max-width: 94%;
-  background: var(--vscode-button-background, #0078d4);
-  color: var(--vscode-button-foreground, #fff);
+/* The words of the user sit on a quiet plate. A fill in the color of the
+   button made the question louder than the answer. */
+.bubble.user-bubble {
+  max-width: 92%;
+  background: var(--vscode-textBlockQuote-background, rgba(128, 128, 128, 0.12));
+  border: 1px solid var(--border);
+  color: var(--fg);
 }
 
 .assistant-body {
@@ -392,62 +449,6 @@ input:focus {
   flex-direction: column;
   gap: 8px;
   word-break: break-word;
-}
-
-.markdown > :first-child {
-  margin-top: 0;
-}
-
-.markdown > :last-child {
-  margin-bottom: 0;
-}
-
-.markdown p {
-  margin: 0 0 8px;
-}
-
-.markdown ul,
-.markdown ol {
-  margin: 4px 0 8px;
-  padding-left: 18px;
-}
-
-.markdown a {
-  color: var(--accent);
-}
-
-.markdown code {
-  font-family: var(--mono);
-  font-size: 0.92em;
-  color: var(--tok-string);
-  background: var(--code-bg);
-  padding: 1px 4px;
-  border-radius: 3px;
-}
-
-.markdown pre {
-  background: var(--code-bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 8px 10px;
-  overflow-x: auto;
-  margin: 6px 0;
-}
-
-.markdown pre code {
-  background: transparent;
-  padding: 0;
-  color: inherit;
-}
-
-.markdown table {
-  border-collapse: collapse;
-}
-
-.markdown th,
-.markdown td {
-  border: 1px solid var(--border);
-  padding: 3px 6px;
 }
 
 /* thinking */
@@ -460,25 +461,26 @@ input:focus {
   border: none;
   color: var(--muted);
   cursor: pointer;
-  font-size: calc(var(--mm-font-base) * 0.85);
+  font-size: var(--fs-sm);
   padding: 0;
 }
 
-.thinking-toggle:hover {
-  color: var(--vscode-foreground);
+.thinking-toggle:hover,
+.thinking-toggle:hover .chevron {
+  color: var(--fg);
   background: transparent;
 }
 
 .thinking-body {
   margin: 6px 0 0;
-  padding: 8px;
+  padding: 8px 12px;
   font-family: var(--mono);
-  font-size: calc(var(--mm-font-base) * 0.85);
-  line-height: 1.5;
+  font-size: var(--fs-sm);
+  line-height: var(--lh);
   white-space: pre-wrap;
   color: var(--muted);
   background: var(--code-bg);
-  border-radius: var(--radius);
+  border-radius: var(--radius-sm);
   max-height: 320px;
   overflow: auto;
 }
@@ -487,18 +489,18 @@ input:focus {
    compete with the text of the chat. */
 .tool-card {
   border: none;
-  border-radius: var(--radius);
+  border-radius: var(--radius-sm);
   background: transparent;
   overflow: hidden;
 }
 
 /* a failure of the panel is a notice, it is not a part of the answer */
 .message-notice {
-  border-left: 2px solid var(--vscode-testing-iconFailed, #f14c4c);
-  padding: 1px 0 1px 8px;
+  border-left: 2px solid var(--err);
+  padding: 2px 0 2px 8px;
   color: var(--muted);
-  font-size: calc(var(--mm-font-base) * 0.9);
-  line-height: 1.5;
+  font-size: var(--fs-md);
+  line-height: var(--lh);
   overflow-wrap: anywhere;
 }
 
@@ -506,12 +508,15 @@ input:focus {
    dot. A rounded border drew a bracket, it looked like a decoration, and the
    color of the theme turned the mark gray. */
 .tool-card.tool-error {
-  border-left: 2px solid var(--vscode-testing-iconFailed, #f14c4c);
+  border-left: 2px solid var(--err);
   border-radius: 0;
 }
 
-.tool-card.tool-error .tool-head {
-  padding-left: 8px;
+/* The bar takes 2px of the gutter, the icons stay in one column with the
+   cards around. */
+.tool-card.tool-error .tool-head,
+.tool-card.tool-error .tool-body {
+  padding-left: 4px;
 }
 
 .tool-head {
@@ -519,22 +524,19 @@ input:focus {
   align-items: center;
   gap: 6px;
   width: 100%;
-  padding: 3px 6px;
+  min-height: var(--control-h);
+  padding: 2px 6px;
   background: transparent;
   border: none;
-  color: var(--vscode-foreground);
-  font-size: calc(var(--mm-font-base) * 0.85);
+  border-radius: var(--radius-sm);
+  color: var(--fg);
+  font-size: var(--fs-sm);
   text-align: left;
   cursor: pointer;
 }
 
 .tool-head:hover {
-  background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.08));
-}
-
-.tool-caret {
-  color: var(--muted);
-  font-size: calc(var(--mm-font-base) * 0.77);
+  background: var(--row-hover);
 }
 
 .tool-icon {
@@ -555,8 +557,10 @@ input:focus {
 
 /* The title of an action is a note, not the headline of the chat. It takes
    the full color when the reader points at it. */
-.tool-head:hover .tool-title {
-  color: var(--vscode-foreground);
+.tool-head:hover .tool-title,
+.tool-head:hover .tool-icon,
+.tool-head:hover .chevron {
+  color: var(--fg);
 }
 
 .tool-summary {
@@ -567,13 +571,14 @@ input:focus {
   white-space: nowrap;
   color: var(--muted);
   font-family: var(--mono);
-  font-size: calc(var(--mm-font-base) * 0.85);
+  font-size: var(--fs-xs);
 }
 
 .tool-time {
-  font-size: calc(var(--mm-font-base) * 0.77);
+  font-size: var(--fs-xs);
   color: var(--muted);
   font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
@@ -582,7 +587,7 @@ input:focus {
   display: inline-flex;
   gap: 6px;
   font-family: var(--mono);
-  font-size: calc(var(--mm-font-base) * 0.77);
+  font-size: var(--fs-xs);
   white-space: nowrap;
 }
 
@@ -607,18 +612,18 @@ input:focus {
    The dot blinks only while the action runs, a finished result burns steady. */
 .tool-dot {
   flex: 0 0 auto;
-  width: 8px;
-  height: 8px;
+  width: var(--dot);
+  height: var(--dot);
   border-radius: 50%;
   background: var(--muted);
 }
 
 .tool-dot.tool-dot-done {
-  background: var(--vscode-testing-iconPassed, #3fb950);
+  background: var(--ok);
 }
 
 .tool-dot.tool-dot-failed {
-  background: var(--vscode-testing-iconFailed, #f14c4c);
+  background: var(--err);
 }
 
 .tool-dot.tool-dot-running {
@@ -626,8 +631,12 @@ input:focus {
   animation: mm-pulse 1s ease-in-out infinite;
 }
 
+/* The body starts under the title, the chevron and the icon stay a gutter. */
 .tool-body {
-  padding: 0 8px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 6px 6px;
 }
 
 .tool-input,
@@ -635,56 +644,61 @@ input:focus {
   margin: 0;
   padding: 6px 8px;
   font-family: var(--mono);
-  font-size: calc(var(--mm-font-base) * 0.85);
-  line-height: 1.45;
+  font-size: var(--fs-sm);
+  line-height: var(--lh);
   white-space: pre-wrap;
   word-break: break-word;
   background: var(--code-bg);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   max-height: 260px;
   overflow: auto;
 }
 
 .tool-output-wrap {
   position: relative;
-  margin-top: 6px;
 }
 
 .tool-output-wrap .tool-output {
-  margin-top: 0;
-  padding-right: 60px;
+  padding-right: 32px;
 }
 
+/* the copy button of a block, it shows itself when the mouse is over it */
 .tool-copy {
   position: absolute;
   top: 4px;
   right: 4px;
+  z-index: 1;
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-  padding: 2px 6px;
-  border-radius: 3px;
-  border: 1px solid var(--border);
-  background: var(--vscode-editorWidget-background, #252526);
+  justify-content: center;
+  width: var(--control-h);
+  height: var(--control-h);
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--popup-bg);
   color: var(--muted);
-  font-size: calc(var(--mm-font-base) * 0.77);
   opacity: 0;
+  transition: opacity var(--ease);
 }
 
-.tool-output-wrap:hover .tool-copy {
+.tool-output-wrap:hover .tool-copy,
+.file-read:hover .tool-copy,
+.term:hover .tool-copy,
+.tool-copy:focus-visible {
   opacity: 1;
 }
 
 .tool-copy:hover {
-  color: var(--vscode-foreground);
-  background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.16));
+  color: var(--fg);
+  background: var(--popup-bg);
 }
 
 /* approval */
 .approval {
   border: 1px solid var(--vscode-focusBorder, #007fd4);
   border-radius: var(--radius);
-  padding: 10px;
+  padding: 12px;
   background: var(--surface);
   display: flex;
   flex-direction: column;
@@ -693,7 +707,7 @@ input:focus {
 
 .approval-title {
   font-weight: 600;
-  font-size: calc(var(--mm-font-base) * 0.92);
+  font-size: var(--fs-md);
 }
 
 .approval-actions {
@@ -706,18 +720,23 @@ input:focus {
   max-height: 160px;
 }
 
-/* diff */
-.diff {
+/* the blocks of a monospace text share one frame */
+.diff,
+.file-read,
+.term {
+  position: relative;
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   overflow: hidden;
 }
 
+/* diff */
 .diff-path {
-  padding: 5px 8px;
-  background: var(--code-bg);
+  padding: 4px 8px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
   font-weight: 600;
-  font-size: calc(var(--mm-font-base) * 0.85);
+  font-size: var(--fs-sm);
   font-family: var(--mono);
 }
 
@@ -729,10 +748,11 @@ input:focus {
 }
 
 .diff-line {
+  padding-right: 8px;
   white-space: pre;
   font-family: var(--mono);
-  font-size: calc(var(--mm-font-base) * 0.85);
-  line-height: 1.5;
+  font-size: var(--fs-sm);
+  line-height: var(--lh);
 }
 
 .diff-add {
@@ -747,8 +767,11 @@ input:focus {
 
 .diff-marker {
   display: inline-block;
-  width: 14px;
-  font-weight: 700;
+  width: 2ch;
+  padding-left: 6px;
+  box-sizing: content-box;
+  font-weight: 600;
+  user-select: none;
 }
 
 .diff-add .diff-marker {
@@ -760,37 +783,33 @@ input:focus {
 }
 
 /* the read of a file */
-.file-read {
-  position: relative;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  overflow: hidden;
-}
-
 .file-read-block + .file-read-block {
   border-top: 1px solid var(--border);
 }
 
 .file-read-path {
   padding: 4px 8px;
-  background: var(--code-bg);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
   color: var(--muted);
-  font-size: calc(var(--mm-font-base) * 0.8);
+  font-family: var(--mono);
+  font-size: var(--fs-xs);
 }
 
 .file-read-lines {
   max-height: 300px;
   overflow: auto;
+  padding: 4px 0;
 }
 
 .file-read-line {
   display: flex;
   align-items: baseline;
-  gap: 10px;
+  gap: 12px;
   padding: 0 8px;
   font-family: var(--mono);
-  font-size: calc(var(--mm-font-base) * 0.85);
-  line-height: 1.55;
+  font-size: var(--fs-sm);
+  line-height: var(--lh);
 }
 
 .file-read-num {
@@ -799,6 +818,7 @@ input:focus {
   text-align: right;
   color: var(--muted);
   opacity: 0.6;
+  font-variant-numeric: tabular-nums;
   user-select: none;
 }
 
@@ -808,17 +828,7 @@ input:focus {
   white-space: pre;
 }
 
-.file-read:hover .tool-copy {
-  opacity: 1;
-}
-
 /* the output of a command */
-.term {
-  position: relative;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  overflow: hidden;
-}
 
 /* The command stands on its own line, a click opens a long one. */
 .term-command {
@@ -828,25 +838,27 @@ input:focus {
   width: 100%;
   text-align: left;
   /* The room on the right belongs to the copy button. */
-  padding: 4px 36px 4px 8px;
-  background: var(--code-bg);
+  padding: 4px 32px 4px 8px;
+  background: var(--surface);
   border: none;
   border-bottom: 1px solid var(--border);
   border-radius: 0;
   font-family: var(--mono);
-  font-size: calc(var(--mm-font-base) * 0.85);
-  color: var(--muted);
+  font-size: var(--fs-sm);
+  line-height: var(--lh);
+  color: var(--fg);
   cursor: pointer;
 }
 
 .term-command:hover {
   background: var(--surface);
-  color: var(--vscode-foreground);
+  color: var(--fg);
 }
 
 .term-prompt {
   flex: 0 0 auto;
   color: var(--accent);
+  user-select: none;
 }
 
 .term-cmd-text {
@@ -870,13 +882,14 @@ input:focus {
   display: inline-block;
   margin-right: 6px;
   padding: 0 4px;
-  border: 1px solid var(--border);
-  border-radius: 3px;
-  color: var(--muted);
+  border: 1px solid currentColor;
+  border-radius: var(--radius-sm);
   font-family: var(--vscode-font-family);
-  font-size: calc(var(--mm-font-base) * 0.72);
+  font-size: var(--fs-xs);
+  line-height: var(--lh-tight);
   letter-spacing: 0.4px;
   text-transform: uppercase;
+  opacity: 0.8;
   vertical-align: 1px;
 }
 
@@ -885,14 +898,14 @@ input:focus {
   overflow: auto;
   padding: 6px 8px;
   font-family: var(--mono);
-  font-size: calc(var(--mm-font-base) * 0.85);
-  line-height: 1.5;
+  font-size: var(--fs-sm);
+  line-height: var(--lh);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 
 .term-line-error {
-  color: var(--vscode-testing-iconFailed, #f14c4c);
+  color: var(--err);
 }
 
 .term-line-note {
@@ -900,24 +913,19 @@ input:focus {
   font-style: italic;
 }
 
-.term:hover .tool-copy {
-  opacity: 1;
-}
-
-/* inline icons of the panel */
-.icon {
-  flex: 0 0 auto;
-  display: block;
-}
-
 /* composer */
 .composer {
   position: relative;
   border-top: 1px solid var(--border);
-  padding: 8px 10px 10px;
+  padding: 8px 12px 12px;
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+/* the paperclip and the send icon live in the corners of the input field */
+.composer-input-wrap {
+  position: relative;
 }
 
 .composer-input {
@@ -925,16 +933,21 @@ input:focus {
   max-height: 180px;
   overflow-y: auto;
   font-family: inherit;
-  font-size: calc(var(--mm-font-base) * 0.92);
-  line-height: 1.5;
-  color: var(--vscode-input-foreground, var(--vscode-foreground));
+  font-size: var(--fs-md);
+  line-height: var(--lh);
+  color: var(--vscode-input-foreground, var(--fg));
   background: var(--vscode-input-background, #2b2b2b);
   border: 1px solid var(--vscode-input-border, var(--border));
   border-radius: var(--radius);
-  padding: 7px 30px 7px 8px;
+  /* The room on the right belongs to the paperclip and the send icon. */
+  padding: 6px 32px 6px 8px;
   outline: none;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.composer-input:focus {
+  border-color: var(--vscode-focusBorder, #007fd4);
 }
 
 /* the placeholder lives in the attribute, the field itself stays empty */
@@ -948,15 +961,15 @@ input:focus {
 .mention {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: 2px;
   margin: 0 1px;
-  padding: 0 3px 0 6px;
-  border-radius: 4px;
+  padding: 0 2px 0 6px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border);
-  background: var(--vscode-textBlockQuote-background, rgba(128, 128, 128, 0.16));
-  color: var(--vscode-foreground);
-  font-size: calc(var(--mm-font-base) * 0.85);
-  line-height: 1.5;
+  background: var(--code-bg);
+  color: var(--fg);
+  font-size: var(--fs-sm);
+  line-height: var(--lh);
   vertical-align: baseline;
   user-select: none;
 }
@@ -968,20 +981,78 @@ input:focus {
   white-space: nowrap;
 }
 
+/* The cross of a chip is a letter, an svg inside the editable field moves
+   the caret. The only glyph of the panel, see docs/styleguide.md. */
 .mention-remove {
   appearance: none;
   background: transparent;
   border: none;
+  border-radius: var(--radius-sm);
   color: var(--muted);
   cursor: pointer;
   padding: 0 2px;
-  font-size: calc(var(--mm-font-base) * 0.92);
+  font-size: var(--fs-md);
   line-height: 1;
 }
 
 .mention-remove:hover {
-  color: var(--vscode-foreground);
+  color: var(--fg);
+  background: var(--hover);
+}
+
+.composer-attach {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-h);
+  height: var(--control-h);
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
   background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.composer-attach:hover {
+  background: var(--hover);
+  color: var(--fg);
+}
+
+/* The send icon lives in the bottom right corner of the input field, it has
+   no fill, the word stays in the tooltip. */
+.composer-send {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-h);
+  height: var(--control-h);
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.composer-send:hover {
+  background: var(--hover);
+  color: var(--fg);
+}
+
+.composer-send.stop {
+  background: transparent;
+  color: var(--err);
+}
+
+.composer-send.stop:hover {
+  color: var(--err);
 }
 
 .composer-selects {
@@ -989,33 +1060,6 @@ input:focus {
   align-items: center;
   flex-wrap: wrap;
   gap: 4px;
-}
-
-/* the paperclip lives in the corner of the input field */
-.composer-input-wrap {
-  position: relative;
-}
-
-.composer-attach {
-  position: absolute;
-  top: 5px;
-  right: 5px;
-  width: 22px;
-  height: 22px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  border: none;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-}
-
-.composer-attach:hover {
-  background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.16));
-  color: var(--vscode-foreground);
 }
 
 /* a compact dropdown, a native select cannot carry an icon */
@@ -1028,19 +1072,21 @@ input:focus {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  height: 24px;
+  height: var(--control-h);
   max-width: 100%;
   padding: 0 6px;
   border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--surface);
-  color: var(--vscode-foreground);
-  font-size: calc(var(--mm-font-base) * 0.85);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  font-size: var(--fs-sm);
   white-space: nowrap;
 }
 
-.icon-select-trigger:hover {
-  background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.16));
+.icon-select-trigger:hover,
+.icon-select-trigger.open {
+  background: var(--hover);
+  color: var(--fg);
 }
 
 .icon-select-label {
@@ -1057,55 +1103,57 @@ input:focus {
   display: flex;
   flex-direction: column;
   min-width: 100%;
-  padding: 2px;
+  padding: 4px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: var(--vscode-dropdown-background, var(--vscode-editorWidget-background, #252526));
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  background: var(--popup-bg);
+  box-shadow: var(--shadow);
 }
 
 .icon-select-option {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   padding: 4px 6px;
   border: none;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--vscode-foreground);
-  font-size: calc(var(--mm-font-base) * 0.85);
+  color: var(--fg);
+  font-size: var(--fs-sm);
   text-align: left;
   white-space: nowrap;
 }
 
 .icon-select-option:hover {
-  background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.16));
+  background: var(--row-hover);
 }
 
 .icon-select-option.active {
-  background: var(--vscode-list-activeSelectionBackground, rgba(128, 128, 128, 0.24));
-  color: var(--vscode-list-activeSelectionForeground, var(--vscode-foreground));
+  background: var(--selected);
+  color: var(--selected-fg);
 }
 
-/* the spend of every action, the input tokens are muted, the output is accent */
-/* The grid under the columns shows how tall a bar is. */
+/* The spend of every action: the input tokens are muted, the output is the
+   accent. The grid under the columns shows how tall a bar is. */
 .usage-graph {
+  --graph-bg: var(--vscode-editorWidget-background, rgba(128, 128, 128, 0.08));
   display: flex;
   align-items: flex-end;
   gap: 2px;
   /* The graph takes the whole width of the header, the columns share it. */
   flex: 1 1 auto;
   min-width: 0;
-  height: 22px;
+  height: var(--control-h);
+  padding: 0 2px;
   overflow: hidden;
-  border-radius: 3px;
-  background-color: var(--vscode-editorWidget-background, rgba(128, 128, 128, 0.08));
+  border-radius: var(--radius-sm);
+  background-color: var(--graph-bg);
   background-image: repeating-linear-gradient(
     to top,
-    var(--border) 0,
-    var(--border) 1px,
-    transparent 1px,
-    transparent 25%
+    transparent 0,
+    transparent calc(25% - 1px),
+    var(--border) calc(25% - 1px),
+    var(--border) 25%
   );
 }
 
@@ -1115,60 +1163,23 @@ input:focus {
   justify-content: flex-end;
   /* The steps keep their own width, the graph around them stretches. */
   flex: 0 0 auto;
-  width: 5px;
-  min-width: 3px;
+  width: 4px;
   height: 100%;
   overflow: hidden;
 }
 
+/* The input bar is a solid mix of the gray and the ground. A transparent
+   bar let the grid shine through and striped the column. */
 .usage-input {
   flex: 0 0 auto;
   width: 100%;
-  background: var(--muted);
-  opacity: 0.35;
+  background: color-mix(in srgb, var(--muted) 45%, var(--graph-bg));
 }
 
 .usage-output {
   flex: 0 0 auto;
   width: 100%;
   background: var(--accent);
-}
-
-.composer-input:focus {
-  border-color: var(--vscode-focusBorder, #007fd4);
-}
-
-/* The send icon lives in the bottom right corner of the input field, it has
-   no fill, the word stays in the tooltip. */
-.composer-send {
-  position: absolute;
-  right: 5px;
-  bottom: 5px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  padding: 0;
-  border: none;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-}
-
-.composer-send.stop {
-  background: transparent;
-  color: var(--vscode-inputValidation-errorForeground, #f14c4c);
-}
-
-.composer-send:hover {
-  background: var(--vscode-toolbar-hoverBackground, rgba(90, 90, 90, 0.2));
-  color: var(--vscode-foreground);
-}
-
-.composer-send.stop:hover {
-  color: var(--vscode-inputValidation-errorForeground, #f14c4c);
 }
 
 /* selections */
@@ -1181,20 +1192,21 @@ input:focus {
 .selection {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   max-width: 100%;
-  padding: 2px 4px 2px 6px;
-  border-radius: 4px;
-  font-size: calc(var(--mm-font-base) * 0.85);
-  background: var(--vscode-textBlockQuote-background, rgba(128, 128, 128, 0.14));
+  height: var(--control-h);
+  padding: 0 2px 0 6px;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-sm);
+  background: var(--code-bg);
   border: 1px solid var(--border);
 }
 
 .selection-kind {
-  font-size: calc(var(--mm-font-base) * 0.69);
+  font-size: var(--fs-xs);
   text-transform: uppercase;
   letter-spacing: 0.4px;
-  color: var(--accent);
+  color: var(--muted);
 }
 
 .selection-label {
@@ -1206,38 +1218,53 @@ input:focus {
 
 .selection-detail {
   color: var(--muted);
-  font-size: calc(var(--mm-font-base) * 0.77);
+  font-size: var(--fs-xs);
 }
 
-.selection-remove {
+/* a small cross that removes a chip or a saved chat */
+.selection-remove,
+.session-delete {
   appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  padding: 2px;
   background: transparent;
   border: none;
+  border-radius: var(--radius-sm);
   color: var(--muted);
   cursor: pointer;
-  padding: 0 3px;
-  font-size: calc(var(--mm-font-base) * 1);
-  line-height: 1;
 }
 
-.selection-remove:hover {
-  color: var(--vscode-foreground);
-  background: transparent;
+.selection-remove .icon,
+.session-delete .icon {
+  width: 12px;
+  height: 12px;
+}
+
+.selection-remove:hover,
+.session-delete:hover {
+  color: var(--fg);
+  background: var(--hover);
 }
 
 /* suggestions */
 .suggestions {
   position: absolute;
   bottom: 100%;
-  left: 10px;
-  right: 10px;
+  left: 12px;
+  right: 12px;
   margin-bottom: 4px;
   max-height: 240px;
   overflow-y: auto;
-  border: 1px solid var(--vscode-widget-border, var(--border));
+  padding: 4px;
+  border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: var(--vscode-quickInput-background, var(--vscode-editorWidget-background, #252526));
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  background: var(--vscode-quickInput-background, var(--popup-bg));
+  box-shadow: var(--shadow);
   z-index: 5;
 }
 
@@ -1248,17 +1275,20 @@ input:focus {
   width: 100%;
   text-align: left;
   background: transparent;
-  color: var(--vscode-foreground);
+  color: var(--fg);
   border: none;
-  border-radius: 0;
-  padding: 5px 8px;
-  font-size: calc(var(--mm-font-base) * 0.92);
+  border-radius: var(--radius-sm);
+  padding: 4px 6px;
+  font-size: var(--fs-md);
 }
 
-.suggestion:hover,
+.suggestion:hover {
+  background: var(--row-hover);
+}
+
 .suggestion.active {
-  background: var(--vscode-list-activeSelectionBackground, #04395e);
-  color: var(--vscode-list-activeSelectionForeground, #fff);
+  background: var(--selected);
+  color: var(--selected-fg);
 }
 
 .suggestion-path {
@@ -1268,11 +1298,11 @@ input:focus {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-family: var(--mono);
-  font-size: calc(var(--mm-font-base) * 0.85);
+  font-size: var(--fs-sm);
 }
 
 .suggestion-source {
-  font-size: calc(var(--mm-font-base) * 0.69);
+  font-size: var(--fs-xs);
   text-transform: uppercase;
   letter-spacing: 0.4px;
   opacity: 0.7;
@@ -1306,9 +1336,14 @@ input:focus {
   gap: 6px;
 }
 
+.settings-section + .settings-section {
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
 .settings-section h3 {
   margin: 0;
-  font-size: calc(var(--mm-font-base) * 0.85);
+  font-size: var(--fs-xs);
   text-transform: uppercase;
   letter-spacing: 0.6px;
   color: var(--muted);
@@ -1328,32 +1363,34 @@ input:focus {
 .field {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  font-size: calc(var(--mm-font-base) * 0.92);
+  gap: 4px;
+  font-size: var(--fs-md);
 }
 
 .field > span:first-child {
   color: var(--muted);
-  font-size: calc(var(--mm-font-base) * 0.85);
+  font-size: var(--fs-sm);
 }
 
 .hint {
   margin: 0;
-  font-size: calc(var(--mm-font-base) * 0.81);
+  font-size: var(--fs-sm);
   color: var(--muted);
-  line-height: 1.4;
+  line-height: var(--lh-tight);
 }
 
 .checkbox {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: calc(var(--mm-font-base) * 0.92);
+  font-size: var(--fs-md);
 }
 
 .checkbox input {
   width: auto;
   flex: none;
+  margin: 0;
+  accent-color: var(--accent);
 }
 
 .settings-actions {
@@ -1363,12 +1400,12 @@ input:focus {
 }
 
 .value {
-  color: var(--vscode-foreground);
+  color: var(--fg);
 }
 
 .saved {
-  font-size: calc(var(--mm-font-base) * 0.85);
-  color: var(--accent);
+  font-size: var(--fs-sm);
+  color: var(--ok);
 }
 
 /* empty state */
@@ -1377,38 +1414,39 @@ input:focus {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px 18px;
+  padding: 24px 16px;
   color: var(--muted);
-  font-size: calc(var(--mm-font-base) * 0.92);
-  line-height: 1.6;
+  font-size: var(--fs-md);
+  line-height: var(--lh);
   text-align: center;
 }
 
+/* A thin bar with a gap from the edge, a wide one cut the code blocks. */
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-thumb {
   background: var(--vscode-scrollbarSlider-background, rgba(121, 121, 121, 0.4));
-  border-radius: 5px;
+  background-clip: padding-box;
+  border: 2px solid transparent;
+  border-radius: 999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--vscode-scrollbarSlider-hoverBackground, rgba(100, 100, 100, 0.6));
+  background-clip: padding-box;
 }
 
-::-webkit-scrollbar-track {
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
   background: transparent;
 }
 
 /* the list of the saved chats */
 .session-menu {
   position: relative;
-}
-
-.icon-button.open {
-  background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.16));
 }
 
 .session-menu-list {
@@ -1425,43 +1463,48 @@ input:focus {
   gap: 2px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: var(--vscode-dropdown-background, var(--vscode-editorWidget-background, #252526));
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  background: var(--popup-bg);
+  box-shadow: var(--shadow);
 }
 
 .session-new {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   background: transparent;
   border: none;
-  color: var(--vscode-foreground);
+  color: var(--fg);
   text-align: left;
-  padding: 5px 8px;
-  border-radius: 3px;
-  font-size: calc(var(--mm-font-base) * 0.92);
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-md);
 }
 
 .session-new:hover {
-  background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.16));
+  background: var(--row-hover);
 }
 
 .session-empty {
   padding: 6px 8px;
   color: var(--muted);
-  font-size: calc(var(--mm-font-base) * 0.85);
+  font-size: var(--fs-sm);
 }
 
 .session-item {
   display: flex;
   align-items: center;
   gap: 4px;
-  border-radius: 3px;
+  padding-right: 4px;
+  border-radius: var(--radius-sm);
 }
 
 .session-item:hover {
-  background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.16));
+  background: var(--row-hover);
 }
 
 .session-item.active {
-  background: var(--vscode-list-activeSelectionBackground, rgba(128, 128, 128, 0.24));
+  background: var(--selected);
+  color: var(--selected-fg);
 }
 
 .session-open {
@@ -1470,13 +1513,17 @@ input:focus {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 1px;
-  padding: 5px 8px;
+  gap: 2px;
+  padding: 4px 8px;
   border: none;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--vscode-foreground);
+  color: inherit;
   text-align: left;
+}
+
+.session-open:hover {
+  background: transparent;
 }
 
 .session-title {
@@ -1484,53 +1531,82 @@ input:focus {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: calc(var(--mm-font-base) * 0.92);
+  font-size: var(--fs-md);
 }
 
 .session-time {
   color: var(--muted);
-  font-size: calc(var(--mm-font-base) * 0.77);
-}
-
-.session-delete {
-  appearance: none;
-  background: transparent;
-  border: none;
-  color: var(--muted);
-  cursor: pointer;
-  padding: 2px 6px;
-  font-size: calc(var(--mm-font-base) * 1);
-  line-height: 1;
-}
-
-.session-delete:hover {
-  color: var(--vscode-foreground);
-  background: transparent;
+  font-size: var(--fs-xs);
 }
 
 /* markdown of the answer */
+.markdown {
+  line-height: var(--lh);
+}
+
+.markdown > :first-child {
+  margin-top: 0;
+}
+
+.markdown > :last-child {
+  margin-bottom: 0;
+}
+
+.markdown p {
+  margin: 0 0 8px;
+}
+
+.markdown ul,
+.markdown ol {
+  margin: 4px 0 8px;
+  padding-left: 16px;
+}
+
+.markdown li {
+  margin: 2px 0;
+}
+
+.markdown li > p {
+  margin: 0 0 2px;
+}
+
+/* the marks of a list are a rhythm, not a signal: they stay gray */
+.markdown ul li::marker,
+.markdown ol li::marker {
+  color: var(--muted);
+}
+
+.markdown ol li::marker {
+  font-variant-numeric: tabular-nums;
+}
+
+.markdown a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* The headings take the weight, not the accent: the accent means a click. */
 .markdown h1,
 .markdown h2,
 .markdown h3,
 .markdown h4 {
-  margin: 12px 0 6px;
-  line-height: 1.3;
+  margin: 16px 0 6px;
+  line-height: var(--lh-tight);
   font-weight: 600;
+  color: var(--fg);
 }
 
 .markdown h1 {
-  font-size: 1.45em;
-  letter-spacing: -0.2px;
-  color: var(--accent);
+  font-size: 1.3em;
 }
 
 .markdown h2 {
-  font-size: 1.25em;
-  color: var(--accent);
+  font-size: 1.15em;
 }
 
 .markdown h3 {
-  font-size: 1.1em;
+  font-size: 1.05em;
 }
 
 .markdown h4 {
@@ -1538,16 +1614,24 @@ input:focus {
   color: var(--muted);
 }
 
-.markdown blockquote {
-  margin: 6px 0;
-  padding: 4px 10px;
-  border-left: 2px solid var(--accent);
-  color: var(--muted);
+.markdown strong {
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.markdown em {
   font-style: italic;
 }
 
+.markdown blockquote {
+  margin: 6px 0;
+  padding: 2px 12px;
+  border-left: 2px solid var(--border);
+  color: var(--muted);
+}
+
 .markdown hr {
-  margin: 10px 0;
+  margin: 12px 0;
   border: none;
   border-top: 1px solid var(--border);
 }
@@ -1562,6 +1646,55 @@ input:focus {
   accent-color: var(--accent);
 }
 
+.markdown code {
+  font-family: var(--mono);
+  font-size: 0.92em;
+  color: var(--tok-string);
+  background: var(--code-bg);
+  padding: 1px 4px;
+  border-radius: var(--radius-sm);
+}
+
+.markdown pre {
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 12px;
+  overflow-x: auto;
+  margin: 6px 0;
+  font-size: var(--fs-sm);
+  line-height: var(--lh);
+}
+
+.markdown pre code {
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  font-size: inherit;
+}
+
+.markdown table {
+  border-collapse: collapse;
+  margin: 6px 0;
+  font-size: var(--fs-md);
+}
+
+.markdown th,
+.markdown td {
+  border: 1px solid var(--border);
+  padding: 4px 8px;
+  text-align: left;
+}
+
+.markdown th {
+  background: var(--surface);
+  font-weight: 600;
+}
+
+.markdown tbody tr:nth-child(even) {
+  background: rgba(128, 128, 128, 0.04);
+}
+
 .markdown .code-block {
   margin: 8px 0;
   border: 1px solid var(--border);
@@ -1574,72 +1707,82 @@ input:focus {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 3px 6px 3px 10px;
+  gap: 8px;
+  min-height: 26px;
+  padding: 2px 4px 2px 12px;
   border-bottom: 1px solid var(--border);
   background: var(--surface);
 }
 
 .markdown .code-lang {
   font-family: var(--mono);
-  font-size: calc(var(--mm-font-base) * 0.77);
+  font-size: var(--fs-xs);
   text-transform: uppercase;
   letter-spacing: 0.6px;
-  color: var(--accent);
+  color: var(--muted);
 }
 
+/* the name of a file is a link, it opens the file */
 .markdown .code-lang.code-file {
   appearance: none;
   border: none;
   background: transparent;
   padding: 0;
   text-transform: none;
-  font-weight: 600;
+  letter-spacing: 0;
+  font-size: var(--fs-sm);
+  color: var(--accent);
   cursor: pointer;
 }
 
 .markdown .code-lang.code-file:hover {
   background: transparent;
-  color: var(--accent);
   text-decoration: underline;
-}
-
-.markdown .code-copy {
-  appearance: none;
-  padding: 2px 6px;
-  border: none;
-  border-radius: 3px;
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-  font-size: calc(var(--mm-font-base) * 0.77);
-}
-
-.markdown .code-copy:hover {
-  background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.16));
-  color: var(--vscode-foreground);
 }
 
 .markdown .code-tools {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
 }
 
+.markdown .code-copy,
 .markdown .code-toggle {
   appearance: none;
-  padding: 2px 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--control-h);
   border: none;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--muted);
   cursor: pointer;
-  font-size: calc(var(--mm-font-base) * 0.77);
-  line-height: 1;
+  font-size: var(--fs-xs);
 }
 
+.markdown .code-copy {
+  padding: 0 6px;
+}
+
+.markdown .code-toggle {
+  width: var(--control-h);
+  padding: 0;
+}
+
+.markdown .code-copy:hover,
 .markdown .code-toggle:hover {
-  background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.16));
-  color: var(--vscode-foreground);
+  background: var(--hover);
+  color: var(--fg);
+}
+
+/* the chevron of a code block turns right when the code is folded */
+.markdown .code-toggle .icon {
+  transition: transform var(--ease);
+}
+
+.markdown .code-block.collapsed .code-toggle .icon {
+  transform: rotate(-90deg);
 }
 
 /* A folded code block shows only its header. */
@@ -1653,7 +1796,6 @@ input:focus {
 
 .markdown .code-block pre {
   margin: 0;
-  padding: 8px 10px;
   border: none;
   border-radius: 0;
 }
@@ -1711,44 +1853,3 @@ input:focus {
 .tok-remove {
   color: var(--tok-remove);
 }
-/* the marks of markdown have to be visible, the answer reads as a document */
-.markdown strong {
-  font-weight: 600;
-  color: var(--vscode-foreground);
-}
-
-.markdown em {
-  font-style: italic;
-}
-
-.markdown li {
-  margin: 2px 0;
-}
-
-.markdown li > p {
-  margin: 0 0 2px;
-}
-
-.markdown ul li::marker {
-  color: var(--accent);
-}
-
-.markdown ol li::marker {
-  color: var(--accent);
-  font-variant-numeric: tabular-nums;
-}
-
-.markdown a {
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-
-.markdown th {
-  background: var(--surface);
-  font-weight: 600;
-}
-
-.markdown tbody tr:nth-child(even) {
-  background: rgba(128, 128, 128, 0.04);
-}
-

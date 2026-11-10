@@ -5,6 +5,7 @@ import type { AgentMode, ModelInfo } from '../../../config/models';
 import type { UiSelection, UiSuggestion } from '../../protocol';
 import {
   IconAttach,
+  IconClose,
   IconCode,
   IconModel,
   IconPlan,
@@ -442,9 +443,10 @@ export function Composer({
               <button
                 className="selection-remove"
                 title={STRINGS.remove}
+                aria-label={STRINGS.remove}
                 onClick={() => onRemoveSelection(selection.id)}
               >
-                ×
+                <IconClose />
               </button>
             </span>
           ))}

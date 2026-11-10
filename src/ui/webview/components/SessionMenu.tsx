@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { UiSessionSummary } from '../../protocol';
-import { IconHistory } from '../icons';
+import { IconClose, IconHistory, IconPlus } from '../icons';
 import { STRINGS } from '../strings';
 
 function formatTime(timestamp: number): string {
@@ -51,6 +51,8 @@ export function SessionMenu({
       <button
         className={'icon-button' + (open ? ' open' : '')}
         title={STRINGS.chatHistory}
+        aria-label={STRINGS.chatHistory}
+        aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
       >
         <IconHistory />
@@ -64,7 +66,8 @@ export function SessionMenu({
               onNewChat();
             }}
           >
-            + {STRINGS.newChat}
+            <IconPlus />
+            {STRINGS.newChat}
           </button>
           {sessions.length === 0 ? (
             <div className="session-empty">{STRINGS.noChats}</div>
@@ -87,9 +90,10 @@ export function SessionMenu({
               <button
                 className="session-delete"
                 title={STRINGS.deleteChat}
+                aria-label={STRINGS.deleteChat}
                 onClick={() => onDelete(session.id)}
               >
-                ×
+                <IconClose />
               </button>
             </div>
           ))}

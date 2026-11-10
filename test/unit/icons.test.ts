@@ -6,6 +6,7 @@ import {
   IconAttach,
   IconCaret,
   IconCode,
+  IconClose,
   IconCopy,
   IconEdit,
   IconGraph,
@@ -13,6 +14,7 @@ import {
   IconList,
   IconModel,
   IconPlan,
+  IconPlus,
   IconRead,
   IconSearch,
   IconSend,
@@ -28,6 +30,7 @@ const ICONS: Array<[string, () => ReactNode]> = [
   ['IconAttach', IconAttach],
   ['IconCaret', IconCaret],
   ['IconCode', IconCode],
+  ['IconClose', IconClose],
   ['IconCopy', IconCopy],
   ['IconEdit', IconEdit],
   ['IconGraph', IconGraph],
@@ -35,6 +38,7 @@ const ICONS: Array<[string, () => ReactNode]> = [
   ['IconList', IconList],
   ['IconModel', IconModel],
   ['IconPlan', IconPlan],
+  ['IconPlus', IconPlus],
   ['IconRead', IconRead],
   ['IconSearch', IconSearch],
   ['IconSend', IconSend],
@@ -189,8 +193,6 @@ describe('send and stop icons of the codicon set', () => {
       new URL('../../src/ui/webview/styles.css', import.meta.url),
       'utf8'
     );
-    expect(cssRule(css, '.composer-send.stop:hover')).toContain(
-      'color: var(--vscode-inputValidation-errorForeground'
-    );
+    expect(cssRule(css, '.composer-send.stop:hover')).toContain('color: var(--err)');
   });
 });

@@ -90,7 +90,8 @@ describe('the dot of an action', () => {
     expect(classes).toContain('tool-dot-done');
     const body = ruleFor(CSS, '.tool-dot.tool-dot-done');
     expect(body).toBeDefined();
-    expect(property(body, 'background')).toContain('testing-iconPassed');
+    // The token of success is built on the color of the passed test.
+    expect(property(body, 'background')).toBe('var(--ok)');
   });
 
   it('paints a failed action red', () => {
@@ -98,7 +99,7 @@ describe('the dot of an action', () => {
     expect(classes).toContain('tool-dot-failed');
     const body = ruleFor(CSS, '.tool-dot.tool-dot-failed');
     expect(body).toBeDefined();
-    expect(property(body, 'background')).toContain('testing-iconFailed');
+    expect(property(body, 'background')).toBe('var(--err)');
   });
 
   it('blinks a running action with the gray of the base dot', () => {
@@ -151,11 +152,9 @@ describe('the dot of an action', () => {
     expect(property(ruleFor(CSS, '.tool-title'), 'font-weight')).toBe('400');
     expect(property(ruleFor(CSS, '.tool-title'), 'color')).toBe('var(--muted)');
     expect(property(ruleFor(CSS, '.tool-head:hover .tool-title'), 'color')).toBe(
-      'var(--vscode-foreground)'
+      'var(--fg)'
     );
-    expect(property(ruleFor(CSS, '.tool-head'), 'font-size')).toBe(
-      'calc(var(--mm-font-base) * 0.85)'
-    );
+    expect(property(ruleFor(CSS, '.tool-head'), 'font-size')).toBe('var(--fs-sm)');
   });
 
   it('shows the change of a file as a diff', () => {
@@ -211,9 +210,9 @@ describe('the dot of an action', () => {
 
   it('marks a failed action with a straight bar in the color of the failed dot', () => {
     const error = ruleFor(CSS, '.tool-card.tool-error');
-    expect(property(error, 'border-left')).toBe(
-      '2px solid var(--vscode-testing-iconFailed, #f14c4c)'
-    );
+    // The bar and the failed dot share one token, a theme cannot split them.
+    expect(property(error, 'border-left')).toBe('2px solid var(--err)');
+    expect(property(ruleFor(CSS, '.tool-dot.tool-dot-failed'), 'background')).toBe('var(--err)');
     // A rounded border draws a bracket, it looks like a decoration.
     expect(property(error, 'border-radius')).toBe('0');
   });
@@ -377,7 +376,7 @@ describe('the dot of an action', () => {
     expect(markup).toContain('term-command');
     expect(CSS).toMatch(/\.term-cmd-text\s*\{[^}]*-webkit-line-clamp:\s*3/);
     // The copy button stands in the corner, the command keeps room for it.
-    expect(property(ruleFor(CSS, '.term-command'), 'padding')).toContain('36px');
+    expect(property(ruleFor(CSS, '.term-command'), 'padding')).toContain('32px');
   });
 
   it('keeps the summary of a finished command empty', () => {

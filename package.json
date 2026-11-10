@@ -267,6 +267,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
+    "preview": "node test/visual/serve.mjs",
     "test:live": "vitest run --config vitest.live.config.ts",
     "build:production": "node esbuild.mjs --production",
     "package": "node esbuild.mjs --production && vsce package",

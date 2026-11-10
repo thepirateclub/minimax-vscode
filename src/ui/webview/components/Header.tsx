@@ -2,6 +2,7 @@ import type { AgentState, UiSessionSummary, UiUsageTurn } from '../../protocol';
 import { formatCount } from '../../format';
 import { UsageGraph } from './UsageGraph';
 import { SessionMenu } from './SessionMenu';
+import { IconPlus } from '../icons';
 import { STRINGS } from '../strings';
 
 export type PanelTab = 'chat' | 'settings';
@@ -58,18 +59,23 @@ export function Header({
           onDelete={onDeleteSession}
           onNewChat={onNewChat}
         />
-        <button className="icon-button" title={STRINGS.newChat} onClick={onNewChat}>
-          +
+        <button
+          className="icon-button"
+          title={STRINGS.newChat}
+          aria-label={STRINGS.newChat}
+          onClick={onNewChat}
+        >
+          <IconPlus />
         </button>
       </div>
-      {tab === 'chat' ? (
-        <div className="header-row">
-          <UsageGraph turns={usage} />
-          <span className="tokens">
-            {formatCount(tokens)} {STRINGS.tokens}
-          </span>
-        </div>
-      ) : null}
+      {/* The row stays on both tabs, the header keeps its height and the
+          panel does not jump when the tab changes. */}
+      <div className="header-row">
+        <UsageGraph turns={usage} />
+        <span className="tokens">
+          {formatCount(tokens)} {STRINGS.tokens}
+        </span>
+      </div>
       {!hasApiKey ? <div className="warning">{STRINGS.noApiKey}</div> : null}
     </div>
   );

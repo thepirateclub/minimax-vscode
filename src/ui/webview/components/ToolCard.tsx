@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { ReactNode } from 'react';
 import type { UiToolCall } from '../../protocol';
 import {
+  Chevron,
   IconCopy,
   IconEdit,
   IconList,
@@ -220,8 +221,8 @@ export function ToolCard({
         'tool-card' + (tool.isError ? ' tool-error' : '') + (tool.running ? ' tool-running' : '')
       }
     >
-      <button className="tool-head" onClick={() => setOverride(!open)}>
-        <span className="tool-caret">{open ? '▾' : '▸'}</span>
+      <button className="tool-head" aria-expanded={open} onClick={() => setOverride(!open)}>
+        <Chevron open={open} />
         <span className="tool-icon">{view.icon}</span>
         <span className="tool-title">{view.title}</span>
         <span className="tool-summary">{view.summary}</span>

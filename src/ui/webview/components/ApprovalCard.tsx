@@ -25,7 +25,10 @@ export function ApprovalCard({
       )}
       <div className="approval-actions">
         <button onClick={() => onApprove(false)}>{STRINGS.approve}</button>
-        <button onClick={() => onApprove(true)}>{STRINGS.alwaysAllow}</button>
+        {/* One primary button in a group, the wider grant is secondary. */}
+        <button className="secondary" onClick={() => onApprove(true)}>
+          {STRINGS.alwaysAllow}
+        </button>
         <button className="secondary" onClick={onReject}>
           {STRINGS.reject}
         </button>

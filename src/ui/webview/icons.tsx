@@ -1,6 +1,7 @@
 // Inline SVG icons, the panel inherits the theme colors from the host.
 import type { ReactNode } from 'react';
 import { CODICON_DEBUG_STOP, CODICON_SEND } from './codicons';
+import { CARET_PATH } from './iconPaths';
 
 interface IconProps {
   size?: number;
@@ -89,8 +90,38 @@ export function IconAttach(): ReactNode {
 export function IconCaret(): ReactNode {
   return (
     <Svg>
-      <path d="M4.5 6.5 8 10l3.5-3.5" />
+      <path d={CARET_PATH} />
     </Svg>
+  );
+}
+
+// A cross of the lucide set, it opens a new chat.
+export function IconPlus(): ReactNode {
+  return (
+    <Svg viewBox="0 0 24 24" strokeWidth={2}>
+      <path d="M5 12h14" />
+      <path d="M12 5v14" />
+    </Svg>
+  );
+}
+
+// An x of the lucide set, it removes a chat or a chip.
+export function IconClose(): ReactNode {
+  return (
+    <Svg viewBox="0 0 24 24" strokeWidth={2}>
+      <path d="M18 6 6 18" />
+      <path d="m6 6 12 12" />
+    </Svg>
+  );
+}
+
+// The chevron of a folding block. It points down when the block is open,
+// the closed state turns it to the right with css, so one icon serves both.
+export function Chevron({ open }: { open: boolean }): ReactNode {
+  return (
+    <span className={'chevron' + (open ? ' chevron-open' : '')} aria-hidden="true">
+      <IconCaret />
+    </span>
   );
 }
 
