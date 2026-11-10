@@ -80,4 +80,33 @@ describe('the goal of the session', () => {
     expect(result.isError).toBe(true);
     expect(result.state).toBeUndefined();
   });
+
+  it('refuses every limit of the goal', async () => {
+    const tools = createGoalTools();
+    const update = tools.find((tool) => tool.name === 'update_goal');
+    for (const key of ['tokenBudget', 'requestLimit', 'secondsLimit']) {
+      const input: Record<string, unknown> = { status: 'complete' };
+      input[key] = 999999;
+      const result = await update!.execute(input, makeContext(GOAL));
+      expect(result.isError).toBe(true);
+      expect(result.state).toBeUndefined();
+      expect(result.content).toContain(
+        'The limits of the goal belong to the user, the model cannot change them.'
+      );
+    }
+  });
+
+  it('refuses an unknown key', async () => {
+    const tools = createGoalTools();
+    const update = tools.find((tool) => tool.name === 'update_goal');
+    const result = await update!.execute(
+      { status: 'complete', objective: 'a different goal' },
+      makeContext(GOAL)
+    );
+    expect(result.isError).toBe(true);
+    expect(result.state).toBeUndefined();
+    expect(result.content).toContain('objective');
+    expect(result.content).toContain('status');
+    expect(result.content).toContain('note');
+  });
 });

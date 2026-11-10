@@ -13,6 +13,10 @@ export interface TodoItem {
 
 export type GoalStatus = 'active' | 'complete' | 'blocked';
 
+// The status that the model can set. The goal starts as active, the model
+// only closes it.
+export type GoalOutcome = Exclude<GoalStatus, 'active'>;
+
 export interface GoalState {
   objective: string;
   // The limits of the budget. Undefined means no limit.
@@ -33,4 +37,4 @@ export interface SessionState {
 // The change of the state of the session, the host applies it.
 export type ToolStateUpdate =
   | { kind: 'todos'; todos: TodoItem[] }
-  | { kind: 'goal'; status: 'complete' | 'blocked'; note?: string };
+  | { kind: 'goal'; status: GoalOutcome; note?: string };

@@ -1,7 +1,12 @@
-import type { GoalState, ToolStateUpdate } from '../agent/state';
+import type { GoalOutcome, GoalState, ToolStateUpdate } from '../agent/state';
 import type { ToolEntry } from './types';
 
-const STATUSES = ['complete', 'blocked'];
+const STATUSES: GoalOutcome[] = ['complete', 'blocked'];
+
+// The status of the goal that the model can set.
+function isGoalOutcome(value: string): value is GoalOutcome {
+  return STATUSES.some((status) => status === value);
+}
 
 // The goal as the model reads it.
 export function formatGoal(goal: GoalState): string {
@@ -80,7 +85,7 @@ export function createGoalTools(): ToolEntry[] {
         };
       }
       const status = String(input['status'] ?? '');
-      if (!STATUSES.includes(status)) {
+      if (!isGoalOutcome(status)) {
         return {
           content:
             'The status of the goal is "complete" or "blocked", not "' + status + '".',
@@ -98,10 +103,23 @@ export function createGoalTools(): ToolEntry[] {
           };
         }
       }
+      // A key that the tool does not know must not look like an accepted
+      // change: the goal has only the status and the note.
+      for (const key of Object.keys(input)) {
+        if (key !== 'status' && key !== 'note') {
+          return {
+            content:
+              'The goal has only the status and the note, the key "' +
+              key +
+              '" is not part of it.',
+            isError: true
+          };
+        }
+      }
       const note = typeof input['note'] === 'string' ? input['note'].trim() : '';
       const state: ToolStateUpdate = {
         kind: 'goal',
-        status: status as 'complete' | 'blocked',
+        status,
         note: note.length > 0 ? note : undefined
       };
       return {
