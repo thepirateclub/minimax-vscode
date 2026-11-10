@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { TodoItem } from '../../agent/state';
+import type { GoalState, TodoItem } from '../../agent/state';
 import type {
   ExtToWeb,
   UiMessage,
@@ -11,6 +11,7 @@ import type {
 } from '../protocol';
 import { Composer, type InsertRequest, type RestoreRequest } from './components/Composer';
 import { EmptyState } from './components/EmptyState';
+import { GoalBar, type GoalValues } from './components/GoalBar';
 import { Header, type PanelTab } from './components/Header';
 import { MessageList } from './components/MessageList';
 import { SettingsView } from './components/SettingsView';
@@ -47,6 +48,7 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
   const [state, setState] = useState<UiState>(EMPTY_STATE);
   const [messages, setMessages] = useState<UiMessage[]>([]);
   const [todos, setTodos] = useState<TodoItem[]>([]);
+  const [goal, setGoal] = useState<GoalState | undefined>(undefined);
   const [selections, setSelections] = useState<UiSelection[]>([]);
   const [suggestions, setSuggestions] = useState<UiSuggestion[]>([]);
   const [settings, setSettings] = useState<UiSettings | undefined>(undefined);
@@ -66,6 +68,7 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
         setState(message.state);
         setMessages(message.state.messages);
         setTodos(message.state.todos);
+        setGoal(message.state.goal);
         return;
       }
       if (message.type === 'user_message') {
@@ -143,6 +146,10 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
       }
       if (message.type === 'todos') {
         setTodos(message.todos);
+        return;
+      }
+      if (message.type === 'goal') {
+        setGoal(message.goal);
         return;
       }
       if (message.type === 'session_loaded') {
@@ -305,6 +312,19 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
       />
       <div className={'view' + (tab === 'chat' ? '' : ' view-hidden')}>
         <TaskList todos={todos} />
+        <GoalBar
+          goal={goal}
+          onSet={(values: GoalValues) =>
+            vscode.postMessage({
+              type: 'set_goal',
+              objective: values.objective,
+              tokenBudget: values.tokenBudget,
+              requestLimit: values.requestLimit,
+              secondsLimit: values.secondsLimit
+            })
+          }
+          onClear={() => vscode.postMessage({ type: 'clear_goal' })}
+        />
         {messages.length === 0 ? (
           <EmptyState />
         ) : (

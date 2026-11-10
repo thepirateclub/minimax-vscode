@@ -493,6 +493,72 @@ input:focus {
   color: var(--muted);
   opacity: 0.75;
 }
+/* the goal over the feed */
+.goal-bar {
+  flex: 0 0 auto;
+  margin: 8px 12px 0;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--fg);
+  font-size: var(--fs-md);
+}
+
+.goal-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.goal-objective {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.goal-spend {
+  flex: 0 0 auto;
+  color: var(--muted);
+}
+
+.goal-status {
+  flex: 0 0 auto;
+  color: var(--accent);
+}
+
+.goal-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.goal-input {
+  flex: 1 1 120px;
+  min-width: 0;
+  padding: 2px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--fg);
+  font-size: var(--fs-sm);
+}
+
+.goal-button {
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--fg);
+  cursor: pointer;
+  font-size: var(--fs-sm);
+}
+
+.goal-button:hover {
+  background: var(--hover);
+}
 
 /* messages */
 .messages-wrap {
