@@ -40,6 +40,19 @@ describe('renderMarkdown', () => {
     expect(html).toContain('checked');
   });
 
+  it('drops the brackets of a checklist item, the box replaces them', () => {
+    const html = renderMarkdown('- [x] done\n- [ ] todo');
+    expect(html).not.toContain('[x]');
+    expect(html).not.toContain('[ ]');
+    expect(html).toContain('> done');
+  });
+
+  it('marks the list of a checklist, the boxes stand on the left edge', () => {
+    const html = renderMarkdown('- [x] done\n- [ ] todo');
+    expect(html).toContain('<ul class="task-list">');
+    expect(renderMarkdown('- one')).not.toContain('task-list');
+  });
+
   it('keeps a plain list item clean', () => {
     const html = renderMarkdown('- one\n- two');
     expect(html).not.toContain('task-check');

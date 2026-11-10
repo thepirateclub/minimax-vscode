@@ -112,8 +112,24 @@ md.core.ruler.push('task_items', (state) => {
       continue;
     }
     token.content = token.content.slice(match[0].length);
+    // The core rule runs after the inline parser, the text is already split
+    // into children: the brackets have to go from the first child as well,
+    // or "[x]" stays next to the box.
+    const first = token.children?.[0];
+    if (first && first.type === 'text' && first.content.startsWith(match[0].trimEnd())) {
+      first.content = first.content.slice(match[0].length).replace(/^\s+/, '');
+    }
     const item = tokens[index]!;
     item.attrSet('class', 'task-item');
+    // The list of a checklist drops its indent, the boxes take the place of
+    // the markers and stand on the left edge of the answer.
+    for (let open = index - 1; open >= 0; open--) {
+      const candidate = tokens[open]!;
+      if (candidate.type === 'bullet_list_open' && candidate.level === item.level - 1) {
+        candidate.attrSet('class', 'task-list');
+        break;
+      }
+    }
     if (match[1]?.toLowerCase() === 'x') {
       item.attrSet('data-checked', 'true');
     }

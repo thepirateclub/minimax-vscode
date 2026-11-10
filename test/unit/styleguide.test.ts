@@ -165,6 +165,58 @@ describe('styleguide rules', () => {
   });
 });
 
+// The px values of one property of a rule, in the order of the shorthand.
+function box(selector: string, property: string): number[] {
+  const value = USES.find(
+    (item) => item.selector.replace(/\s+/g, ' ') === selector && item.property === property
+  )?.value;
+  expect(value, selector + ' ' + property).toBeDefined();
+  return (value ?? '').split(/\s+/).map((part) => Number.parseFloat(part) || 0);
+}
+
+// The left side of a padding or a margin shorthand.
+function leftOf(values: number[]): number {
+  return values.length === 4 ? values[3]! : values.length >= 2 ? values[1]! : values[0]!;
+}
+
+describe('styleguide alignment', () => {
+  it('puts the label of the first tab on the left edge of the panel', () => {
+    expect(leftOf(box('.tabs', 'margin-left')) + leftOf(box('.tab', 'padding'))).toBe(0);
+  });
+
+  it('puts the chevron of an action on the left edge, the hover goes into the margin', () => {
+    const margin = leftOf(box('.tool-card', 'margin'));
+    expect(margin + leftOf(box('.tool-head', 'padding'))).toBe(0);
+    expect(margin + leftOf(box('.tool-body', 'padding'))).toBe(0);
+  });
+
+  it('keeps the text of a failed action and of a notice on the edge, the bar in the margin', () => {
+    const bar = 2;
+    const card = leftOf(box('.tool-card', 'margin'));
+    const failed = box('.tool-card.tool-error .tool-head, .tool-card.tool-error .tool-body', 'padding-left');
+    expect(card + bar + failed[0]!).toBe(0);
+    const notice = box('.message-notice', 'margin-left')[0]! + bar + leftOf(box('.message-notice', 'padding'));
+    expect(notice).toBe(0);
+  });
+
+  it('indents the text of every monospace block by one step', () => {
+    // A block of code, of a diff, of an output and of a terminal start their
+    // text at the same depth, the eye reads them as one family.
+    expect(leftOf(box('.tool-input, .tool-output', 'padding'))).toBe(8);
+    expect(leftOf(box('.thinking-body', 'padding'))).toBe(8);
+    expect(leftOf(box('.markdown pre', 'padding'))).toBe(8);
+    expect(leftOf(box('.markdown .code-head', 'padding'))).toBe(8);
+    expect(leftOf(box('.term-body', 'padding'))).toBe(8);
+    expect(leftOf(box('.term-command', 'padding'))).toBe(8);
+    expect(leftOf(box('.file-read-line', 'padding'))).toBe(8);
+    expect(box('.diff-marker', 'padding-left')[0]).toBe(8);
+  });
+
+  it('puts the boxes of a checklist on the left edge of the text', () => {
+    expect(box('.markdown .task-list', 'padding-left')[0]).toBe(0);
+  });
+});
+
 describe('styleguide icons', () => {
   const dir = new URL('../../src/ui/webview/components/', import.meta.url);
   const sources = readdirSync(dir)

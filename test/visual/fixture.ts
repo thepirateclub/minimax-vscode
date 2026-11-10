@@ -13,6 +13,49 @@ export const MESSAGES: UiMessage[] = [
     text: '## Plan\n\nI will read **format.ts**, then patch `formatCount`.\n\n1. Read the module\n2. Add the `B` suffix\n\n> The status bar uses the same helper.\n\n```ts\nexport function formatCount(value: number): string {\n  return value >= 1e9 ? (value / 1e9).toFixed(1) + \'B\' : String(value);\n}\n```\n\n| Suffix | Value |\n|---|---|\n| K | 1e3 |\n| M | 1e6 |'
   },
   {
+    id: 'a2',
+    role: 'assistant',
+    // Every kind of nesting of an answer: the left edges and the indents of
+    // the nested blocks are checked on this message.
+    text: [
+      '### Nested blocks',
+      '',
+      'A paragraph before the list.',
+      '',
+      '- First level with `code`',
+      '  - Second level',
+      '    - Third level with a long line that has to wrap and keep its indent under the marker',
+      '  - Back to the second level',
+      '- A step with a code block:',
+      '',
+      '  ```bash',
+      '  npm run typecheck && npm test',
+      '  ```',
+      '',
+      '- A step with a quote:',
+      '',
+      '  > Quoted inside a list item.',
+      '',
+      '1. Ordered',
+      '   1. Nested ordered',
+      '   2. Second nested',
+      '2. Back',
+      '',
+      '- [x] Done task',
+      '- [ ] Open task',
+      '',
+      '> A quote with a list:',
+      '> - item one',
+      '> - item two',
+      '',
+      '| Column | Code |',
+      '|---|---|',
+      '| long | `src/ui/webview/components/ToolCard.tsx` |',
+      '',
+      'A long link https://platform.minimax.io/docs/api-reference/text-anthropic-api-with-a-very-long-path and a longword_without_any_break_points_at_all_in_it_to_test_wrapping.'
+    ].join('\n')
+  },
+  {
     id: 't1',
     role: 'tool',
     tool: { id: 't1', name: 'read_file', input: { path: 'src/ui/format.ts', start_line: 1, end_line: 14 }, content: README, durationMs: 4 }

@@ -268,6 +268,9 @@ input:focus {
   display: flex;
   align-items: center;
   gap: 2px;
+  /* The label of the first tab stands on the left edge of the panel, the
+     padding of the tab goes into the margin of the panel. */
+  margin-left: -8px;
 }
 
 /* The active tab is marked by a rounded bar under the label, the panel
@@ -489,7 +492,7 @@ input:focus {
 
 .thinking-body {
   margin: 6px 0 0;
-  padding: 8px 12px;
+  padding: 8px;
   font-family: var(--mono);
   font-size: var(--fs-sm);
   line-height: var(--lh);
@@ -509,12 +512,19 @@ input:focus {
   border-radius: var(--radius-sm);
   background: transparent;
   overflow: hidden;
+  /* The chevron and the blocks stand on the left edge of the answer. The
+     hover of the row and the bar of a failure go into the margin of the
+     panel, like the rows of the lists of VS Code. */
+  margin: 0 -6px;
 }
 
 /* a failure of the panel is a notice, it is not a part of the answer */
 .message-notice {
   border-left: 2px solid var(--err);
-  padding: 2px 0 2px 8px;
+  /* The bar stands in the margin of the panel, the text on the left edge,
+     like the bar of a failed action. */
+  margin-left: -6px;
+  padding: 2px 0 2px 4px;
   color: var(--muted);
   font-size: var(--fs-md);
   line-height: var(--lh);
@@ -799,7 +809,7 @@ input:focus {
 .diff-marker {
   display: inline-block;
   width: 2ch;
-  padding-left: 6px;
+  padding-left: 8px;
   box-sizing: content-box;
   font-weight: 600;
   user-select: none;
@@ -1754,12 +1764,18 @@ html {
   border-top: 1px solid var(--border);
 }
 
+/* The boxes of a checklist take the place of the markers, the list drops
+   its indent and the boxes stand on the left edge of the text. */
+.markdown .task-list {
+  padding-left: 0;
+}
+
 .markdown .task-item {
   list-style: none;
 }
 
 .markdown .task-check {
-  margin-right: 6px;
+  margin: 0 6px 0 0;
   vertical-align: middle;
   accent-color: var(--accent);
 }
@@ -1777,7 +1793,7 @@ html {
   background: var(--code-bg);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 8px 12px;
+  padding: 8px;
   overflow-x: auto;
   margin: 6px 0;
   font-size: var(--fs-sm);
@@ -1827,7 +1843,7 @@ html {
   justify-content: space-between;
   gap: 8px;
   min-height: 26px;
-  padding: 2px 4px 2px 12px;
+  padding: 2px 4px 2px 8px;
   border-bottom: 1px solid var(--border);
   background: var(--surface);
 }
