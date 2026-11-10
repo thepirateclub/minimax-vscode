@@ -210,6 +210,13 @@ const TODO_SSE = [
   'event: message_stop\ndata: {"type":"message_stop"}\n\n'
 ].join('');
 
+const GOAL_SSE = [
+  'event: content_block_start\ndata: {"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"toolu_1","name":"update_goal","input":{}}}\n\n',
+  'event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{\\"status\\":\\"complete\\",\\"note\\":\\"The parser is rewritten\\"}"}}\n\n',
+  'event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"tool_use"},"usage":{"output_tokens":9}}\n\n',
+  'event: message_stop\ndata: {"type":"message_stop"}\n\n'
+].join('');
+
 function makeContext(): ExtensionContext {
   return {
     subscriptions: [],
@@ -1308,8 +1315,10 @@ describe('extension activation', () => {
 
     state.posted.length = 0;
     state.receive?.({ type: 'send', text: 'hello', mentions: [], selections: [] });
+    // The turn has to be over, otherwise the second request finds the
+    // agent busy.
     await vi.waitFor(() => {
-      expect(ofType('text_delta').length).toBeGreaterThan(0);
+      expect(ofType('status').pop()?.state).toBe('idle');
     });
     // The spend of the request (18 tokens) broke the limit of 10 tokens.
     state.posted.length = 0;
@@ -1322,6 +1331,202 @@ describe('extension activation', () => {
     expect(notice.message).toContain('Rewrite the parser');
     // The request did not go out.
     expect(state.fetched.filter((url) => url === MESSAGES_URL)).toHaveLength(1);
+  });
+
+  it('keeps the spend when the user raises the limit of the same goal', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.secrets.set('minimax.apiKey', 'test-key');
+    state.responses.push(TEXT_SSE);
+    await boot();
+
+    state.receive?.({
+      type: 'set_goal',
+      objective: 'Rewrite the parser',
+      tokenBudget: 10
+    });
+    await vi.waitFor(() => {
+      expect(ofType('goal').length).toBe(1);
+    });
+
+    state.posted.length = 0;
+    state.receive?.({ type: 'send', text: 'hello', mentions: [], selections: [] });
+    await vi.waitFor(() => {
+      expect(ofType('status').pop()?.state).toBe('idle');
+    });
+
+    // The user raises the limit of the same goal, the spend stays.
+    state.posted.length = 0;
+    state.receive?.({
+      type: 'set_goal',
+      objective: 'Rewrite the parser',
+      tokenBudget: 12000
+    });
+    await vi.waitFor(() => {
+      expect(ofType('goal').length).toBe(1);
+    });
+    const goal = ofType('goal')[0]!.goal!;
+    expect(goal.tokenBudget).toBe(12000);
+    // The request spent 18 tokens, the raise of the limit does not forget it.
+    expect(goal.used.tokens).toBe(18);
+    expect(goal.used.requests).toBe(1);
+    expect(goal.status).toBe('active');
+  });
+
+  it('refuses a limit of the goal that is not a positive number', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    await boot();
+
+    state.posted.length = 0;
+    state.receive?.({
+      type: 'set_goal',
+      objective: 'Rewrite the parser',
+      tokenBudget: 0
+    });
+    await vi.waitFor(() => {
+      expect(ofType('notice').length).toBe(1);
+    });
+    const notice = ofType('notice')[0]!;
+    expect(notice.message).toContain('positive numbers');
+    expect(notice.kind).toBe('error');
+    // The goal was not set.
+    expect(ofType('goal').length).toBe(0);
+  });
+
+  it('applies the status of the goal that the model sets', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.secrets.set('minimax.apiKey', 'test-key');
+    state.responses.push(GOAL_SSE, TEXT_SSE);
+    await boot();
+
+    state.receive?.({
+      type: 'set_goal',
+      objective: 'Rewrite the parser',
+      tokenBudget: 12000
+    });
+    await vi.waitFor(() => {
+      expect(ofType('goal').length).toBe(1);
+    });
+
+    state.posted.length = 0;
+    state.receive?.({ type: 'send', text: 'do the work', mentions: [], selections: [] });
+    await vi.waitFor(() => {
+      expect(ofType('tool_end').length).toBe(1);
+    });
+
+    // The host applies the status that the model set.
+    const goal = ofType('goal').pop()!.goal!;
+    expect(goal.status).toBe('complete');
+    // The reason of the model reaches the user.
+    const notice = ofType('notice').find((message) =>
+      message.message.includes('The parser is rewritten')
+    );
+    expect(notice?.kind).toBe('info');
+  });
+
+  it('keeps the limit of the goal when the model closes it', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.secrets.set('minimax.apiKey', 'test-key');
+    state.responses.push(GOAL_SSE, TEXT_SSE);
+    await boot();
+
+    state.receive?.({
+      type: 'set_goal',
+      objective: 'Rewrite the parser',
+      tokenBudget: 10
+    });
+    await vi.waitFor(() => {
+      expect(ofType('goal').length).toBe(1);
+    });
+
+    state.posted.length = 0;
+    state.receive?.({ type: 'send', text: 'do the work', mentions: [], selections: [] });
+    await vi.waitFor(() => {
+      expect(ofType('status').pop()?.state).toBe('idle');
+    });
+
+    // The model closed the goal, the spend is counted anyway.
+    const goal = ofType('goal').pop()!.goal!;
+    expect(goal.status).toBe('complete');
+    expect(goal.used.tokens).toBe(27);
+    expect(goal.used.requests).toBe(2);
+
+    // The limit of the goal still holds, the next turn is refused.
+    state.posted.length = 0;
+    state.receive?.({ type: 'send', text: 'again', mentions: [], selections: [] });
+    await vi.waitFor(() => {
+      expect(ofType('notice').length).toBeGreaterThan(0);
+    });
+    expect(ofType('notice')[0]!.message).toContain('budget');
+    // The request did not go out.
+    expect(state.fetched.filter((url) => url === MESSAGES_URL)).toHaveLength(2);
+  });
+
+  it('adds the time of every turn to the goal', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.secrets.set('minimax.apiKey', 'test-key');
+    state.responses.push(TEXT_SSE, TEXT_SSE);
+    // The clock of the test: every request takes five seconds.
+    let clock = 1_000_000;
+    const now = vi.spyOn(Date, 'now').mockImplementation(() => clock);
+    const base = globalThis.fetch as (
+      url: string | URL | Request,
+      init?: RequestInit
+    ) => Promise<Response>;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+        if (String(url).includes('/v1/messages')) {
+          clock += 5000;
+        }
+        return base(url, init);
+      })
+    );
+    const storedGoal = () => {
+      const stored = state.globalState.get('minimax.sessions') as Array<{
+        goal?: { used: { tokens: number; requests: number; seconds: number } };
+      }>;
+      return stored[0]?.goal;
+    };
+    const idleCount = () =>
+      ofType('status').filter((message) => message.state === 'idle').length;
+    try {
+      await boot();
+      state.receive?.({
+        type: 'set_goal',
+        objective: 'Rewrite the parser',
+        tokenBudget: 12000
+      });
+      await vi.waitFor(() => {
+        expect(ofType('goal').length).toBe(1);
+      });
+
+      const idleBefore = idleCount();
+      state.receive?.({ type: 'send', text: 'first', mentions: [], selections: [] });
+      await vi.waitFor(() => {
+        expect(idleCount()).toBeGreaterThan(idleBefore);
+      });
+      await vi.waitFor(() => {
+        expect(storedGoal()?.used.seconds).toBe(5);
+      });
+
+      // The user waits a minute between the turns, the waiting is not work.
+      clock += 60_000;
+      state.receive?.({ type: 'send', text: 'second', mentions: [], selections: [] });
+      await vi.waitFor(() => {
+        expect(idleCount()).toBeGreaterThan(idleBefore + 1);
+      });
+      await vi.waitFor(() => {
+        expect(storedGoal()?.used.seconds).toBe(10);
+      });
+      expect(storedGoal()?.used.requests).toBe(2);
+    } finally {
+      now.mockRestore();
+    }
   });
 
 });

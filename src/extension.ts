@@ -425,11 +425,15 @@ class MiniMaxController {
   }
 
   // The limits of the goal. The agent stops when one of them is over, the
-  // status of the goal stays active: the user raises the limit and the work
-  // continues.
+  // user raises the limit and the work continues.
+  // The status of the goal does not switch the budget off. The status is
+  // the business of the model, the limits are the business of the user, and
+  // a model that marks the goal as blocked or complete keeps its limit.
+  // The idle time between the turns is not work, so the running time is
+  // read only while the turn runs.
   private goalBudgetOk(runtime: RuntimeSession): boolean {
     const goal = runtime.goal;
-    if (!goal || goal.status !== 'active') {
+    if (!goal) {
       return true;
     }
     // The time of the running turn counts too. The time of a turn that is
@@ -585,7 +589,9 @@ class MiniMaxController {
     }
     if (event.type === 'usage') {
       const goal = runtime.goal;
-      if (goal && goal.status === 'active') {
+      // The spend is counted for every status of the goal, the panel has to
+      // show the truth.
+      if (goal) {
         goal.used.tokens +=
           event.usage.inputTokens +
           event.usage.outputTokens +
@@ -619,7 +625,7 @@ class MiniMaxController {
       // the reason of the stop is named, a silent stop confuses.
       this.markStepTime(runtime);
       const goal = runtime.goal;
-      if (goal && goal.status === 'active' && runtime.turnStartedAt > 0) {
+      if (goal && runtime.turnStartedAt > 0) {
         goal.used.seconds += (Date.now() - runtime.turnStartedAt) / 1000;
       }
       const notice = stopNotice(event.stopReason, getSettings().maxIterations, goal);
@@ -800,15 +806,43 @@ class MiniMaxController {
         });
         return;
       }
+      // The limits are numbers the user typed. A limit that is not a
+      // positive number would stop the agent before it starts, and a limit
+      // that is not a number would take the limit away.
+      const limits = [
+        message.tokenBudget,
+        message.requestLimit,
+        message.secondsLimit
+      ];
+      if (
+        limits.some(
+          (limit) => limit !== undefined && (!Number.isFinite(limit) || limit <= 0)
+        )
+      ) {
+        this.panel.post({
+          type: 'notice',
+          message: 'The limits of the goal must be positive numbers.',
+          kind: 'error'
+        });
+        return;
+      }
+      // The same goal with new limits keeps the spend: the user raises the
+      // limit of the goal that is already running and the work continues from
+      // where it stopped. A new objective is a new goal and starts from zero.
+      const previous = runtime.goal;
+      const used =
+        previous && previous.objective === objective
+          ? { ...previous.used }
+          : { tokens: 0, requests: 0, seconds: 0 };
       runtime.goal = {
         objective,
         tokenBudget: message.tokenBudget,
         requestLimit: message.requestLimit,
         secondsLimit: message.secondsLimit,
         status: 'active',
-        used: { tokens: 0, requests: 0, seconds: 0 }
+        used
       };
-      this.panel.post({ type: 'goal', goal: { ...runtime.goal } });
+      this.panel.post({ type: 'goal', goal: runtime.goal });
       this.persist(runtime);
       return;
     }
@@ -902,7 +936,7 @@ class MiniMaxController {
       this.panel.post({
         type: 'notice',
         message: notice?.message ?? 'The budget of the goal is exhausted.',
-        kind: 'warn'
+        kind: notice?.kind ?? 'warn'
       });
       return;
     }
@@ -1401,7 +1435,9 @@ class MiniMaxController {
       })),
       turns: stored.turns ?? [],
       todos: [...(stored.todos ?? [])],
-      goal: stored.goal,
+      goal: stored.goal
+        ? { ...stored.goal, used: { ...stored.goal.used } }
+        : undefined,
       turnStartedAt: 0
     };
   }
