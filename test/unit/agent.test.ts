@@ -414,4 +414,55 @@ describe('Agent', () => {
     await agent.run('make a plan', []);
     expect(depths).toEqual([1]);
   });
+
+  it('sends the spend of every request', async () => {
+    const client = new FakeClient([toolResponse('read_file', {}), textResponse('done')]);
+    const { agent, events } = makeAgent(client);
+    await agent.run('hi', []);
+    const spends = events.filter(
+      (event): event is Extract<AgentEvent, { type: 'usage' }> => event.type === 'usage'
+    );
+    expect(spends).toHaveLength(2);
+    expect(spends[0]?.usage).toEqual({ inputTokens: 10, outputTokens: 5 });
+  });
+
+  it('stops by the budget of the goal', async () => {
+    const client = new FakeClient([toolResponse('read_file', { path: 'a.ts' })]);
+    const events: AgentEvent[] = [];
+    const registry = new ToolRegistry();
+    registry.register({
+      name: 'read_file',
+      description: 'read',
+      approval: 'never',
+      sideEffect: false,
+      inputSchema: { type: 'object', properties: {} },
+      execute: async () => ({ content: 'file content' })
+    });
+    const agent = new Agent({
+      client,
+      registry,
+      approval: new ApprovalGate({
+        autoApprove: [],
+        request: async () => ({ approved: true, allowForSession: false })
+      }),
+      model: 'MiniMax-M3.1-Flash',
+      maxTokens: 32000,
+      maxIterations: 5,
+      effort: 'max',
+      mode: 'code',
+      systemPrompt: 'system',
+      workspaceRoot: '/tmp/root',
+      budget: () => false,
+      logger: { info: () => undefined, error: () => undefined },
+      onEvent: (event) => events.push(event)
+    });
+    const result = await agent.run('read it', []);
+    expect(result.stopReason).toBe('goal_limit');
+    // The tools do not run, the model does not get another round of work.
+    expect(client.requests).toHaveLength(1);
+    const done = events.find(
+      (event): event is Extract<AgentEvent, { type: 'done' }> => event.type === 'done'
+    );
+    expect(done?.stopReason).toBe('goal_limit');
+  });
 });

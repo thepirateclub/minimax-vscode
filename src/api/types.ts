@@ -53,7 +53,8 @@ export type StopReason =
   | 'tool_use'
   | 'max_tokens'
   | 'stop_sequence'
-  | 'max_iterations';
+  | 'max_iterations'
+  | 'goal_limit';
 
 export interface Usage {
   inputTokens: number;

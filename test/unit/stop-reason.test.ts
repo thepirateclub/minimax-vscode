@@ -26,4 +26,15 @@ describe('the reason of the stop', () => {
     ).toBe(true);
     expect(isAbortMessage('the model refused the request')).toBe(false);
   });
+
+  it('names the budget of the goal', () => {
+    const notice = stopNotice('goal_limit', 40, {
+      objective: 'Rewrite the parser',
+      status: 'active',
+      used: { tokens: 12000, requests: 2, seconds: 10 }
+    });
+    expect(notice?.kind).toBe('warn');
+    expect(notice?.message).toContain('Rewrite the parser');
+    expect(notice?.message.toLowerCase()).toContain('budget');
+  });
 });

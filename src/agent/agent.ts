@@ -14,7 +14,7 @@ import type { Logger } from '../logger';
 import type { ToolRegistry } from '../tools/registry';
 import { buildPreview } from '../tools/preview';
 import type { ApprovalGate, DiffPreview } from '../ui/approvals';
-import type { ToolStateUpdate } from './state';
+import type { SessionState, ToolStateUpdate } from './state';
 
 export type AgentEvent =
   | { type: 'assistant_start' }
@@ -33,6 +33,7 @@ export type AgentEvent =
       state?: ToolStateUpdate;
     }
   | { type: 'approval_resolved'; id: string; approved: boolean }
+  | { type: 'usage'; usage: Usage }
   | { type: 'done'; stopReason: StopReason; usage: Usage }
   | { type: 'error'; message: string };
 
@@ -58,6 +59,10 @@ export interface AgentOptions {
   workspaceRoot: string;
   // How deep the agent is. Undefined is the main agent.
   depth?: number;
+  // The budget of the goal. The agent stops when the guard says no.
+  budget?: () => boolean;
+  // The state of the session, the tools read it.
+  sessionState?: SessionState;
   logger: Logger;
   onEvent: (event: AgentEvent) => void;
 }
@@ -126,6 +131,9 @@ export class Agent {
       const streamed = await this.streamWithRetry(messages);
       const blocks = streamed.blocks;
       usage = addUsage(usage, streamed.usage);
+      // The spend of every request goes to the host, the limits of the goal
+      // are checked there.
+      this.options.onEvent({ type: 'usage', usage: streamed.usage });
 
       messages.push({ role: 'assistant', content: blocks });
 
@@ -136,6 +144,15 @@ export class Agent {
       if (toolUses.length === 0) {
         this.options.onEvent({ type: 'done', stopReason: streamed.stopReason, usage });
         return { messages, stopReason: streamed.stopReason, usage, requestIndex };
+      }
+
+      // The budget of the goal. The request that just went out can be the one
+      // that broke the budget, then the tools do not run and the model gets no
+      // more work. The check does not stand at the top of the loop: an answer
+      // that ends the turn without tools stays an answer.
+      if (this.options.budget && !this.options.budget()) {
+        this.options.onEvent({ type: 'done', stopReason: 'goal_limit', usage });
+        return { messages, stopReason: 'goal_limit', usage, requestIndex };
       }
 
       const results: AnthropicContentBlock[] = [];
@@ -245,7 +262,8 @@ export class Agent {
             workspaceRoot: this.options.workspaceRoot,
             signal: this.controller.signal,
             logger: this.options.logger,
-            depth: this.options.depth
+            depth: this.options.depth,
+            sessionState: this.options.sessionState
           });
           content = result.content;
           isError = result.isError === true;

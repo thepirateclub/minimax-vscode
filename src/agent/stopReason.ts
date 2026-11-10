@@ -1,3 +1,4 @@
+import type { GoalState } from './state';
 import type { StopReason } from '../api/types';
 
 export interface StopNotice {
@@ -10,7 +11,8 @@ export interface StopNotice {
 // reader sees a silent stop.
 export function stopNotice(
   stopReason: StopReason,
-  maxIterations: number
+  maxIterations: number,
+  goal?: GoalState
 ): StopNotice | undefined {
   if (stopReason === 'end_turn' || stopReason === 'tool_use') {
     return undefined;
@@ -28,6 +30,17 @@ export function stopNotice(
     return {
       message:
         'The answer was cut, the model reached the limit of tokens for one reply.',
+      kind: 'warn'
+    };
+  }
+  if (stopReason === 'goal_limit') {
+    const name = goal
+      ? 'The budget of the goal "' + goal.objective + '" is exhausted'
+      : 'The budget of the goal is exhausted';
+    return {
+      message:
+        name +
+        ', the agent stopped. Raise the limit in the goal bar and send the next request.',
       kind: 'warn'
     };
   }
