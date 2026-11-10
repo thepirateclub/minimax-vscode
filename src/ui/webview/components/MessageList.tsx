@@ -3,6 +3,7 @@ import type { MouseEvent } from 'react';
 import type { UiMessage } from '../../protocol';
 import { collectFileSources, type CodeSource } from '../codeBlock';
 import { contentChanged, isAtBottom, measure, shouldFollow } from '../listScroll';
+import { writeToClipboard } from '../clipboard';
 import { renderMarkdown } from '../markdown';
 import { STRINGS } from '../strings';
 import { ApprovalCard } from './ApprovalCard';
@@ -11,20 +12,6 @@ import { ToolCard } from './ToolCard';
 
 // The panel keeps the dom small, the older messages are loaded on demand.
 const PAGE = 120;
-
-async function writeToClipboard(text: string): Promise<void> {
-  try {
-    await navigator.clipboard.writeText(text);
-  } catch {
-    // The webview can refuse the clipboard, the fallback keeps the button alive.
-    const area = document.createElement('textarea');
-    area.value = text;
-    document.body.appendChild(area);
-    area.select();
-    document.execCommand('copy');
-    area.remove();
-  }
-}
 
 function handleMarkdownClick(
   event: MouseEvent<HTMLDivElement>,
@@ -73,9 +60,12 @@ function copyCode(event: MouseEvent<HTMLDivElement>): void {
   const block = button.closest('.code-block');
   const code = block?.querySelector('code')?.textContent ?? '';
   void writeToClipboard(code);
-  button.textContent = STRINGS.copied;
+  // The icon turns into a check for a moment, the css swaps the two icons.
+  button.classList.add('copied');
+  button.setAttribute('aria-label', STRINGS.copied);
   window.setTimeout(() => {
-    button.textContent = STRINGS.copy;
+    button.classList.remove('copied');
+    button.setAttribute('aria-label', STRINGS.copy);
   }, 1200);
 }
 

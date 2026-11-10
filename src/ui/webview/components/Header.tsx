@@ -76,7 +76,18 @@ export function Header({
           {formatCount(tokens)} {STRINGS.tokens}
         </span>
       </div>
-      {!hasApiKey ? <div className="warning">{STRINGS.noApiKey}</div> : null}
+      {!hasApiKey ? (
+        <div className="warning">
+          <span className="warning-text">{STRINGS.noApiKey}</span>
+          {tab !== 'settings' ? (
+            // The notice leads to the place of the fix, the reader does not
+            // have to look for the tab.
+            <button className="secondary warning-action" onClick={() => onTab('settings')}>
+              {STRINGS.openSettings}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }

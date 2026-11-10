@@ -3,7 +3,6 @@ import type { ReactNode } from 'react';
 import type { UiToolCall } from '../../protocol';
 import {
   Chevron,
-  IconCopy,
   IconEdit,
   IconList,
   IconRead,
@@ -18,6 +17,8 @@ import { editDiff } from '../editDiff';
 import { DiffView } from './DiffView';
 import { FileReadView } from './FileReadView';
 import { TerminalView } from './TerminalView';
+import { CopyButton } from './CopyButton';
+import { formatInput } from '../toolText';
 
 interface ToolView {
   icon: ReactNode;
@@ -166,19 +167,6 @@ function describeTool(tool: UiToolCall, folded: boolean): ToolView {
   };
 }
 
-// The arguments are shown as a short list, not as a json dump.
-function formatInput(input: Record<string, unknown>): string {
-  const lines: string[] = [];
-  for (const [key, value] of Object.entries(input)) {
-    const shown = text(value);
-    if (shown.length === 0) {
-      continue;
-    }
-    lines.push(key + ': ' + (shown.length > 200 ? shown.slice(0, 200) + '…' : shown));
-  }
-  return lines.join('\n');
-}
-
 export function ToolCard({
   tool,
   collapsed
@@ -269,15 +257,7 @@ export function ToolCard({
               <pre className="tool-input">{formatInput(tool.input)}</pre>
               {tool.content ? (
                 <div className="tool-output-wrap">
-                  <button
-                    className="tool-copy"
-                    onClick={() => {
-                      void navigator.clipboard?.writeText(tool.content ?? '');
-                    }}
-                  >
-                    <IconCopy />
-                    {STRINGS.copy}
-                  </button>
+                  <CopyButton text={tool.content} />
                   <pre className="tool-output">{tool.content}</pre>
                 </div>
               ) : null}

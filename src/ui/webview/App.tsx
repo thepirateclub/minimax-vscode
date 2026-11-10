@@ -9,6 +9,7 @@ import type {
   WebToExt
 } from '../protocol';
 import { Composer, type InsertRequest } from './components/Composer';
+import { EmptyState } from './components/EmptyState';
 import { Header, type PanelTab } from './components/Header';
 import { MessageList } from './components/MessageList';
 import { SettingsView } from './components/SettingsView';
@@ -263,7 +264,7 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
       />
       <div className={'view' + (tab === 'chat' ? '' : ' view-hidden')}>
         {messages.length === 0 ? (
-          <div className="empty">{STRINGS.empty}</div>
+          <EmptyState />
         ) : (
           <MessageList
             messages={messages}

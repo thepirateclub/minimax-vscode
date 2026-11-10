@@ -2,8 +2,7 @@ import { useMemo } from 'react';
 import { languageOf } from '../codeBlock';
 import { parseReadOutput } from '../fileRead';
 import { highlight } from '../highlight';
-import { IconCopy } from '../icons';
-import { STRINGS } from '../strings';
+import { CopyButton } from './CopyButton';
 
 // The read of a file is shown as the file: the numbers stand in a gutter and
 // the text keeps the colors of the language of the file.
@@ -25,16 +24,7 @@ export function FileReadView({ content, path }: { content: string; path: string 
 
   return (
     <div className="file-read">
-      <button
-        className="tool-copy"
-        title={STRINGS.copy}
-        aria-label={STRINGS.copy}
-        onClick={() => {
-          void navigator.clipboard?.writeText(content);
-        }}
-      >
-        <IconCopy />
-      </button>
+      <CopyButton text={content} />
       {blocks.map((block, index) => (
         <div className="file-read-block" key={index}>
           {blocks.length > 1 ? <div className="file-read-path">{block.path}</div> : null}

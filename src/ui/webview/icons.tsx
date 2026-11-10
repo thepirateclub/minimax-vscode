@@ -1,7 +1,7 @@
 // Inline SVG icons, the panel inherits the theme colors from the host.
 import type { ReactNode } from 'react';
 import { CODICON_DEBUG_STOP, CODICON_SEND } from './codicons';
-import { CARET_PATH } from './iconPaths';
+import { CARET_PATH, CHECK_PATH, COPY_PATH, COPY_RECT } from './iconPaths';
 
 interface IconProps {
   size?: number;
@@ -212,8 +212,17 @@ export function IconHistory(): ReactNode {
 export function IconCopy(): ReactNode {
   return (
     <Svg>
-      <rect x="5.5" y="5.5" width="8" height="8" rx="1.2" />
-      <path d="M10.5 5.5v-1a1.2 1.2 0 0 0-1.2-1.2H3.7A1.2 1.2 0 0 0 2.5 4.5v5.6a1.2 1.2 0 0 0 1.2 1.2h1.3" />
+      <rect {...COPY_RECT} />
+      <path d={COPY_PATH} />
+    </Svg>
+  );
+}
+
+// A check of the lucide set, it confirms a copy.
+export function IconCheck(): ReactNode {
+  return (
+    <Svg viewBox="0 0 24 24" strokeWidth={2}>
+      <path d={CHECK_PATH} />
     </Svg>
   );
 }

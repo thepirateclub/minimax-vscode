@@ -45,8 +45,13 @@ export const STRINGS = {
   toolAdded: 'added',
   toolRemoved: 'removed',
   attach: 'Attach',
+  emptyTitle: 'What should we build?',
   empty: 'Ask a question or describe a task. The agent reads files, runs commands and proposes edits.',
-  noApiKey: 'No API key yet. Open the Settings tab and paste your MiniMax key.',
+  emptyHintMention: 'attach a file',
+  emptyHintNewLine: 'new line',
+  emptyHintSend: 'send',
+  noApiKey: 'No API key yet. Paste your MiniMax key in the settings.',
+  openSettings: 'Open settings',
   tokens: 'tokens',
   usageGraph: 'Token spend per action',
   usageAction: 'Action',
@@ -103,6 +108,8 @@ export const STRINGS = {
   jumpToLatest: 'Jump to the latest',
   copy: 'Copy',
   copied: 'Copied',
+  approveCommand: 'Run this command?',
+  approveTool: 'Run',
   today: 'today',
   yesterday: 'yesterday'
 } as const;

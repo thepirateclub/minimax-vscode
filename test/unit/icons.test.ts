@@ -5,6 +5,7 @@ import type { ReactElement, ReactNode } from 'react';
 import {
   IconAttach,
   IconCaret,
+  IconCheck,
   IconCode,
   IconClose,
   IconCopy,
@@ -29,6 +30,7 @@ import { markupBBox, pathPoints } from '../helpers/iconGeometry';
 const ICONS: Array<[string, () => ReactNode]> = [
   ['IconAttach', IconAttach],
   ['IconCaret', IconCaret],
+  ['IconCheck', IconCheck],
   ['IconCode', IconCode],
   ['IconClose', IconClose],
   ['IconCopy', IconCopy],

@@ -82,6 +82,11 @@ export const MESSAGES: UiMessage[] = [
         ]
       }
     }
+  },
+  {
+    id: 'ap2',
+    role: 'assistant',
+    approval: { id: 'ap2', name: 'run_terminal', input: { command: 'npm run typecheck && npm test' } }
   }
 ];
 

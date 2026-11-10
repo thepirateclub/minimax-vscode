@@ -86,6 +86,20 @@ const vscode = {
   postMessage(message: { type: string }): void {
     if (message.type === 'ready') {
       post({ type: 'init', state: STATE });
+      // The composer with its chips and the popup of the file suggestions.
+      if (params.get('composer') === '1') {
+        post({ type: 'selection', selection: { id: 'sel1', path: 'src/ui/format.ts', label: 'format.ts', detail: '3-9' } });
+        post({ type: 'mention', path: 'src/ui/webview/components/Header.tsx' });
+        post({
+          type: 'suggestions',
+          requestId: 'suggestions',
+          items: [
+            { id: 'a', path: 'src/ui/format.ts', label: 'format.ts', source: 'open' },
+            { id: 'b', path: 'src/ui/statusBar.ts', label: 'statusBar.ts', source: 'workspace' },
+            { id: 'c', path: 'src/ui/webview/components/Header.tsx', label: 'Header.tsx', source: 'workspace' }
+          ]
+        });
+      }
     }
     if (message.type === 'request_settings') {
       post({ type: 'settings', settings: SETTINGS });

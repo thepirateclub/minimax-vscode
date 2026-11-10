@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
-import { IconCopy } from '../icons';
 import { STRINGS } from '../strings';
+import { CopyButton } from './CopyButton';
 import { parseTerminalOutput } from '../terminalOutput';
 
 // The output of a command is shown as a terminal: the command stands on its
@@ -23,16 +23,7 @@ export function TerminalView({
   const transcript = [command, ...body.map((line) => line.text)].join('\n');
   return (
     <div className="term">
-      <button
-        className="tool-copy"
-        title={STRINGS.copy}
-        aria-label={STRINGS.copy}
-        onClick={() => {
-          void navigator.clipboard?.writeText(transcript);
-        }}
-      >
-        <IconCopy />
-      </button>
+      <CopyButton text={transcript} />
       <button
         className={'term-command' + (open ? ' term-command-open' : '')}
         title={command}

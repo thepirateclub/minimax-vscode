@@ -1,6 +1,6 @@
 import MarkdownIt from 'markdown-it';
 import { describeCodeBlock, type CodeSource } from './codeBlock';
-import { CARET_SVG } from './iconPaths';
+import { CARET_SVG, CHECK_SVG, COPY_SVG } from './iconPaths';
 import { highlight } from './highlight';
 import { STRINGS } from './strings';
 
@@ -62,7 +62,15 @@ md.renderer.rules.fence = (tokens, idx, _options, env): string => {
         CARET_SVG +
         '</button>'
       : '') +
-    '<button type="button" class="code-copy">Copy</button>' +
+    // The copy is an icon like the copy of a card, it turns into a check.
+    '<button type="button" class="code-copy" title="' +
+    md.utils.escapeHtml(STRINGS.copy) +
+    '" aria-label="' +
+    md.utils.escapeHtml(STRINGS.copy) +
+    '">' +
+    COPY_SVG +
+    CHECK_SVG +
+    '</button>' +
     '</div>';
   return (
     '<div class="' +

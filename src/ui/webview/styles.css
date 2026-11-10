@@ -341,12 +341,26 @@ input:focus {
 }
 
 .warning {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: var(--fs-sm);
   padding: 6px 8px;
   border-radius: var(--radius-sm);
   color: var(--vscode-inputValidation-warningForeground, var(--fg));
   background: var(--vscode-inputValidation-warningBackground, rgba(204, 167, 0, 0.1));
   border: 1px solid var(--warn);
+}
+
+.warning-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.warning-action {
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  font-size: var(--fs-sm);
 }
 
 /* views */
@@ -700,6 +714,13 @@ input:focus {
   background: var(--popup-bg);
 }
 
+/* the check after a copy stays visible while the mouse goes away */
+.tool-copy.copied,
+.tool-copy.copied:hover {
+  opacity: 1;
+  color: var(--ok);
+}
+
 /* approval */
 .approval {
   border: 1px solid var(--vscode-focusBorder, #007fd4);
@@ -724,6 +745,10 @@ input:focus {
 
 .approval .tool-input {
   max-height: 160px;
+}
+
+.approval-command {
+  color: var(--fg);
 }
 
 /* the blocks of a monospace text share one frame */
@@ -1145,6 +1170,9 @@ input:focus {
   --graph-bg: var(--vscode-editorWidget-background, rgba(128, 128, 128, 0.08));
   display: flex;
   align-items: flex-end;
+  /* The newest action stands next to the counter of the session, the graph
+     reads as a timeline that flows into the total. */
+  justify-content: flex-end;
   gap: 2px;
   /* The graph takes the whole width of the header, the columns share it. */
   flex: 1 1 auto;
@@ -1424,6 +1452,83 @@ input:focus {
   color: var(--muted);
   font-size: var(--fs-md);
   line-height: var(--lh);
+  text-align: center;
+}
+
+.empty-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  max-width: 280px;
+}
+
+/* the mark of the agent, the spark of the reasoning selector at a larger size */
+.empty-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--accent);
+}
+
+.empty-mark .icon {
+  width: 20px;
+  height: 20px;
+}
+
+.empty-title {
+  color: var(--fg);
+  font-size: var(--fs-base);
+  font-weight: 600;
+}
+
+.empty-text {
+  margin: 0;
+}
+
+.empty-hints {
+  /* The keys stand in one column and the words in another. */
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: center;
+  gap: 4px 8px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--fs-sm);
+}
+
+.empty-hints li {
+  display: contents;
+}
+
+.empty-keys {
+  display: inline-flex;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.empty-hints li > span:last-child {
+  text-align: left;
+}
+
+/* a key of the keyboard, drawn like the keybinding labels of VS Code */
+kbd {
+  display: inline-block;
+  min-width: 18px;
+  padding: 0 4px;
+  border: 1px solid var(--vscode-keybindingLabel-border, var(--border));
+  border-bottom-color: var(--vscode-keybindingLabel-bottomBorder, var(--border));
+  border-radius: var(--radius-sm);
+  background: var(--vscode-keybindingLabel-background, var(--code-bg));
+  color: var(--vscode-keybindingLabel-foreground, var(--fg));
+  font-family: var(--vscode-font-family);
+  font-size: var(--fs-xs);
+  line-height: 16px;
   text-align: center;
 }
 
@@ -1775,7 +1880,22 @@ html {
 }
 
 .markdown .code-copy {
-  padding: 0 6px;
+  width: var(--control-h);
+  padding: 0;
+}
+
+/* The copy and the check share the button, the class swaps them. */
+.markdown .code-copy .icon-check,
+.markdown .code-copy.copied .icon-copy {
+  display: none;
+}
+
+.markdown .code-copy.copied .icon-check {
+  display: block;
+}
+
+.markdown .code-copy.copied {
+  color: var(--ok);
 }
 
 .markdown .code-toggle {
