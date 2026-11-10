@@ -39,9 +39,36 @@ describe('the widget of the list of tasks', () => {
     expect(render([])).toBe('');
   });
 
+  it('gives every state and every priority its class', () => {
+    const markup = render([
+      { content: 'Read the parser', status: 'pending', priority: 'high' },
+      { content: 'Add tests', status: 'in_progress', priority: 'medium' },
+      { content: 'Ship it', status: 'completed', priority: 'low' }
+    ]);
+    expect(markup).toContain('task-pending');
+    expect(markup).toContain('task-in_progress');
+    expect(markup).toContain('task-completed');
+    expect(markup).toContain('task-high');
+    expect(markup).toContain('task-medium');
+    expect(markup).toContain('task-low');
+  });
+
+  it('shows the priority in the words of the interface', () => {
+    const markup = render([
+      { content: 'Read the parser', status: 'pending', priority: 'high' },
+      { content: 'Add tests', status: 'pending', priority: 'medium' },
+      { content: 'Ship it', status: 'pending', priority: 'low' }
+    ]);
+    expect(markup).toContain('High');
+    expect(markup).toContain('Medium');
+    expect(markup).toContain('Low');
+  });
+
   it('has a rule for every class of the widget', () => {
     const markup = render([
-      { content: 'Read the parser', status: 'completed', priority: 'high' }
+      { content: 'Read the parser', status: 'completed', priority: 'high' },
+      { content: 'Add tests', status: 'pending', priority: 'medium' },
+      { content: 'Ship it', status: 'in_progress', priority: 'low' }
     ]);
     const classes = Array.from(
       markup.matchAll(/class="([^"]*)"/g)

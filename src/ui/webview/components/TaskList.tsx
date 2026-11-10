@@ -1,7 +1,14 @@
 import { useState } from 'react';
-import type { TodoItem } from '../../../agent/state';
+import type { TodoItem, TodoPriority } from '../../../agent/state';
 import { IconList } from '../icons';
 import { STRINGS } from '../strings';
+
+// The priority of a task in the words of the interface.
+const PRIORITY_TEXT: Record<TodoPriority, string> = {
+  high: STRINGS.taskPriorityHigh,
+  medium: STRINGS.taskPriorityMedium,
+  low: STRINGS.taskPriorityLow
+};
 
 // The list of tasks over the feed. The model writes the list, the reader
 // only looks at it: a click on a task changes nothing.
@@ -28,10 +35,13 @@ export function TaskList({ todos }: { todos: TodoItem[] }) {
       {open ? (
         <ul className="task-rows">
           {todos.map((item, index) => (
-            <li key={index} className={'task-row task-' + item.status}>
+            <li
+              key={index}
+              className={'task-row task-' + item.status + ' task-' + item.priority}
+            >
               <span className="task-marker" aria-hidden="true" />
               <span className="task-text">{item.content}</span>
-              <span className="task-priority">{item.priority}</span>
+              <span className="task-priority">{PRIORITY_TEXT[item.priority]}</span>
             </li>
           ))}
         </ul>

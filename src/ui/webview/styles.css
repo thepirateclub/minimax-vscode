@@ -452,6 +452,10 @@ input:focus {
   border-radius: var(--radius-sm);
 }
 
+.task-pending .task-marker {
+  border-color: var(--muted);
+}
+
 .task-in_progress .task-marker {
   border-color: var(--accent);
   background: var(--accent);
@@ -479,6 +483,15 @@ input:focus {
 
 .task-high .task-priority {
   color: var(--accent);
+}
+
+.task-medium .task-priority {
+  color: var(--muted);
+}
+
+.task-low .task-priority {
+  color: var(--muted);
+  opacity: 0.75;
 }
 
 /* messages */
