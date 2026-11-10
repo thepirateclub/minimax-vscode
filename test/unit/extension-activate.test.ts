@@ -1595,4 +1595,78 @@ describe('extension activation', () => {
     expect(globalThis.fetch).toBe(base);
   });
 
+  it('carries the goal of the session into the request of the model', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.secrets.set('minimax.apiKey', 'test-key');
+    state.responses.push(TEXT_SSE, TEXT_SSE);
+    await boot();
+
+    state.receive?.({
+      type: 'set_goal',
+      objective: 'Rewrite the parser',
+      tokenBudget: 12000,
+      requestLimit: 8
+    });
+    await vi.waitFor(() => {
+      expect(ofType('goal').length).toBe(1);
+    });
+
+    state.posted.length = 0;
+    state.receive?.({ type: 'send', text: 'hello', mentions: [], selections: [] });
+    await vi.waitFor(() => {
+      expect(state.bodies.length).toBe(1);
+    });
+    await vi.waitFor(() => {
+      expect(ofType('status').pop()?.state).toBe('idle');
+    });
+
+    // The goal is a section of the prompt of the model.
+    const first = JSON.parse(state.bodies[0]!) as { system: string };
+    expect(first.system).toContain('Goal: Rewrite the parser');
+    expect(first.system).toContain('Budget: 12000 tokens, 8 requests');
+    expect(first.system).toContain('Used: 0 tokens, 0 requests');
+
+    // The next request carries the spend of the previous one.
+    state.posted.length = 0;
+    state.receive?.({ type: 'send', text: 'again', mentions: [], selections: [] });
+    await vi.waitFor(() => {
+      expect(state.bodies.length).toBe(2);
+    });
+    const second = JSON.parse(state.bodies[1]!) as { system: string };
+    expect(second.system).toContain('Goal: Rewrite the parser');
+    expect(second.system).toContain('Used: 18 tokens, 1 requests');
+  });
+
+  it('sends no section of the goal when the session has no goal', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.secrets.set('minimax.apiKey', 'test-key');
+    // The model writes the list of the tasks, the next turn carries it.
+    state.responses.push(TODO_SSE, TEXT_SSE, TEXT_SSE);
+    await boot();
+
+    state.posted.length = 0;
+    state.receive?.({ type: 'send', text: 'plan the work', mentions: [], selections: [] });
+    await vi.waitFor(() => {
+      expect(ofType('todos').length).toBe(1);
+    });
+    await vi.waitFor(() => {
+      expect(ofType('status').pop()?.state).toBe('idle');
+    });
+
+    state.posted.length = 0;
+    state.receive?.({ type: 'send', text: 'continue the work', mentions: [], selections: [] });
+    await vi.waitFor(() => {
+      expect(state.bodies.length).toBe(3);
+    });
+
+    const body = JSON.parse(state.bodies[2]!) as { system: string };
+    // The session carries the list of the tasks, but it has no goal.
+    expect(body.system).toContain('Tasks:');
+    expect(body.system).not.toContain('Goal:');
+    // An empty section of the goal is not pushed into the prompt.
+    expect(body.system).not.toMatch(/\n\n$/);
+  });
+
 });
