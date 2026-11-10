@@ -1087,215 +1087,144 @@ describe('extension activation', () => {
     });
   });
 
-
   it('keeps the list of the tasks of the model in the session', async () => {
-
     const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
-
     state.config.set('root', root);
-
     state.secrets.set('minimax.apiKey', 'test-key');
-
     state.responses.push(TODO_SSE, TEXT_SSE);
-
     await boot();
 
-
-
     state.posted.length = 0;
-
     state.receive?.({ type: 'send', text: 'plan the work', mentions: [], selections: [] });
 
-
-
     await vi.waitFor(() => {
-
       expect(ofType('todos').length).toBe(1);
-
     });
-
     expect(ofType('todos')[0]!.todos).toEqual([
-
       { content: 'Read the parser', status: 'pending', priority: 'high' }
-
     ]);
-
     await vi.waitFor(() => {
-
       const stored = state.globalState.get('minimax.sessions') as Array<{
-
         todos?: unknown[];
-
       }>;
-
       expect(stored[0]?.todos).toEqual([
-
         { content: 'Read the parser', status: 'pending', priority: 'high' }
-
       ]);
-
     });
-
   });
-
-
 
   it('takes the list of the tasks with it when the chat rolls back', async () => {
-
     const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
-
     state.config.set('root', root);
-
     state.secrets.set('minimax.apiKey', 'test-key');
-
     state.responses.push(TODO_SSE, TEXT_SSE);
-
     await boot();
 
-
-
     state.posted.length = 0;
-
     state.receive?.({ type: 'send', text: 'plan the work', mentions: [], selections: [] });
-
     await vi.waitFor(() => {
-
       expect(ofType('todos').length).toBe(1);
-
     });
-
     const userId = ofType('user_message')[0]?.id ?? '';
-
     // The turn is over when the anchor of the request is in the state.
-
     await vi.waitFor(() => {
-
       const stored = state.globalState.get('minimax.sessions') as Array<{
-
         turns?: unknown[];
-
       }>;
-
       expect(stored[0]?.turns?.length).toBe(1);
-
     });
-
-
 
     state.posted.length = 0;
-
     state.receive?.({ type: 'rewind', id: userId });
-
     await vi.waitFor(() => {
-
       expect(ofType('todos').length).toBe(1);
-
     });
-
     // The list of the turn that goes away goes away with it.
-
     expect(ofType('todos')[0]!.todos).toEqual([]);
-
     await vi.waitFor(() => {
-
       const stored = state.globalState.get('minimax.sessions') as Array<{
-
         todos?: unknown[];
-
       }>;
-
       expect(stored[0]?.todos).toEqual([]);
-
     });
-
   });
 
-
-
   it('writes the list of the tasks while the turn runs and keeps the last complete turn', async () => {
-
     const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
-
     state.config.set('root', root);
-
     state.secrets.set('minimax.apiKey', 'test-key');
-
     // The first turn ends, the second one waits for the approval of a write.
-
     state.responses.push(TEXT_SSE, TODO_SSE, TOOL_SSE);
-
     await boot();
 
-
-
     state.receive?.({ type: 'send', text: 'first question', mentions: [], selections: [] });
-
     await vi.waitFor(() => {
-
       expect(ofType('text_delta').length).toBeGreaterThan(0);
-
     });
-
     await vi.waitFor(() => {
-
       const stored = state.globalState.get('minimax.sessions') as Array<{
-
         turns?: unknown[];
-
       }>;
-
       expect(stored[0]?.turns?.length).toBe(1);
-
     });
-
-
 
     state.posted.length = 0;
-
     state.receive?.({ type: 'send', text: 'second question', mentions: [], selections: [] });
-
     // The turn waits for the approval of the write, the list is written already.
-
     await vi.waitFor(() => {
-
       expect(ofType('approval_request').length).toBe(1);
-
     });
-
     await vi.waitFor(() => {
-
       const stored = state.globalState.get('minimax.sessions') as Array<{
-
         todos?: unknown[];
-
         messages: unknown[];
-
         uiMessages: Array<{ text?: string }>;
-
       }>;
-
       expect(stored[0]?.todos).toHaveLength(1);
-
       // The session keeps the last complete turn, not the running one.
-
       expect(stored[0]?.messages).toHaveLength(2);
-
       expect(stored[0]?.uiMessages).toHaveLength(2);
+    });
+    const stored = state.globalState.get('minimax.sessions') as Array<{
+      uiMessages: Array<{ text?: string }>;
+    }>;
+    expect(stored[0]?.uiMessages.map((message) => message.text)).not.toContain(
+      'second question'
+    );
+  });
 
+  it('carries the list of the tasks into the request of the next turn', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.secrets.set('minimax.apiKey', 'test-key');
+    // The model writes the list and answers, the next turn carries it.
+    state.responses.push(TODO_SSE, TEXT_SSE, TEXT_SSE);
+    await boot();
+
+    state.posted.length = 0;
+    state.receive?.({ type: 'send', text: 'plan the work', mentions: [], selections: [] });
+    await vi.waitFor(() => {
+      expect(ofType('text_delta').length).toBeGreaterThan(0);
+    });
+    // The turn is over, the agent waits for the next request.
+    await vi.waitFor(() => {
+      expect(ofType('status').pop()?.state).toBe('idle');
     });
 
-    const stored = state.globalState.get('minimax.sessions') as Array<{
+    state.posted.length = 0;
+    state.receive?.({ type: 'send', text: 'continue the work', mentions: [], selections: [] });
+    await vi.waitFor(() => {
+      expect(state.bodies.length).toBe(3);
+    });
 
-      uiMessages: Array<{ text?: string }>;
-
-    }>;
-
-    expect(stored[0]?.uiMessages.map((message) => message.text)).not.toContain(
-
-      'second question'
-
-    );
-
+    // The list was empty when the first turn started, that request has no section.
+    const first = JSON.parse(state.bodies[0]!) as { system: string };
+    expect(first.system).not.toContain('Tasks:');
+    // The list of the tasks is a section of the prompt of the model.
+    const body = JSON.parse(state.bodies[2]!) as { system: string };
+    expect(body.system).toContain('Tasks:');
+    expect(body.system).toContain('- [pending] Read the parser (high)');
+    expect(body.system).toContain('\nTasks:\n- [pending] Read the parser (high)');
   });
 
 });
