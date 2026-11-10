@@ -132,7 +132,9 @@ button {
   line-height: var(--lh-tight);
   padding: 4px 12px;
   border-radius: var(--radius-sm);
-  border: 1px solid transparent;
+  /* The modern themes draw a secondary button with a clear fill and an outline
+     from this variable: without it the button reads as plain text. */
+  border: 1px solid var(--vscode-button-border, transparent);
   background: var(--vscode-button-background, #0078d4);
   color: var(--vscode-button-foreground, #ffffff);
   cursor: pointer;
@@ -480,6 +482,7 @@ input:focus {
   white-space: pre-wrap;
   color: var(--muted);
   background: var(--code-bg);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   max-height: 320px;
   overflow: auto;
@@ -649,6 +652,9 @@ input:focus {
   white-space: pre-wrap;
   word-break: break-word;
   background: var(--code-bg);
+  /* Light Modern paints the code ground in the color of the side bar, a
+     block held by its fill alone melts into the panel. */
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   max-height: 260px;
   overflow: auto;
@@ -1419,6 +1425,13 @@ input:focus {
   font-size: var(--fs-md);
   line-height: var(--lh);
   text-align: center;
+}
+
+/* The host sets scrollbar-color on the html in its default styles. While
+   that standard property is set, Chromium ignores the rules below and draws
+   the system bar with arrows on a track in the color of the editor. */
+html {
+  scrollbar-color: auto;
 }
 
 /* A thin bar with a gap from the edge, a wide one cut the code blocks. */

@@ -4,8 +4,10 @@ import { STRINGS } from '../strings';
 
 // One bar per action, the height is the token spend of that action.
 export function UsageGraph({ turns }: { turns: UiUsageTurn[] }) {
+  // An empty chat keeps the frame of the graph, the row of the header does
+  // not shrink to a lonely counter.
   if (turns.length === 0) {
-    return null;
+    return <div className="usage-graph" role="img" aria-label={STRINGS.usageGraph} />;
   }
   const max = Math.max(
     ...turns.map((turn) => turn.input + (turn.cache ?? 0) + turn.output),

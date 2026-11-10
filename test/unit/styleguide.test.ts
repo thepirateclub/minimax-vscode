@@ -132,6 +132,32 @@ describe('styleguide rules', () => {
     expect(reds).toEqual([]);
   });
 
+  it('takes the scroll bar back from the default styles of the host', () => {
+    // VS Code sets scrollbar-color on the html, and while it is set the
+    // webkit rules of the bar are ignored.
+    const reset = USES.find((item) => item.selector === 'html' && item.property === 'scrollbar-color');
+    expect(reset?.value).toBe('auto');
+  });
+
+  it('outlines a button with the border of the theme', () => {
+    // The modern themes draw a secondary button with a clear fill, the
+    // outline comes from --vscode-button-border.
+    const border = USES.find((item) => item.selector === 'button' && item.property === 'border');
+    expect(border?.value).toContain('--vscode-button-border');
+  });
+
+  it('frames every block of a monospace text', () => {
+    // Light Modern paints the code ground in the color of the side bar, a
+    // block held by its fill alone melts into the panel.
+    const blocks = ['.tool-input, .tool-output', '.thinking-body', '.diff, .file-read, .term', '.markdown .code-block'];
+    for (const selector of blocks) {
+      const border = USES.find(
+        (item) => item.selector.replace(/\s+/g, ' ') === selector && item.property === 'border'
+      );
+      expect(border?.value, selector).toBe('1px solid var(--border)');
+    }
+  });
+
   it('paints a transparent fill only on a plain ground', () => {
     // A transparent bar over the grid of the graph striped the column.
     const input = USES.find((item) => item.selector === '.usage-input' && item.property === 'opacity');

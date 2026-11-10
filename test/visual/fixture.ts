@@ -1,0 +1,99 @@
+// One chat that holds every kind of message of the panel. The stand of the
+// panel and the check inside VS Code show the same chat.
+import type { UiMessage, UiSessionSummary, UiUsageTurn } from '../../src/ui/protocol';
+
+const README = Array.from({ length: 14 }, (_, i) => `${i + 1}: ${i % 3 === 0 ? 'import { join } from \'node:path\';' : i % 3 === 1 ? 'export function run(args: string[]): number {' : '  return args.length; // count'}`).join('\n');
+
+export const MESSAGES: UiMessage[] = [
+  { id: 'u1', role: 'user', text: 'Найди, где считается расход токенов, и добавь округление.' },
+  {
+    id: 'a1',
+    role: 'assistant',
+    thinking: 'The user wants rounding. Look at src/ui/format.ts first.',
+    text: '## Plan\n\nI will read **format.ts**, then patch `formatCount`.\n\n1. Read the module\n2. Add the `B` suffix\n\n> The status bar uses the same helper.\n\n```ts\nexport function formatCount(value: number): string {\n  return value >= 1e9 ? (value / 1e9).toFixed(1) + \'B\' : String(value);\n}\n```\n\n| Suffix | Value |\n|---|---|\n| K | 1e3 |\n| M | 1e6 |'
+  },
+  {
+    id: 't1',
+    role: 'tool',
+    tool: { id: 't1', name: 'read_file', input: { path: 'src/ui/format.ts', start_line: 1, end_line: 14 }, content: README, durationMs: 4 }
+  },
+  {
+    id: 't2',
+    role: 'tool',
+    tool: { id: 't2', name: 'search_code', input: { query: 'formatCount' }, content: 'src/ui/format.ts:3\nsrc/ui/statusBar.ts:12\nsrc/ui/webview/components/Header.tsx:5', durationMs: 18 }
+  },
+  {
+    id: 't3',
+    role: 'tool',
+    tool: {
+      id: 't3',
+      name: 'edit_file',
+      input: { path: 'src/ui/format.ts' },
+      content: 'Edited src/ui/format.ts',
+      durationMs: 9,
+      diff: {
+        path: 'src/ui/format.ts',
+        lines: [
+          { type: 'context', text: 'export function formatCount(value: number): string {' },
+          { type: 'remove', text: '  return String(value);' },
+          { type: 'add', text: '  if (value >= 1e9) return (value / 1e9).toFixed(1) + \'B\';' },
+          { type: 'add', text: '  return String(value);' },
+          { type: 'context', text: '}' }
+        ]
+      }
+    }
+  },
+  {
+    id: 't4',
+    role: 'tool',
+    tool: {
+      id: 't4',
+      name: 'run_terminal',
+      input: { command: 'npm test -- format' },
+      content: 'Command failed with exit code 1\n> vitest run format\n\nstderr: FAIL test/unit/format.test.ts > rounds billions\nstderr: AssertionError: expected \'1.0B\' to be \'1B\'\n Tests 1 failed | 12 passed',
+      isError: true,
+      durationMs: 2412
+    }
+  },
+  {
+    id: 't5',
+    role: 'tool',
+    tool: { id: 't5', name: 'list_files', input: { path: 'src/ui' }, content: 'format.ts\nprotocol.ts\nstatusBar.ts', durationMs: 2 }
+  },
+  {
+    id: 't6',
+    role: 'tool',
+    tool: { id: 't6', name: 'run_terminal', input: { command: 'npm run typecheck' }, running: true }
+  },
+  { id: 'n1', role: 'notice', text: 'Cannot open src/missing.ts: the file does not exist.' },
+  {
+    id: 'ap1',
+    role: 'assistant',
+    approval: {
+      id: 'ap1',
+      name: 'write_file',
+      input: { path: 'src/ui/format.ts' },
+      preview: {
+        path: 'src/ui/format.ts',
+        lines: [
+          { type: 'context', text: 'export function formatCount(value: number): string {' },
+          { type: 'add', text: '  return value.toLocaleString();' },
+          { type: 'context', text: '}' }
+        ]
+      }
+    }
+  }
+];
+
+export function sessions(now: number): UiSessionSummary[] {
+  return [
+    { id: 's1', title: 'Rounding of the token counter', updatedAt: now },
+    { id: 's2', title: 'Fix the diff colors in the light theme of the editor', updatedAt: now - 90_000_000 }
+  ];
+}
+
+export const USAGE: UiUsageTurn[] = Array.from({ length: 18 }, (_, i) => ({
+  input: 2000 + ((i * 937) % 5000),
+  output: 200 + ((i * 431) % 1600),
+  cache: i % 4 === 0 ? 800 : 0
+}));
