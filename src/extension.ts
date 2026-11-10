@@ -8,7 +8,7 @@ import type { AnthropicMessage, EffortLevel } from './api/types';
 import type { AgentEvent } from './agent/agent';
 import { buildWorkspaceSnapshot, renderSnapshot } from './agent/context';
 import { readMentionedFiles } from './agent/mentions';
-import { buildSystemPrompt, renderGitContext } from './agent/prompt';
+import { buildSystemPrompt, renderGitContext, renderTasksContext } from './agent/prompt';
 import { generateCommitMessage } from './agent/commitMessage';
 import { AgentSession } from './agent/session';
 import type { TodoItem } from './agent/state';
@@ -404,6 +404,21 @@ class MiniMaxController {
     return renderGitContext(summarizeState(state));
   }
 
+  // The context of the turn carries the state of the repository and the
+  // list of tasks, both change between the turns.
+  private async sessionContext(runtime: RuntimeSession): Promise<string> {
+    const parts: string[] = [];
+    const git = await this.gitContext();
+    if (git.length > 0) {
+      parts.push(git);
+    }
+    const tasks = renderTasksContext(runtime.todos);
+    if (tasks.length > 0) {
+      parts.push(tasks);
+    }
+    return parts.join('\n\n');
+  }
+
   private async ensureAgent(runtime: RuntimeSession): Promise<AgentSession | undefined> {
     if (runtime.agent) {
       return runtime.agent;
@@ -435,7 +450,7 @@ class MiniMaxController {
       historyLimit: settings.historyMaxMessages,
       contextThreshold: settings.contextThreshold,
       systemPrompt: await this.buildPrompt(),
-      contextProvider: async () => await this.gitContext(),
+      contextProvider: async () => await this.sessionContext(runtime),
       workspaceRoot: this.workspaceRoot(),
       logger: this.logger,
       autoApprove: settings.autoApprove,

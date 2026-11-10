@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { buildSystemPrompt, renderGitContext, type PromptContext } from '../../src/agent/prompt';
+import {
+  buildSystemPrompt,
+  renderGitContext,
+  renderTasksContext,
+  type PromptContext
+} from '../../src/agent/prompt';
 
 const context: PromptContext = {
   workspaceRoot: 'C:\\work',
@@ -72,5 +77,21 @@ describe('system prompt', () => {
     expect(prompt).toContain('patterns');
     expect(prompt).toContain('ignore_case');
     expect(prompt).toContain('path');
+  });
+});
+
+describe('the list of tasks in the prompt', () => {
+  it('renders every task with its state and its priority', () => {
+    const text = renderTasksContext([
+      { content: 'Read the parser', status: 'in_progress', priority: 'high' },
+      { content: 'Add tests', status: 'completed', priority: 'medium' }
+    ]);
+    expect(text).toContain('Tasks:');
+    expect(text).toContain('- [in_progress] Read the parser (high)');
+    expect(text).toContain('- [completed] Add tests (medium)');
+  });
+
+  it('renders nothing when the list is empty', () => {
+    expect(renderTasksContext([])).toBe('');
   });
 });

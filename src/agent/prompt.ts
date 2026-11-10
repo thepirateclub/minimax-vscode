@@ -1,4 +1,5 @@
 import type { AgentMode } from '../config/models';
+import type { TodoItem } from './state';
 
 export interface PromptContext {
   workspaceRoot: string;
@@ -92,6 +93,11 @@ const TOOL_LINES: Array<{ name: string; line: string }> = [
     name: 'run_terminal',
     line: '- run_terminal(command, cwd?, timeout_ms?) - run a shell command in the workspace root'
   },
+  {
+    name: 'todo_write',
+    line:
+      '- todo_write(todos) - write the list of tasks of the session, every task with its state and its priority'
+  }
 ];
 
 // The state of the repository is a section of its own, it changes between the
@@ -101,6 +107,20 @@ export function renderGitContext(lines: string[]): string {
     return '';
   }
   return ['Repository:', ...lines.map((line) => '- ' + line)].join('\n');
+}
+
+// The list of tasks is a section of its own, the model writes it and the
+// reader sees it over the chat.
+export function renderTasksContext(todos: TodoItem[]): string {
+  if (todos.length === 0) {
+    return '';
+  }
+  return [
+    'Tasks:',
+    ...todos.map(
+      (item) => '- [' + item.status + '] ' + item.content + ' (' + item.priority + ')'
+    )
+  ].join('\n');
 }
 
 export function buildSystemPrompt(context: PromptContext): string {
