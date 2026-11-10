@@ -424,11 +424,13 @@ describe('Agent', () => {
     );
     expect(spends).toHaveLength(2);
     expect(spends[0]?.usage).toEqual({ inputTokens: 10, outputTokens: 5 });
+    expect(spends[1]?.usage).toEqual({ inputTokens: 10, outputTokens: 5 });
   });
 
   it('stops by the budget of the goal', async () => {
     const client = new FakeClient([toolResponse('read_file', { path: 'a.ts' })]);
     const events: AgentEvent[] = [];
+    let toolRuns = 0;
     const registry = new ToolRegistry();
     registry.register({
       name: 'read_file',
@@ -436,7 +438,10 @@ describe('Agent', () => {
       approval: 'never',
       sideEffect: false,
       inputSchema: { type: 'object', properties: {} },
-      execute: async () => ({ content: 'file content' })
+      execute: async () => {
+        toolRuns += 1;
+        return { content: 'file content' };
+      }
     });
     const agent = new Agent({
       client,
@@ -460,6 +465,7 @@ describe('Agent', () => {
     expect(result.stopReason).toBe('goal_limit');
     // The tools do not run, the model does not get another round of work.
     expect(client.requests).toHaveLength(1);
+    expect(toolRuns).toBe(0);
     const done = events.find(
       (event): event is Extract<AgentEvent, { type: 'done' }> => event.type === 'done'
     );
