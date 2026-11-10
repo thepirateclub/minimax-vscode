@@ -11,6 +11,8 @@ import { readMentionedFiles } from './agent/mentions';
 import { buildSystemPrompt, renderGitContext } from './agent/prompt';
 import { generateCommitMessage } from './agent/commitMessage';
 import { AgentSession } from './agent/session';
+import { isAbortMessage, stopNotice } from './agent/stopReason';
+import { findRequestIndex, turnOfMessage, type TurnAnchor } from './agent/turns';
 import { AGENT_MODES, MODELS, resolveBaseUrl } from './config/models';
 import {
   clearApiKey as clearStoredApiKey,
@@ -58,6 +60,12 @@ interface RuntimeSession {
   errorReported: boolean;
   // The token spend of every action of this session.
   usage: UiUsageTurn[];
+  // The anchors of the requests, they tell where a request sits in the
+  // history and let the chat roll back to it.
+  turns: TurnAnchor[];
+  // When the turn of this moment started, the panel shows how long it
+  // took.
+  turnStartedAt: number;
 }
 
 const TITLE_LIMIT = 60;
@@ -516,11 +524,29 @@ class MiniMaxController {
         runtime.usage = runtime.usage.slice(-MAX_USAGE_TURNS);
       }
       this.panel.post({ type: 'usage', turns: runtime.usage });
+      // The last message of the step tells how long the step took, and
+      // the reason of the stop is named, a silent stop confuses.
+      this.markStepTime(runtime);
+      const notice = stopNotice(event.stopReason, getSettings().maxIterations);
+      if (notice) {
+        this.panel.post({ type: 'notice', message: notice.message, kind: notice.kind });
+      }
       this.setState('idle');
       return;
     }
     if (event.type === 'error') {
       runtime.errorReported = true;
+      if (isAbortMessage(event.message)) {
+        // The user stopped the turn, it is not a failure of the server.
+        this.panel.post({
+          type: 'notice',
+          message: 'The request was stopped.',
+          kind: 'info'
+        });
+        this.markStepTime(runtime);
+        this.setState('idle');
+        return;
+      }
       this.panel.post({ type: 'error', message: event.message });
       this.setState('error');
     }
@@ -635,6 +661,10 @@ class MiniMaxController {
       this.activeSession()?.agent?.stop();
       return;
     }
+    if (message.type === 'rewind') {
+      await this.rewindTo(message.id);
+      return;
+    }
     if (message.type === 'approve') {
       this.activeSession()?.agent?.approve(message.id, message.allowForSession);
       this.panel.post({ type: 'approval_resolved', id: message.id, approved: true });
@@ -741,6 +771,7 @@ class MiniMaxController {
       runtime.title = firstLine.slice(0, TITLE_LIMIT) || 'New chat';
     }
     this.setState('thinking');
+    runtime.turnStartedAt = Date.now();
 
     try {
       await vscode.window.withProgress(
@@ -764,9 +795,86 @@ class MiniMaxController {
     } finally {
       runtime.busy = false;
       runtime.history = agent.getHistory();
+      // The anchor of the request, the chat can roll back to it.
+      runtime.turns.push({
+        uiId: userId,
+        text,
+        historyIndex: findRequestIndex(runtime.history, text),
+        mentions,
+        selections
+      });
       this.persist(runtime);
       void this.refreshQuota();
     }
+  }
+
+  // The last message of the step tells how long the step took.
+  private markStepTime(runtime: RuntimeSession): void {
+    if (runtime.turnStartedAt === 0) {
+      return;
+    }
+    const elapsed = Date.now() - runtime.turnStartedAt;
+    if (elapsed < 0) {
+      return;
+    }
+    for (let i = runtime.uiMessages.length - 1; i >= 0; i--) {
+      const message = runtime.uiMessages[i]!;
+      if (message.role === 'assistant') {
+        message.elapsedMs = elapsed;
+        this.panel.post({
+          type: 'step_time',
+          id: message.id,
+          elapsedMs: elapsed
+        });
+        return;
+      }
+    }
+  }
+
+  // The chat rolls back to a request and runs it again. The messages
+  // after the request go away, the history of the model is cut at the
+  // same place, so the answer of the model starts from the same state.
+  private async rewindTo(id: string): Promise<void> {
+    const runtime = this.activeSession();
+    if (!runtime) {
+      return;
+    }
+    if (runtime.busy) {
+      this.panel.post({
+        type: 'notice',
+        message: 'The agent is busy, wait for the turn to end.',
+        kind: 'warn'
+      });
+      return;
+    }
+    const turn = turnOfMessage(runtime.turns, runtime.uiMessages, id);
+    if (!turn) {
+      this.panel.post({
+        type: 'notice',
+        message: 'This message has no request to repeat, the chat is too old.',
+        kind: 'warn'
+      });
+      return;
+    }
+    const userIndex = runtime.uiMessages.findIndex(
+      (message) => message.id === turn.uiId
+    );
+    if (userIndex === -1) {
+      return;
+    }
+    // The turns after this one go away with the messages.
+    runtime.turns = runtime.turns.filter((item) => {
+      const at = runtime.uiMessages.findIndex((message) => message.id === item.uiId);
+      return at !== -1 && at < userIndex;
+    });
+    const found = findRequestIndex(runtime.history, turn.text, turn.historyIndex);
+    const cut = found === -1 ? runtime.history.length : found;
+    runtime.history = runtime.history.slice(0, cut);
+    runtime.agent?.setHistory(runtime.history);
+    runtime.uiMessages = runtime.uiMessages.slice(0, userIndex);
+    // The panel gets a copy, the chat grows right after this line.
+    this.panel.post({ type: 'session_loaded', messages: [...runtime.uiMessages] });
+    await this.handleSend(turn.text, turn.mentions, turn.selections);
   }
 
   private async buildPromptText(
@@ -986,7 +1094,8 @@ class MiniMaxController {
       updatedAt: runtime.updatedAt,
       messages: runtime.history,
       uiMessages: runtime.uiMessages,
-      usage: runtime.usage
+      usage: runtime.usage,
+      turns: runtime.turns
     };
     // A full state of the host must not break the turn, the chat stays in
     // memory and the failure goes to the log.
@@ -1023,7 +1132,9 @@ class MiniMaxController {
         input: turn.input,
         output: turn.output,
         cache: turn.cache ?? 0
-      }))
+      })),
+      turns: stored.turns ?? [],
+      turnStartedAt: 0
     };
   }
 
@@ -1042,7 +1153,9 @@ class MiniMaxController {
       agent: undefined,
       busy: false,
       errorReported: false,
-      usage: []
+      usage: [],
+      turns: [],
+      turnStartedAt: 0
     });
     this.activeSessionId = id;
     // The id of the new chat goes to the state of the host together with the

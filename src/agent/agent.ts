@@ -309,7 +309,14 @@ export class Agent {
         return { blocks, stopReason, usage };
       } catch (error) {
         const retryable = error instanceof MiniMaxApiError && error.retryable;
-        if (!retryable || emitted || attempt >= RETRY_DELAYS_MS.length) {
+        // A request that the user stopped is not a failure of the server,
+        // a retry would wait and fail again.
+        if (
+          this.controller.signal.aborted ||
+          !retryable ||
+          emitted ||
+          attempt >= RETRY_DELAYS_MS.length
+        ) {
           const message = error instanceof Error ? error.message : String(error);
           this.options.onEvent({ type: 'error', message });
           throw error;

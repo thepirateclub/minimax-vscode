@@ -448,3 +448,51 @@ describe('the dot of an action', () => {
     expect(markup).not.toContain('Command failed with exit code');
   });
 });
+
+describe('the body of a card', () => {
+  it('does not draw an empty block of the arguments', () => {
+    const markup = card({ name: 'git_status', input: {}, content: 'branch: main' });
+    // A tool without arguments has nothing to show, an empty box reads
+    // like a panel that failed to open.
+    expect(markup).not.toContain('tool-input');
+  });
+
+  it('names the worktrees of the repository', () => {
+    const markup = card({
+      name: 'git_worktree_list',
+      input: {},
+      content: '.worktrees/wt  feature/x  abc1234'
+    });
+    expect(titleOf(markup)).toBe('Git worktrees');
+  });
+
+  it('names the worktree that the agent adds', () => {
+    const markup = card({
+      name: 'git_worktree_add',
+      input: { path: '.worktrees/wt' },
+      content: 'added the worktree .worktrees/wt on the branch feature/x'
+    });
+    expect(titleOf(markup)).toContain('Add worktree');
+    expect(titleOf(markup)).toContain('.worktrees/wt');
+  });
+
+  it('shows the time of the action with its unit', () => {
+    const markup = card({
+      name: 'git_status',
+      input: {},
+      content: 'branch: main',
+      durationMs: 12500
+    });
+    expect(markup).toContain('12.5s');
+    expect(markup).not.toContain('12500 ms');
+  });
+
+  it('names the words of the search', () => {
+    const markup = card({
+      name: 'search_code',
+      input: { query: 'hp:', patterns: ['hp:', 'atk:'] },
+      content: 'js/units.js:12: hp: 10'
+    });
+    expect(titleOf(markup)).toContain('hp: atk:');
+  });
+});

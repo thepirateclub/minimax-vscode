@@ -20,6 +20,7 @@ import { FileReadView } from './FileReadView';
 import { TerminalView } from './TerminalView';
 import { CopyButton } from './CopyButton';
 import { formatInput } from '../toolText';
+import { formatDuration } from '../../format';
 
 interface ToolView {
   icon: ReactNode;
@@ -133,11 +134,16 @@ function describeTool(tool: UiToolCall, folded: boolean): ToolView {
     };
   }
   if (tool.name === 'search_code') {
-    const query = text(input['query']);
+    // The patterns replace the query, the card names them as they are.
+    const many = input['patterns'];
+    const patterns = Array.isArray(many)
+      ? many.filter((item): item is string => typeof item === 'string')
+      : [];
+    const shown = patterns.length > 0 ? patterns.join(' ') : text(input['query']);
     const noMatch = (content ?? '').startsWith('No matches');
     return {
       icon: <IconSearch />,
-      title: STRINGS.toolSearch + ' "' + query + '"',
+      title: STRINGS.toolSearch + ' "' + shown + '"',
       summary: noMatch ? '0 ' + STRINGS.toolMatches : countLines(content) + ' ' + STRINGS.toolMatches
     };
   }
@@ -237,6 +243,27 @@ function describeTool(tool: UiToolCall, folded: boolean): ToolView {
       summary: firstLine(content)
     };
   }
+  if (tool.name === 'git_worktree_list') {
+    return {
+      icon: <IconGit />,
+      title: STRINGS.toolGitWorktrees,
+      summary: countLines(content) + ' ' + STRINGS.toolGitWorktreeCount
+    };
+  }
+  if (tool.name === 'git_worktree_add') {
+    return {
+      icon: <IconGit />,
+      title: STRINGS.toolGitWorktreeAdd + ' ' + (paths[0] ?? ''),
+      summary: firstLine(content)
+    };
+  }
+  if (tool.name === 'git_worktree_remove') {
+    return {
+      icon: <IconGit />,
+      title: STRINGS.toolGitWorktreeRemove + ' ' + (paths[0] ?? ''),
+      summary: firstLine(content)
+    };
+  }
   return {
     icon: <IconRead />,
     title: tool.name,
@@ -280,6 +307,9 @@ export function ToolCard({
       ? STRINGS.toolFailed
       : STRINGS.toolDone;
   const view = describe(tool, !open);
+  // A tool without arguments has nothing to show, an empty block reads
+  // like a panel that failed to open.
+  const inputText = formatInput(tool.input);
   return (
     <div
       className={
@@ -303,8 +333,8 @@ export function ToolCard({
         ) : null}
         <span className="tool-tail">
           {tool.durationMs !== undefined ? (
-            <span className="tool-time">
-              {tool.durationMs} {STRINGS.toolElapsed}
+            <span className="tool-time" title={STRINGS.toolElapsed}>
+              {formatDuration(tool.durationMs)}
             </span>
           ) : null}
           <span
@@ -331,7 +361,9 @@ export function ToolCard({
             />
           ) : (
             <>
-              <pre className="tool-input">{formatInput(tool.input)}</pre>
+              {inputText.length > 0 ? (
+                <pre className="tool-input">{inputText}</pre>
+              ) : null}
               {tool.content ? (
                 <div className="tool-output-wrap">
                   <CopyButton text={tool.content} />

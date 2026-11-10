@@ -56,4 +56,21 @@ describe('system prompt', () => {
     expect(renderGitContext(['Branch main, 2 changed files'])).toContain('- Branch main');
     expect(renderGitContext([])).toBe('');
   });
+
+  it('lists the tools of the worktrees', () => {
+    const prompt = buildSystemPrompt({
+      ...context,
+      tools: ['git_worktree_list', 'git_worktree_add', 'git_worktree_remove']
+    });
+    expect(prompt).toContain('git_worktree_list');
+    expect(prompt).toContain('git_worktree_add');
+    expect(prompt).toContain('git_worktree_remove');
+  });
+
+  it('tells the model that the search takes several words and a file', () => {
+    const prompt = buildSystemPrompt({ ...context, tools: ['search_code'] });
+    expect(prompt).toContain('patterns');
+    expect(prompt).toContain('ignore_case');
+    expect(prompt).toContain('path');
+  });
 });

@@ -33,6 +33,9 @@ export interface UiApproval {
   preview?: { path: string; lines: UiDiffLine[] };
 }
 
+// The kind of a notice: a note, a warning or a failure.
+export type NoticeKind = 'info' | 'warn' | 'error';
+
 export interface UiMessage {
   id: string;
   // A notice is a failure of the panel itself, it is not the answer of the
@@ -42,6 +45,10 @@ export interface UiMessage {
   thinking?: string;
   tool?: UiToolCall;
   approval?: UiApproval;
+  // The kind of a notice.
+  kind?: NoticeKind;
+  // The time of the step that ends with this message.
+  elapsedMs?: number;
 }
 
 export interface UiSessionSummary {
@@ -150,6 +157,8 @@ export type ExtToWeb =
   | { type: 'theme'; kind: ThemeKind }
   | { type: 'usage'; turns: UiUsageTurn[] }
   | { type: 'error'; message: string }
+  | { type: 'notice'; message: string; kind: NoticeKind }
+  | { type: 'step_time'; id: string; elapsedMs: number }
   | { type: 'session_loaded'; messages: UiMessage[] }
   | { type: 'sessions'; sessions: UiSessionSummary[] }
   | { type: 'models'; models: ModelInfo[]; selected: string }
@@ -163,6 +172,7 @@ export type WebToExt =
   | { type: 'ready' }
   | { type: 'send'; text: string; mentions: string[]; selections: UiSelection[] }
   | { type: 'stop' }
+  | { type: 'rewind'; id: string }
   | { type: 'approve'; id: string; allowForSession: boolean }
   | { type: 'reject'; id: string }
   | { type: 'new_session' }

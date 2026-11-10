@@ -1,5 +1,6 @@
 import { MAX_HISTORY_MESSAGES, trimHistory } from '../api/history';
 import type { AnthropicMessage } from '../api/types';
+import type { TurnAnchor } from '../agent/turns';
 import type { UiDiffLine, UiMessage, UiUsageTurn } from '../ui/protocol';
 
 export interface StoredSession {
@@ -9,6 +10,8 @@ export interface StoredSession {
   messages: AnthropicMessage[];
   uiMessages: UiMessage[];
   usage: UiUsageTurn[];
+  // The anchors of the requests, the chat rolls back to one of them.
+  turns?: TurnAnchor[];
 }
 
 // The state of the host. The type is structural, so the store stays testable
@@ -25,6 +28,7 @@ export const MAX_STORED_HISTORY = MAX_HISTORY_MESSAGES;
 export const MAX_STORED_MESSAGE_CHARS = 200_000;
 export const MAX_STORED_DIFF_LINES = 600;
 export const MAX_STORED_USAGE_TURNS = 24;
+export const MAX_STORED_TURNS = 50;
 
 function capText(text: string | undefined): string | undefined {
   if (text === undefined) {
@@ -73,7 +77,8 @@ export function capSession(session: StoredSession): StoredSession {
     updatedAt: session.updatedAt,
     messages: trimHistory(session.messages, MAX_STORED_HISTORY),
     uiMessages: session.uiMessages.slice(-MAX_STORED_MESSAGES).map(capMessage),
-    usage: session.usage.slice(-MAX_STORED_USAGE_TURNS)
+    usage: session.usage.slice(-MAX_STORED_USAGE_TURNS),
+    turns: (session.turns ?? []).slice(-MAX_STORED_TURNS)
   };
 }
 

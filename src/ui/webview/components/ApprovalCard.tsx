@@ -27,9 +27,9 @@ export function ApprovalCard({
           <span className="term-prompt">$ </span>
           {String(approval.input['command'] ?? '')}
         </pre>
-      ) : (
+      ) : formatInput(approval.input).length > 0 ? (
         <pre className="tool-input">{formatInput(approval.input)}</pre>
-      )}
+      ) : null}
       <div className="approval-actions">
         <button onClick={() => onApprove(false)}>{STRINGS.approve}</button>
         {/* One primary button in a group, the wider grant is secondary. */}

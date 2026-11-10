@@ -2,7 +2,9 @@ import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import type { MouseEvent } from 'react';
 import type { UiMessage } from '../../protocol';
 import { collectFileSources, type CodeSource } from '../codeBlock';
+import { IconRetry, IconRewind } from '../icons';
 import { contentChanged, isAtBottom, measure, shouldFollow } from '../listScroll';
+import { formatDuration } from '../../format';
 import { writeToClipboard } from '../clipboard';
 import { renderMarkdown } from '../markdown';
 import { STRINGS } from '../strings';
@@ -76,7 +78,8 @@ const MessageRow = memo(function MessageRow({
   collapseCode,
   onApprove,
   onReject,
-  onOpenFile
+  onOpenFile,
+  onRewind
 }: {
   message: UiMessage;
   sources: CodeSource[];
@@ -85,7 +88,13 @@ const MessageRow = memo(function MessageRow({
   onApprove: (id: string, allowForSession: boolean) => void;
   onReject: (id: string) => void;
   onOpenFile: (path: string, line?: number) => void;
+  onRewind: (id: string) => void;
 }) {
+  // The question of the user and the answer of the model can be taken
+  // back, the card of an approval cannot.
+  const repeatable =
+    (message.role === 'user' || message.role === 'assistant') && !message.approval;
+  const actionLabel = message.role === 'user' ? STRINGS.retry : STRINGS.rewind;
   return (
     // The notice paints its own bar, the container of a message stays plain.
     <div
@@ -123,6 +132,23 @@ const MessageRow = memo(function MessageRow({
           onReject={() => onReject(message.approval!.id)}
         />
       ) : null}
+      {repeatable ? (
+        <div className="message-actions">
+          <button
+            className="message-action"
+            title={actionLabel}
+            aria-label={actionLabel}
+            onClick={() => onRewind(message.id)}
+          >
+            {message.role === 'user' ? <IconRetry /> : <IconRewind />}
+          </button>
+          {message.elapsedMs !== undefined ? (
+            <span className="message-elapsed" title={STRINGS.stepTime}>
+              {formatDuration(message.elapsedMs)}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 });
@@ -133,7 +159,8 @@ export function MessageList({
   collapseCode,
   onApprove,
   onReject,
-  onOpenFile
+  onOpenFile,
+  onRewind
 }: {
   messages: UiMessage[];
   // The cards of the actions fold to their title.
@@ -143,6 +170,7 @@ export function MessageList({
   onApprove: (id: string, allowForSession: boolean) => void;
   onReject: (id: string) => void;
   onOpenFile: (path: string, line?: number) => void;
+  onRewind: (id: string) => void;
 }) {
   const listRef = useRef<HTMLDivElement>(null);
   const atBottomRef = useRef(true);
@@ -242,6 +270,7 @@ export function MessageList({
             onApprove={onApprove}
             onReject={onReject}
             onOpenFile={onOpenFile}
+            onRewind={onRewind}
           />
         ))}
       </div>

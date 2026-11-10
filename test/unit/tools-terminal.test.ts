@@ -58,4 +58,32 @@ describe('run_terminal', () => {
     const result = await tool!.execute({ command: 'node -e "console.log(process.cwd())"' }, makeContext(root));
     expect(result.content.toLowerCase()).toContain(root.slice(0, 3).toLowerCase());
   });
+
+  it('refuses a git worktree command that has its own tool', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-'));
+    const tool = createTerminalTools().find((t) => t.name === 'run_terminal');
+    const result = await tool!.execute({ command: 'git worktree list' }, makeContext(root));
+    expect(result.isError).toBe(true);
+    expect(result.content).toContain('git_worktree_list');
+  });
+
+  it('refuses a git worktree add behind another command', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-'));
+    const tool = createTerminalTools().find((t) => t.name === 'run_terminal');
+    const result = await tool!.execute(
+      { command: 'cd sub && git worktree add wt' },
+      makeContext(root)
+    );
+    expect(result.isError).toBe(true);
+    expect(result.content).toContain('git_worktree_add');
+  });
+
+  it('runs a git worktree command that has no tool of its own', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-'));
+    const tool = createTerminalTools().find((t) => t.name === 'run_terminal');
+    const result = await tool!.execute({ command: 'git worktree prune' }, makeContext(root));
+    // The command runs in the shell, the refusal of the panel does not
+    // come. The folder is not a repository, so git complains.
+    expect(result.content).not.toContain('use the');
+  });
 });

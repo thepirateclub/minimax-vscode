@@ -31,7 +31,7 @@ const TOOL_LINES: Array<{ name: string; line: string }> = [
   { name: 'list_files', line: '- list_files(path?, depth?) - list the project layout' },
   {
     name: 'search_code',
-    line: '- search_code(query, path?, max_results?) - search for a literal string'
+    line: '- search_code(query, patterns?, ignore_case?, path?, max_results?) - search for a literal string, several words or one file'
   },
   {
     name: 'git_status',
@@ -74,6 +74,21 @@ const TOOL_LINES: Array<{ name: string; line: string }> = [
     line: '- git_checkout(ref) - switch to another branch or a commit'
   },
   {
+    name: 'git_worktree_list',
+    line:
+      '- git_worktree_list() - the worktrees of the repository with their branches'
+  },
+  {
+    name: 'git_worktree_add',
+    line:
+      '- git_worktree_add(path, branch?, base?) - add a worktree with a branch of its own'
+  },
+  {
+    name: 'git_worktree_remove',
+    line:
+      '- git_worktree_remove(path, force?) - remove a worktree'
+  },
+  {
     name: 'run_terminal',
     line: '- run_terminal(command, cwd?, timeout_ms?) - run a shell command in the workspace root'
   },
@@ -103,7 +118,7 @@ export function buildSystemPrompt(context: PromptContext): string {
     plan
       ? '- Answer with a concrete plan: name the files you would change and the exact edits, step by step. The user applies the plan after switching to code mode.'
       : '- Make the smallest change that solves the task. Prefer edit_file over write_file when only part of a file changes.',
-    '- Never run a git command in the terminal, the git tools do the same work and read the output of git in the code: git_status, git_diff, git_log, git_show, git_branch, git_blame, git_stage, git_commit, git_branch_create, git_checkout.',
+    '- Never run a git command in the terminal, the git tools do the same work and read the output of git in the code: git_status, git_diff, git_log, git_show, git_branch, git_blame, git_stage, git_commit, git_branch_create, git_checkout, git_worktree_list, git_worktree_add, git_worktree_remove.',
     '- After a tool returns, use its output. Never guess the content of a file you have not read.',
     '- Report what you changed and what you verified. State plainly when something failed.',
     '- Answer in the language of the user request.',

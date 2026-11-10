@@ -124,4 +124,41 @@ describe('the git tools', () => {
     expect(result.isError).toBe(true);
     expect(result.content.toLowerCase()).toContain('not a git repository');
   });
+
+  it('adds a worktree with a branch of its own and lists it', async () => {
+    const root = await makeRepo();
+    const added = await tool('git_worktree_add').execute(
+      { path: '.worktrees/wt', branch: 'feature/wt' },
+      makeContext(root)
+    );
+    expect(added.isError).toBeFalsy();
+    const list = await tool('git_worktree_list').execute({}, makeContext(root));
+    expect(list.isError).toBeFalsy();
+    expect(list.content).toContain('feature/wt');
+    expect(list.content).toContain('.worktrees/wt');
+  });
+
+  it('removes a worktree and keeps the branch', async () => {
+    const root = await makeRepo();
+    await tool('git_worktree_add').execute(
+      { path: '.worktrees/wt', branch: 'feature/wt' },
+      makeContext(root)
+    );
+    const removed = await tool('git_worktree_remove').execute(
+      { path: '.worktrees/wt' },
+      makeContext(root)
+    );
+    expect(removed.isError).toBeFalsy();
+    expect(await git(root, 'branch', '--format=%(refname:short)')).toContain('feature/wt');
+  });
+
+  it('refuses a worktree outside the workspace', async () => {
+    const root = await makeRepo();
+    const result = await tool('git_worktree_add').execute(
+      { path: '../outside' },
+      makeContext(root)
+    );
+    expect(result.isError).toBe(true);
+    expect(result.content.toLowerCase()).toContain('outside');
+  });
 });

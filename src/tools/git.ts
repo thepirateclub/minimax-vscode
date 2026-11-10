@@ -1,6 +1,6 @@
 import { isAbsolute, relative, resolve } from 'node:path';
 import { repoRoot, runGit, type GitRunResult } from '../git/cli';
-import { parseBlame, parseBranches, parseLog, parseStatus } from '../git/parse';
+import { parseBlame, parseBranches, parseLog, parseStatus, parseWorktrees } from '../git/parse';
 import type { ToolEntry, ToolExecutionResult } from './types';
 
 const MAX_DIFF_CHARS = 30_000;
@@ -43,6 +43,27 @@ function toRepoPath(repository: Repository, candidate: string): string {
   }
   if (rel.startsWith('..') || isAbsolute(rel)) {
     throw new Error('the path is outside the repository: ' + candidate);
+  }
+  return rel.split(/[\\/]/).join('/');
+}
+
+// The path of the model is relative to the workspace, a worktree lives
+// inside it.
+function toWorkspacePath(workspace: string, candidate: string): string {
+  const absolute = isAbsolute(candidate) ? candidate : resolve(workspace, candidate);
+  const rel = relative(resolve(workspace), absolute);
+  if (rel.startsWith('..') || isAbsolute(rel)) {
+    throw new Error('the path is outside the workspace: ' + candidate);
+  }
+  return absolute;
+}
+
+// The path of a worktree as the reader knows it, relative to the workspace
+// when the worktree lives inside it.
+function displayPath(workspace: string, absolute: string): string {
+  const rel = relative(workspace, absolute);
+  if (rel.length === 0 || rel.startsWith('..') || isAbsolute(rel)) {
+    return absolute;
   }
   return rel.split(/[\\/]/).join('/');
 }
@@ -508,6 +529,180 @@ export function createGitTools(): ToolEntry[] {
     }
   };
 
+  const gitWorktreeList: ToolEntry = {
+    name: 'git_worktree_list',
+    description:
+      'List the worktrees of the repository: the folder of every worktree, its branch and its commit. A worktree is a second folder of the same repository with a branch of its own.',
+    approval: 'never',
+    sideEffect: false,
+    inputSchema: {
+      type: 'object',
+      properties: {}
+    },
+    async execute(_input, ctx) {
+      const repository = await openRepository(ctx.workspaceRoot);
+      if (!repository) {
+        return failure('Not a git repository: ' + ctx.workspaceRoot);
+      }
+      const result = await runGit(
+        repository.root,
+        ['worktree', 'list', '--porcelain'],
+        { signal: ctx.signal }
+      );
+      if (result.code !== 0) {
+        return commandFailure(result);
+      }
+      const worktrees = parseWorktrees(result.stdout);
+      if (worktrees.length === 0) {
+        return { content: 'no worktrees' };
+      }
+      const lines = worktrees.map((worktree) => {
+        const branch = worktree.detached
+          ? 'HEAD (detached)'
+          : worktree.branch.length > 0
+            ? worktree.branch
+            : 'no branch';
+        const head = worktree.head.slice(0, 7);
+        return displayPath(repository.workspace, worktree.path) + '  ' + branch + '  ' + head;
+      });
+      return { content: lines.join('\n') };
+    }
+  };
+
+  const gitWorktreeAdd: ToolEntry = {
+    name: 'git_worktree_add',
+    description:
+      'Add a worktree: a second folder of the repository with a branch of its own. The path is relative to the workspace root. The branch is created when it does not exist yet, the base is the commit the new branch starts from.',
+    approval: 'always',
+    sideEffect: true,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: {
+          type: 'string',
+          description: 'The folder of the worktree, relative to the workspace root.'
+        },
+        branch: { type: 'string', description: 'The branch of the worktree.' },
+        base: {
+          type: 'string',
+          description: 'The commit or the branch the new branch starts from.'
+        }
+      },
+      required: ['path']
+    },
+    async execute(input, ctx) {
+      const repository = await openRepository(ctx.workspaceRoot);
+      if (!repository) {
+        return failure('Not a git repository: ' + ctx.workspaceRoot);
+      }
+      const raw = String(input['path'] ?? '').trim();
+      if (raw.length === 0) {
+        return failure('git_worktree_add failed: path must not be empty');
+      }
+      let target: string;
+      try {
+        target = toWorkspacePath(repository.workspace, raw);
+      } catch (error) {
+        return failure(error instanceof Error ? error.message : String(error));
+      }
+      const branch = String(input['branch'] ?? '').trim();
+      const base = String(input['base'] ?? '').trim();
+      const args = ['worktree', 'add'];
+      if (branch.length > 0) {
+        const known = await runGit(repository.root, [
+          'show-ref',
+          '--verify',
+          '--quiet',
+          'refs/heads/' + branch
+        ]);
+        if (known.code === 0) {
+          // The branch exists, git checks it out in the new folder.
+          args.push(target, branch);
+        } else {
+          args.push('-b', branch, target);
+          if (base.length > 0) {
+            args.push(base);
+          }
+        }
+      } else {
+        args.push('--detach', target);
+        if (base.length > 0) {
+          args.push(base);
+        }
+      }
+      const result = await runGit(repository.root, args, { signal: ctx.signal });
+      if (result.code !== 0) {
+        return commandFailure(result);
+      }
+      return {
+        content:
+          'added the worktree ' +
+          displayPath(repository.workspace, target) +
+          (branch.length > 0 ? ' on the branch ' + branch : '')
+      };
+    }
+  };
+
+  const gitWorktreeRemove: ToolEntry = {
+    name: 'git_worktree_remove',
+    description:
+      'Remove a worktree: its folder goes away, the branch it holds stays in the repository and can be checked out again.',
+    approval: 'always',
+    sideEffect: true,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: {
+          type: 'string',
+          description: 'The folder of the worktree, relative to the workspace root.'
+        },
+        force: {
+          type: 'boolean',
+          description: 'Remove it even when it holds changes.'
+        }
+      },
+      required: ['path']
+    },
+    async execute(input, ctx) {
+      const repository = await openRepository(ctx.workspaceRoot);
+      if (!repository) {
+        return failure('Not a git repository: ' + ctx.workspaceRoot);
+      }
+      const raw = String(input['path'] ?? '').trim();
+      if (raw.length === 0) {
+        return failure('git_worktree_remove failed: path must not be empty');
+      }
+      let target: string;
+      try {
+        target = toWorkspacePath(repository.workspace, raw);
+      } catch (error) {
+        return failure(error instanceof Error ? error.message : String(error));
+      }
+      const args = ['worktree', 'remove'];
+      if (input['force'] === true) {
+        args.push('--force');
+      }
+      args.push(target);
+      const result = await runGit(repository.root, args, { signal: ctx.signal });
+      if (result.code !== 0) {
+        // The folder is gone, the record of the worktree is stale.
+        const pruned = await runGit(repository.root, ['worktree', 'prune'], {
+          signal: ctx.signal
+        });
+        if (pruned.code === 0) {
+          return {
+            content:
+              'the folder of the worktree was gone, the stale record is pruned'
+          };
+        }
+        return commandFailure(result);
+      }
+      return {
+        content: 'removed the worktree ' + displayPath(repository.workspace, target)
+      };
+    }
+  };
+
   return [
     gitStatus,
     gitDiff,
@@ -518,6 +713,9 @@ export function createGitTools(): ToolEntry[] {
     gitStage,
     gitCommit,
     gitBranchCreate,
-    gitCheckout
+    gitCheckout,
+    gitWorktreeList,
+    gitWorktreeAdd,
+    gitWorktreeRemove
   ];
 }

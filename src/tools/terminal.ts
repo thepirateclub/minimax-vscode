@@ -34,6 +34,14 @@ const GIT_TOOLS: Record<string, string> = {
   switch: 'git_checkout'
 };
 
+// The worktrees have their own tools, the action of the command tells
+// which one has to serve it.
+const WORKTREE_TOOLS: Record<string, string> = {
+  'worktree list': 'git_worktree_list',
+  'worktree add': 'git_worktree_add',
+  'worktree remove': 'git_worktree_remove'
+};
+
 // The global flags of git that take a value.
 const GIT_FLAGS_WITH_VALUE = new Set([
   '-C',
@@ -71,6 +79,10 @@ export function gitToolFor(command: string): string | undefined {
       }
     }
     const sub = tokens[index];
+    if (sub === 'worktree') {
+      const action = tokens[index + 1];
+      return action === undefined ? undefined : WORKTREE_TOOLS[sub + ' ' + action];
+    }
     if (sub !== undefined && GIT_TOOLS[sub] !== undefined) {
       return GIT_TOOLS[sub];
     }

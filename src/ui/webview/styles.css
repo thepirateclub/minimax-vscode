@@ -542,6 +542,56 @@ input:focus {
   overflow-wrap: anywhere;
 }
 
+/* The bar of a note tells how serious it is. A note that is not a
+   failure keeps the quiet color of the text. */
+.message-notice.notice-info {
+  border-left-color: var(--muted);
+}
+
+.message-notice.notice-warn {
+  border-left-color: var(--warn);
+}
+
+.message-notice.notice-error {
+  border-left-color: var(--err);
+}
+
+/* The actions of a message: repeat the request, go back to it. The row
+   is quiet, the button takes the color of the text on a hover. */
+.message-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: var(--control-h);
+}
+
+.message-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-h);
+  height: var(--control-h);
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.message-action:hover {
+  background: var(--row-hover);
+  color: var(--fg);
+}
+
+/* The time of the step stands in the right edge of the row. */
+.message-elapsed {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+}
+
 /* A failed action is marked with a straight bar in the color of the failed
    dot. A rounded border drew a bracket, it looked like a decoration, and the
    color of the theme turned the mark gray. */

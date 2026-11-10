@@ -220,6 +220,26 @@ export function IconGit(): ReactNode {
   );
 }
 
+// An arrow that turns back, the request runs again.
+export function IconRetry(): ReactNode {
+  return (
+    <Svg viewBox="0 0 24 24" strokeWidth={2}>
+      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+      <path d="M3 3v5h5" />
+    </Svg>
+  );
+}
+
+// An arrow that turns back to the left, the chat goes to an earlier point.
+export function IconRewind(): ReactNode {
+  return (
+    <Svg viewBox="0 0 24 24" strokeWidth={2}>
+      <path d="M9 14 4 9l5-5" />
+      <path d="M20 20v-7a4 4 0 0 0-4-4H4" />
+    </Svg>
+  );
+}
+
 // Two sheets, the copy button.
 export function IconCopy(): ReactNode {
   return (

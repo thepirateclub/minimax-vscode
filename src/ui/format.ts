@@ -7,6 +7,25 @@ const UNITS = [
   { limit: 1_000, suffix: 'K' }
 ];
 
+// The time of an action is read by a person: milliseconds are too short
+// to see, minutes are too long. The value grows from ms to s to m.
+export function formatDuration(milliseconds: number): string {
+  const ms = Math.max(0, Math.round(milliseconds));
+  if (ms < 1000) {
+    return ms + 'ms';
+  }
+  const seconds = ms / 1000;
+  if (seconds < 60) {
+    return (Math.round(seconds * 10) / 10).toFixed(1).replace(/\.0$/, '') + 's';
+  }
+  const minutes = Math.floor(seconds / 60);
+  const rest = Math.round(seconds - minutes * 60);
+  if (rest === 60) {
+    return minutes + 1 + 'm 0s';
+  }
+  return minutes + 'm ' + rest + 's';
+}
+
 export function formatCount(value: number): string {
   if (!Number.isFinite(value)) {
     return '0';

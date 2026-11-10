@@ -82,4 +82,66 @@ describe('explore tools', () => {
     expect(result.isError).toBeFalsy();
     expect(result.content).toContain('No matches');
   });
+
+  it('searches several words in one file, like findstr does', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-'));
+    await mkdir(join(root, 'js', 'data'), { recursive: true });
+    await writeFile(
+      join(root, 'js', 'data', 'units.js'),
+      'const unit = {\n  hp: 10,\n  atk: 20,\n  spd: 30\n};\n',
+      'utf8'
+    );
+    const tool = createExploreTools().find((t) => t.name === 'search_code');
+    const result = await tool!.execute(
+      {
+        query: 'hp:',
+        patterns: ['hp:', 'atk:', 'spd:'],
+        ignore_case: true,
+        path: 'js/data/units.js'
+      },
+      makeContext(root)
+    );
+    expect(result.isError).toBeFalsy();
+    expect(result.content).toContain('js/data/units.js:2');
+    expect(result.content).toContain('js/data/units.js:3');
+    expect(result.content).toContain('js/data/units.js:4');
+  });
+
+  it('searches a hidden folder that the model named', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-'));
+    await mkdir(join(root, '.worktrees', 'kuznets-a19', 'js', 'data'), { recursive: true });
+    await writeFile(
+      join(root, '.worktrees', 'kuznets-a19', 'js', 'data', 'units.js'),
+      'hp: 10\n',
+      'utf8'
+    );
+    const tool = createExploreTools().find((t) => t.name === 'search_code');
+    const result = await tool!.execute(
+      { query: 'hp:', path: '.worktrees/kuznets-a19/js/data/units.js' },
+      makeContext(root)
+    );
+    expect(result.isError).toBeFalsy();
+    expect(result.content).toContain('hp: 10');
+  });
+
+  it('ignores the case when it is asked', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-'));
+    await writeFile(join(root, 'a.ts'), 'const HP = 1;\n', 'utf8');
+    const tool = createExploreTools().find((t) => t.name === 'search_code');
+    const strict = await tool!.execute({ query: 'hp' }, makeContext(root));
+    expect(strict.content).toContain('No matches');
+    const loose = await tool!.execute({ query: 'hp', ignore_case: true }, makeContext(root));
+    expect(loose.content).toContain('const HP');
+  });
+
+  it('reports a path that does not exist', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-'));
+    const tool = createExploreTools().find((t) => t.name === 'search_code');
+    const result = await tool!.execute(
+      { query: 'hp', path: 'nope/units.js' },
+      makeContext(root)
+    );
+    expect(result.isError).toBe(true);
+    expect(result.content).toContain('does not exist');
+  });
 });

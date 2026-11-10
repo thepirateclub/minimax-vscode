@@ -172,3 +172,62 @@ export function parseBlame(output: string): GitBlameLine[] {
   }
   return lines;
 }
+
+export interface GitWorktree {
+  path: string;
+  head: string;
+  branch: string;
+  detached: boolean;
+  locked: boolean;
+  prunable: boolean;
+}
+
+// The output of "git worktree list --porcelain".
+export function parseWorktrees(output: string): GitWorktree[] {
+  const worktrees: GitWorktree[] = [];
+  let current: GitWorktree | undefined;
+  for (const raw of output.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (line.length === 0) {
+      continue;
+    }
+    if (line.startsWith('worktree ')) {
+      current = {
+        path: line.slice('worktree '.length).trim(),
+        head: '',
+        branch: '',
+        detached: false,
+        locked: false,
+        prunable: false
+      };
+      worktrees.push(current);
+      continue;
+    }
+    if (!current) {
+      continue;
+    }
+    if (line.startsWith('HEAD ')) {
+      current.head = line.slice('HEAD '.length).trim();
+      continue;
+    }
+    if (line.startsWith('branch ')) {
+      const ref = line.slice('branch '.length).trim();
+      current.branch = ref.startsWith('refs/heads/')
+        ? ref.slice('refs/heads/'.length)
+        : ref;
+      continue;
+    }
+    if (line === 'detached') {
+      current.detached = true;
+      continue;
+    }
+    if (line.startsWith('locked')) {
+      current.locked = true;
+      continue;
+    }
+    if (line.startsWith('prunable')) {
+      current.prunable = true;
+    }
+  }
+  return worktrees;
+}

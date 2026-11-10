@@ -174,6 +174,20 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
       }
       if (message.type === 'error') {
         setMessages((prev) => appendNotice(prev, message.message, 'error-' + Date.now()));
+        return;
+      }
+      if (message.type === 'notice') {
+        setMessages((prev) =>
+          appendNotice(prev, message.message, 'notice-' + Date.now(), message.kind)
+        );
+        return;
+      }
+      if (message.type === 'step_time') {
+        setMessages((prev) =>
+          prev.map((item) =>
+            item.id === message.id ? { ...item, elapsedMs: message.elapsedMs } : item
+          )
+        );
       }
     };
 
@@ -275,6 +289,7 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
             onApprove={approve}
             onReject={reject}
             onOpenFile={openFile}
+            onRewind={(id) => vscode.postMessage({ type: 'rewind', id })}
           />
         )}
         <Composer

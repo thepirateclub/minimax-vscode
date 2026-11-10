@@ -1002,4 +1002,55 @@ describe('extension activation', () => {
     expect(activeId).not.toBe('s-old');
     expect(activeId === undefined || stored.some((item) => item.id === activeId)).toBe(true);
   });
+
+  it('tells the panel how long the step took', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.secrets.set('minimax.apiKey', 'test-key');
+    state.responses.push(TEXT_SSE);
+    await boot();
+
+    state.posted.length = 0;
+    state.receive?.({ type: 'send', text: 'hello', mentions: [], selections: [] });
+    await vi.waitFor(() => {
+      expect(ofType('step_time').length).toBe(1);
+    });
+    expect(ofType('step_time')[0]?.elapsedMs ?? -1).toBeGreaterThanOrEqual(0);
+  });
+
+  it('rolls the chat back to a request and runs it again', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.secrets.set('minimax.apiKey', 'test-key');
+    state.responses.push(TEXT_SSE, TEXT_SSE);
+    await boot();
+
+    state.posted.length = 0;
+    state.receive?.({ type: 'send', text: 'first question', mentions: [], selections: [] });
+    await vi.waitFor(() => {
+      expect(ofType('text_delta').length).toBeGreaterThan(0);
+    });
+    const userId = ofType('user_message')[0]?.id ?? '';
+    expect(userId.length).toBeGreaterThan(0);
+    // The turn is over when the anchor of the request is in the state.
+    await vi.waitFor(() => {
+      const stored =
+        (state.globalState.get('minimax.sessions') as
+          | Array<{ turns?: unknown[] }>
+          | undefined) ?? [];
+      expect(stored[0]?.turns?.length).toBe(1);
+    });
+
+    state.posted.length = 0;
+    state.receive?.({ type: 'rewind', id: userId });
+    await vi.waitFor(() => {
+      expect(ofType('session_loaded').length).toBe(1);
+    });
+    // The chat went back to the request, the answer of the model is gone.
+    expect(ofType('session_loaded')[0]!.messages).toHaveLength(0);
+    await vi.waitFor(() => {
+      expect(ofType('user_message').length).toBe(1);
+    });
+    expect(ofType('user_message')[0]?.text).toBe('first question');
+  });
 });

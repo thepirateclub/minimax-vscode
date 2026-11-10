@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseBlame, parseBranches, parseLog, parseStatus } from '../../src/git/parse';
+import { parseBlame, parseBranches, parseLog, parseStatus, parseWorktrees } from '../../src/git/parse';
 
 describe('the status of a repository', () => {
   it('reads the branch, the counters and the files', () => {
@@ -89,5 +89,39 @@ describe('the blame', () => {
     );
     expect(blame).toHaveLength(1);
     expect(blame[0]).toEqual({ commit: 'a1b2c3d', author: 'Georgy', line: 1, text: 'const a = 1;' });
+  });
+});
+
+describe('the worktrees', () => {
+  it('reads the folder, the branch and the commit of every worktree', () => {
+    const worktrees = parseWorktrees(
+      [
+        'worktree C:\\work\\main',
+        'HEAD 1111111111111111111111111111111111111111',
+        'branch refs/heads/main',
+        '',
+        'worktree C:\\work\\.worktrees\\wt',
+        'HEAD 2222222222222222222222222222222222222222',
+        'branch refs/heads/feature/x',
+        ''
+      ].join('\n')
+    );
+    expect(worktrees).toHaveLength(2);
+    expect(worktrees[0]?.branch).toBe('main');
+    expect(worktrees[0]?.head.startsWith('1111')).toBe(true);
+    expect(worktrees[1]?.branch).toBe('feature/x');
+    expect(worktrees[1]?.path).toContain('.worktrees');
+  });
+
+  it('knows a detached worktree', () => {
+    const worktrees = parseWorktrees(
+      [
+        'worktree C:\\work\\wt',
+        'HEAD 3333333333333333333333333333333333333333',
+        'detached'
+      ].join('\n')
+    );
+    expect(worktrees[0]?.detached).toBe(true);
+    expect(worktrees[0]?.branch).toBe('');
   });
 });

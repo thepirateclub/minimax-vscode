@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatCount } from '../../src/ui/format';
+import { formatCount, formatDuration } from '../../src/ui/format';
 
 describe('formatCount', () => {
   it('keeps small numbers as they are', () => {
@@ -29,5 +29,30 @@ describe('formatCount', () => {
   it('survives a broken value', () => {
     expect(formatCount(Number.NaN)).toBe('0');
     expect(formatCount(Number.POSITIVE_INFINITY)).toBe('0');
+  });
+});
+
+describe('formatDuration', () => {
+  it('keeps the milliseconds short', () => {
+    expect(formatDuration(0)).toBe('0ms');
+    expect(formatDuration(350)).toBe('350ms');
+    expect(formatDuration(999)).toBe('999ms');
+  });
+
+  it('counts the seconds when the action is longer', () => {
+    expect(formatDuration(1000)).toBe('1s');
+    expect(formatDuration(1250)).toBe('1.3s');
+    expect(formatDuration(12500)).toBe('12.5s');
+    expect(formatDuration(59999)).toBe('60s');
+  });
+
+  it('counts the minutes when the action is long', () => {
+    expect(formatDuration(60000)).toBe('1m 0s');
+    expect(formatDuration(65000)).toBe('1m 5s');
+    expect(formatDuration(125000)).toBe('2m 5s');
+  });
+
+  it('survives a broken value', () => {
+    expect(formatDuration(-5)).toBe('0ms');
   });
 });
