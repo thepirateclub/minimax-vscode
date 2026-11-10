@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { Composer } from '../../src/ui/webview/components/Composer';
+import { Header } from '../../src/ui/webview/components/Header';
 import { UsageGraph } from '../../src/ui/webview/components/UsageGraph';
 import { MODELS } from '../../src/config/models';
 import type { ReactElement } from 'react';
@@ -54,7 +55,34 @@ function renderComposer(busy: boolean): string {
   );
 }
 
+function renderHeader(version: string): string {
+  return renderToStaticMarkup(
+    createElement(Header, {
+      tab: 'chat',
+      onTab: noop,
+      state: 'idle',
+      tokens: 0,
+      usage: [],
+      hasApiKey: true,
+      sessions: [],
+      activeSessionId: undefined,
+      onSelectSession: noop,
+      onDeleteSession: noop,
+      onNewChat: noop,
+      version
+    }) as ReactElement
+  );
+}
+
 describe('panel layout', () => {
+  it('shows the version of the panel', () => {
+    const markup = renderHeader('0.1.0');
+    expect(markup).toContain('v0.1.0');
+    const style = rule('.version');
+    expect(style).toMatch(/color:\s*var\(--muted\)/);
+    expect(style).toMatch(/font-size:\s*var\(--fs-xs\)/);
+  });
+
   it('sends with an icon instead of a text label', () => {
     const markup = renderComposer(false);
     expect(markup).toContain('composer-send');

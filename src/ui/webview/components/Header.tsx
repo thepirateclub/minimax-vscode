@@ -18,7 +18,8 @@ export function Header({
   activeSessionId,
   onSelectSession,
   onDeleteSession,
-  onNewChat
+  onNewChat,
+  version
 }: {
   tab: PanelTab;
   onTab: (tab: PanelTab) => void;
@@ -31,6 +32,7 @@ export function Header({
   onSelectSession: (id: string) => void;
   onDeleteSession: (id: string) => void;
   onNewChat: () => void;
+  version: string;
 }) {
   return (
     <div className="header">
@@ -67,6 +69,11 @@ export function Header({
         >
           <IconPlus />
         </button>
+        {version ? (
+          <span className="version" title={STRINGS.versionLabel}>
+            v{version}
+          </span>
+        ) : null}
       </div>
       {/* The row stays on both tabs, the header keeps its height and the
           panel does not jump when the tab changes. */}

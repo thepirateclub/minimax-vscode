@@ -319,6 +319,17 @@ input:focus {
   margin-right: 4px;
 }
 
+/* The version of the extension sits in the corner of the tab row, it tells
+   the reader which build is running without opening the settings. */
+.version {
+  flex: 0 0 auto;
+  margin-left: 4px;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 /* A square button with an icon, it has no frame until the mouse points at
    it, like the toolbar of VS Code. */
 .icon-button {

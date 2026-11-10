@@ -124,6 +124,8 @@ export interface UiState {
   collapseTools: boolean;
   // The code blocks of the answers fold to their header.
   collapseCode: boolean;
+  // The version of the running extension, the panel shows it in the header.
+  version: string;
 }
 
 export type ExtToWeb =

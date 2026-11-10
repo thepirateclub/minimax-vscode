@@ -1,5 +1,6 @@
 export const STRINGS = {
   appName: 'MiniMax',
+  versionLabel: 'Version',
   chatTab: 'Chat',
   settingsTab: 'Settings',
   placeholder: 'Ask MiniMax to change your code. Type @ to attach a file.',

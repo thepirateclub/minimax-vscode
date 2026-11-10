@@ -1111,7 +1111,9 @@ class MiniMaxController {
         theme: themeKind(),
         fontSize: settings.fontSize,
         collapseTools: settings.collapseTools,
-        collapseCode: settings.collapseCode
+        collapseCode: settings.collapseCode,
+        // The version comes from the manifest, the webview does not know it.
+        version: this.context.extension?.packageJSON?.version ?? ''
       }
     });
   }

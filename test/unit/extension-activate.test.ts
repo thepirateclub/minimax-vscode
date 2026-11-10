@@ -207,6 +207,7 @@ function makeContext(): ExtensionContext {
   return {
     subscriptions: [],
     extensionUri: { fsPath: 'C:/extension' },
+    extension: { packageJSON: { version: '0.1.0' } },
     secrets: {
       get: async (key: string) => state.secrets.get(key),
       store: async (key: string, value: string) => {
@@ -866,6 +867,15 @@ describe('extension activation', () => {
     expect(init.state.messages).toHaveLength(1);
     expect(init.state.messages[0]?.text).toBe('old question');
     expect(init.state.sessions.map((item) => item.id)).toContain('s-old');
+  });
+
+  it('tells the panel which version is running', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    await boot();
+
+    const init = ofType('init')[0]!;
+    expect(init.state.version).toBe('0.1.0');
   });
 
   it('measures the duration of an action', async () => {

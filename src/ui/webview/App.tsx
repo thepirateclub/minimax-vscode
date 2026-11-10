@@ -36,7 +36,8 @@ const EMPTY_STATE: UiState = {
   theme: 'dark',
   fontSize: 13,
   collapseTools: false,
-  collapseCode: false
+  collapseCode: false,
+  version: ''
 };
 
 export function App({ vscode }: { vscode: VsCodeApi }) {
@@ -261,6 +262,7 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
         onSelectSession={(id) => vscode.postMessage({ type: 'select_session', id })}
         onDeleteSession={(id) => vscode.postMessage({ type: 'delete_session', id })}
         onNewChat={() => vscode.postMessage({ type: 'new_session' })}
+        version={state.version}
       />
       <div className={'view' + (tab === 'chat' ? '' : ' view-hidden')}>
         {messages.length === 0 ? (

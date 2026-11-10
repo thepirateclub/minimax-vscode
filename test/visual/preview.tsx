@@ -53,7 +53,8 @@ const STATE: UiState = {
   theme: themeKind,
   fontSize: 13,
   collapseTools: params.get('collapse') === '1',
-  collapseCode: params.get('collapse') === '1'
+  collapseCode: params.get('collapse') === '1',
+  version: '0.1.0'
 };
 
 const SETTINGS: UiSettings = {
