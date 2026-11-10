@@ -159,6 +159,7 @@ export type ExtToWeb =
   | { type: 'error'; message: string }
   | { type: 'notice'; message: string; kind: NoticeKind }
   | { type: 'step_time'; id: string; elapsedMs: number }
+  | { type: 'restore_input'; text: string; mentions: string[]; selections: UiSelection[] }
   | { type: 'session_loaded'; messages: UiMessage[] }
   | { type: 'sessions'; sessions: UiSessionSummary[] }
   | { type: 'models'; models: ModelInfo[]; selected: string }
@@ -172,6 +173,7 @@ export type WebToExt =
   | { type: 'ready' }
   | { type: 'send'; text: string; mentions: string[]; selections: UiSelection[] }
   | { type: 'stop' }
+  | { type: 'retry'; id: string }
   | { type: 'rewind'; id: string }
   | { type: 'approve'; id: string; allowForSession: boolean }
   | { type: 'reject'; id: string }

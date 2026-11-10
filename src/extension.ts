@@ -661,6 +661,10 @@ class MiniMaxController {
       this.activeSession()?.agent?.stop();
       return;
     }
+    if (message.type === 'retry') {
+      await this.retryTurn(message.id);
+      return;
+    }
     if (message.type === 'rewind') {
       await this.rewindTo(message.id);
       return;
@@ -831,10 +835,59 @@ class MiniMaxController {
     }
   }
 
-  // The chat rolls back to a request and runs it again. The messages
-  // after the request go away, the history of the model is cut at the
-  // same place, so the answer of the model starts from the same state.
+  // The chat rolls back to a message of the user. The message and every
+  // message after it go away, the text of the request comes back to the
+  // input field and the agent waits for the next command.
   private async rewindTo(id: string): Promise<void> {
+    const runtime = this.activeSession();
+    if (!runtime) {
+      return;
+    }
+    if (runtime.busy) {
+      this.panel.post({
+        type: 'notice',
+        message: 'The agent is busy, wait for the turn to end.',
+        kind: 'warn'
+      });
+      return;
+    }
+    const index = runtime.uiMessages.findIndex((message) => message.id === id);
+    if (index === -1) {
+      return;
+    }
+    const message = runtime.uiMessages[index]!;
+    if (message.role !== 'user') {
+      this.panel.post({
+        type: 'notice',
+        message: 'Only a request of the user can be taken back.',
+        kind: 'warn'
+      });
+      return;
+    }
+    const turn = runtime.turns.find((item) => item.uiId === id);
+    const text = turn?.text ?? message.text ?? '';
+    const mentions = turn?.mentions ?? [];
+    const selections = turn?.selections ?? [];
+    // The history of the model is cut before the request, the next
+    // request starts from the same state.
+    this.cutHistoryBefore(runtime, turn, text);
+    // The turns after this one go away with the messages.
+    runtime.turns = runtime.turns.filter((item) => {
+      const at = runtime.uiMessages.findIndex((entry) => entry.id === item.uiId);
+      return at !== -1 && at < index;
+    });
+    runtime.uiMessages = runtime.uiMessages.slice(0, index);
+    // The panel gets a copy, the chat grows right after this line.
+    this.panel.post({ type: 'session_loaded', messages: [...runtime.uiMessages] });
+    // The request comes back to the input field, the agent waits.
+    this.panel.post({ type: 'restore_input', text, mentions, selections });
+    this.persist(runtime);
+  }
+
+  // The request runs again. The messages after it go away, the history
+  // of the model is cut at the same place, so the answer of the model
+  // starts from the same state.
+  private async retryTurn(id: string): Promise<void> {
     const runtime = this.activeSession();
     if (!runtime) {
       return;
@@ -867,14 +920,32 @@ class MiniMaxController {
       const at = runtime.uiMessages.findIndex((message) => message.id === item.uiId);
       return at !== -1 && at < userIndex;
     });
-    const found = findRequestIndex(runtime.history, turn.text, turn.historyIndex);
-    const cut = found === -1 ? runtime.history.length : found;
-    runtime.history = runtime.history.slice(0, cut);
-    runtime.agent?.setHistory(runtime.history);
+    this.cutHistoryBefore(runtime, turn, turn.text);
     runtime.uiMessages = runtime.uiMessages.slice(0, userIndex);
     // The panel gets a copy, the chat grows right after this line.
     this.panel.post({ type: 'session_loaded', messages: [...runtime.uiMessages] });
     await this.handleSend(turn.text, turn.mentions, turn.selections);
+  }
+
+  // The history of the model loses the request and everything after it.
+  private cutHistoryBefore(
+    runtime: RuntimeSession,
+    turn: TurnAnchor | undefined,
+    text: string
+  ): void {
+    const hint = turn?.historyIndex;
+    const found = findRequestIndex(runtime.history, text, hint);
+    let cut = found;
+    if (cut === -1) {
+      // The request is not in the history any more, the place of the
+      // anchor is the best guess.
+      cut =
+        hint !== undefined && hint >= 0
+          ? Math.min(hint, runtime.history.length)
+          : runtime.history.length;
+    }
+    runtime.history = runtime.history.slice(0, cut);
+    runtime.agent?.setHistory(runtime.history);
   }
 
   private async buildPromptText(

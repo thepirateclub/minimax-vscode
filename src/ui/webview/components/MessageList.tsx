@@ -79,6 +79,7 @@ const MessageRow = memo(function MessageRow({
   onApprove,
   onReject,
   onOpenFile,
+  onRetry,
   onRewind
 }: {
   message: UiMessage;
@@ -88,13 +89,14 @@ const MessageRow = memo(function MessageRow({
   onApprove: (id: string, allowForSession: boolean) => void;
   onReject: (id: string) => void;
   onOpenFile: (path: string, line?: number) => void;
+  onRetry: (id: string) => void;
   onRewind: (id: string) => void;
 }) {
-  // The question of the user and the answer of the model can be taken
-  // back, the card of an approval cannot.
-  const repeatable =
-    (message.role === 'user' || message.role === 'assistant') && !message.approval;
-  const actionLabel = message.role === 'user' ? STRINGS.retry : STRINGS.rewind;
+  // The buttons live only at the messages of the user: the request can
+  // be repeated or taken back. The answer of the model shows the time
+  // of the step, the card of an approval shows nothing.
+  const isUser = message.role === 'user';
+  const hasActions = !message.approval && (isUser || message.elapsedMs !== undefined);
   return (
     // The notice paints its own bar, the container of a message stays plain.
     <div
@@ -132,16 +134,28 @@ const MessageRow = memo(function MessageRow({
           onReject={() => onReject(message.approval!.id)}
         />
       ) : null}
-      {repeatable ? (
+      {hasActions ? (
         <div className="message-actions">
-          <button
-            className="message-action"
-            title={actionLabel}
-            aria-label={actionLabel}
-            onClick={() => onRewind(message.id)}
-          >
-            {message.role === 'user' ? <IconRetry /> : <IconRewind />}
-          </button>
+          {isUser ? (
+            <>
+              <button
+                className="message-action"
+                title={STRINGS.retry}
+                aria-label={STRINGS.retry}
+                onClick={() => onRetry(message.id)}
+              >
+                <IconRetry />
+              </button>
+              <button
+                className="message-action"
+                title={STRINGS.rewind}
+                aria-label={STRINGS.rewind}
+                onClick={() => onRewind(message.id)}
+              >
+                <IconRewind />
+              </button>
+            </>
+          ) : null}
           {message.elapsedMs !== undefined ? (
             <span className="message-elapsed" title={STRINGS.stepTime}>
               {formatDuration(message.elapsedMs)}
@@ -160,6 +174,7 @@ export function MessageList({
   onApprove,
   onReject,
   onOpenFile,
+  onRetry,
   onRewind
 }: {
   messages: UiMessage[];
@@ -170,6 +185,7 @@ export function MessageList({
   onApprove: (id: string, allowForSession: boolean) => void;
   onReject: (id: string) => void;
   onOpenFile: (path: string, line?: number) => void;
+  onRetry: (id: string) => void;
   onRewind: (id: string) => void;
 }) {
   const listRef = useRef<HTMLDivElement>(null);
@@ -270,6 +286,7 @@ export function MessageList({
             onApprove={onApprove}
             onReject={onReject}
             onOpenFile={onOpenFile}
+            onRetry={onRetry}
             onRewind={onRewind}
           />
         ))}

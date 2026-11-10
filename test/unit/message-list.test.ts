@@ -19,6 +19,7 @@ function render(messages: UiMessage[]): string {
       onApprove: () => undefined,
       onReject: () => undefined,
       onOpenFile: () => undefined,
+      onRetry: () => undefined,
       onRewind: () => undefined
     })
   );
@@ -60,9 +61,16 @@ describe('the actions of a message', () => {
     expect(markup).toContain('Repeat the request');
   });
 
-  it('offers to go back to the answer of the model', () => {
-    const markup = render([{ id: 'a1', role: 'assistant', text: 'the answer' }]);
+  it('offers to go back to the request of the user', () => {
+    const markup = render([{ id: 'u1', role: 'user', text: 'the question' }]);
     expect(markup).toContain('Go back to this point');
+  });
+
+  it('gives the buttons only to the messages of the user', () => {
+    const markup = render([{ id: 'a1', role: 'assistant', text: 'the answer' }]);
+    expect(markup).not.toContain('message-action');
+    expect(markup).not.toContain('Go back to this point');
+    expect(markup).not.toContain('Repeat the request');
   });
 
   it('shows the time of the step in the last message', () => {

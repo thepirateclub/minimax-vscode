@@ -1018,7 +1018,7 @@ describe('extension activation', () => {
     expect(ofType('step_time')[0]?.elapsedMs ?? -1).toBeGreaterThanOrEqual(0);
   });
 
-  it('rolls the chat back to a request and runs it again', async () => {
+  it('rolls the chat back to a request and puts it into the input', async () => {
     const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
     state.config.set('root', root);
     state.secrets.set('minimax.apiKey', 'test-key');
@@ -1048,9 +1048,35 @@ describe('extension activation', () => {
     });
     // The chat went back to the request, the answer of the model is gone.
     expect(ofType('session_loaded')[0]!.messages).toHaveLength(0);
+    // The request comes back to the input field, the agent waits for it.
+    expect(ofType('restore_input').length).toBe(1);
+    expect(ofType('restore_input')[0]?.text).toBe('first question');
+    expect(ofType('user_message').length).toBe(0);
+    expect(ofType('text_delta').length).toBe(0);
+  });
+
+  it('runs the request again when the request is repeated', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.secrets.set('minimax.apiKey', 'test-key');
+    state.responses.push(TEXT_SSE, TEXT_SSE);
+    await boot();
+
+    state.posted.length = 0;
+    state.receive?.({ type: 'send', text: 'first question', mentions: [], selections: [] });
+    await vi.waitFor(() => {
+      expect(ofType('text_delta').length).toBeGreaterThan(0);
+    });
+    const userId = ofType('user_message')[0]?.id ?? '';
+
+    state.posted.length = 0;
+    state.receive?.({ type: 'retry', id: userId });
     await vi.waitFor(() => {
       expect(ofType('user_message').length).toBe(1);
     });
     expect(ofType('user_message')[0]?.text).toBe('first question');
+    await vi.waitFor(() => {
+      expect(ofType('text_delta').length).toBeGreaterThan(0);
+    });
   });
 });

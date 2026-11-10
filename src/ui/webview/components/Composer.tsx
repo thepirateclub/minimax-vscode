@@ -13,11 +13,19 @@ import {
   IconStop,
   IconThinking
 } from '../icons';
+import { splitRestore } from '../restoreInput';
 import { STRINGS } from '../strings';
 import { IconSelect, type IconSelectOption } from './IconSelect';
 
 export interface InsertRequest {
   paths: string[];
+  token: number;
+}
+
+// The request that the rollback of the chat puts back into the input.
+export interface RestoreRequest {
+  text: string;
+  mentions: string[];
   token: number;
 }
 
@@ -144,7 +152,7 @@ function triggerPrefix(value: string): string | undefined {
   return match ? match[1] ?? '' : undefined;
 }
 
-function insertMention(root: HTMLElement, path: string): void {
+function createMentionChip(path: string): HTMLElement {
   const label = fileLabel(path);
   const chip = document.createElement('span');
   chip.className = 'mention';
@@ -162,6 +170,11 @@ function insertMention(root: HTMLElement, path: string): void {
   remove.className = 'mention-remove';
   remove.textContent = '×';
   chip.appendChild(remove);
+  return chip;
+}
+
+function insertMention(root: HTMLElement, path: string): void {
+  const chip = createMentionChip(path);
 
   const selection = window.getSelection();
   if (selection && selection.rangeCount > 0 && root.contains(selection.getRangeAt(0).startContainer)) {
@@ -223,12 +236,26 @@ function insertLineBreak(): void {
   selection.addRange(range);
 }
 
+// The caret goes to the end of the restored request, the user edits it there.
+function placeCaretAtEnd(root: HTMLElement): void {
+  const selection = window.getSelection();
+  if (!selection) {
+    return;
+  }
+  const range = document.createRange();
+  range.selectNodeContents(root);
+  range.collapse(false);
+  selection.removeAllRanges();
+  selection.addRange(range);
+}
+
 export function Composer({
   busy,
   selections,
   focusToken,
   suggestions,
   insert,
+  restore,
   onInsertHandled,
   resetToken,
   models,
@@ -252,6 +279,7 @@ export function Composer({
   focusToken: number;
   suggestions: UiSuggestion[];
   insert: InsertRequest | undefined;
+  restore: RestoreRequest | undefined;
   onInsertHandled: () => void;
   resetToken: number;
   models: ModelInfo[];
@@ -319,6 +347,29 @@ export function Composer({
     root.focus();
     report();
   }, [insert?.token]);
+
+  // The rollback of the chat puts the request back into the input field.
+  // A draft that is already there stays, the request comes after it.
+  useEffect(() => {
+    if (!restore) {
+      return;
+    }
+    const root = editorRef.current;
+    if (!root) {
+      return;
+    }
+    for (const segment of splitRestore(restore.text, restore.mentions)) {
+      if (segment.kind === 'mention') {
+        root.appendChild(createMentionChip(segment.value));
+        root.appendChild(document.createTextNode(' '));
+        continue;
+      }
+      root.appendChild(document.createTextNode(segment.value));
+    }
+    root.focus();
+    placeCaretAtEnd(root);
+    report();
+  }, [restore?.token]);
 
   const report = (): void => {
     const root = editorRef.current;

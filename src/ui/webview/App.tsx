@@ -8,7 +8,7 @@ import type {
   UiSuggestion,
   WebToExt
 } from '../protocol';
-import { Composer, type InsertRequest } from './components/Composer';
+import { Composer, type InsertRequest, type RestoreRequest } from './components/Composer';
 import { EmptyState } from './components/EmptyState';
 import { Header, type PanelTab } from './components/Header';
 import { MessageList } from './components/MessageList';
@@ -51,6 +51,8 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
   const [resetToken, setResetToken] = useState(0);
   const [insert, setInsert] = useState<InsertRequest | undefined>(undefined);
   const insertToken = useRef(0);
+  const [restore, setRestore] = useState<RestoreRequest | undefined>(undefined);
+  const restoreToken = useRef(0);
 
   useEffect(() => {
     const onMessage = (event: MessageEvent<ExtToWeb>): void => {
@@ -182,6 +184,20 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
         );
         return;
       }
+      if (message.type === 'restore_input') {
+        // The rollback of the chat puts the request back into the
+        // input field, the agent waits for the next command.
+        restoreToken.current += 1;
+        setRestore({
+          text: message.text,
+          mentions: message.mentions,
+          token: restoreToken.current
+        });
+        setSelections(message.selections);
+        setTab('chat');
+        setFocusToken((value) => value + 1);
+        return;
+      }
       if (message.type === 'step_time') {
         setMessages((prev) =>
           prev.map((item) =>
@@ -289,6 +305,7 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
             onApprove={approve}
             onReject={reject}
             onOpenFile={openFile}
+            onRetry={(id) => vscode.postMessage({ type: 'retry', id })}
             onRewind={(id) => vscode.postMessage({ type: 'rewind', id })}
           />
         )}
@@ -299,6 +316,7 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
           resetToken={resetToken}
           suggestions={suggestions}
           insert={insert}
+          restore={restore}
           onInsertHandled={() => setInsert(undefined)}
           models={state.models}
           model={state.model}

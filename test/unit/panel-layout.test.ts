@@ -35,6 +35,7 @@ function renderComposer(busy: boolean): string {
       focusToken: 0,
       suggestions: [],
       insert: undefined,
+      restore: undefined,
       onInsertHandled: noop,
       resetToken: 0,
       models: MODELS,
