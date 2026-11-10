@@ -1,4 +1,4 @@
-import type { ToolStateUpdate } from '../agent/state';
+import type { SessionState, ToolStateUpdate } from '../agent/state';
 import type { JsonSchema } from '../api/types';
 import type { Logger } from '../logger';
 
@@ -8,6 +8,8 @@ export interface ToolContext {
   logger: Logger;
   // How deep the agent is. Undefined is the main agent, 1 is a sub-agent.
   depth?: number;
+  // The state of the session, the tools read it.
+  sessionState?: SessionState;
 }
 
 export interface ToolExecutionResult {

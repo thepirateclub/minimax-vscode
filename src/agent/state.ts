@@ -11,8 +11,26 @@ export interface TodoItem {
   priority: TodoPriority;
 }
 
+export type GoalStatus = 'active' | 'complete' | 'blocked';
+
+export interface GoalState {
+  objective: string;
+  // The limits of the budget. Undefined means no limit.
+  tokenBudget?: number;
+  requestLimit?: number;
+  secondsLimit?: number;
+  status: GoalStatus;
+  used: { tokens: number; requests: number; seconds: number };
+}
+
+// The state of the session that the tools read. The host owns it, a tool
+// never writes into it.
+export interface SessionState {
+  readonly todos: TodoItem[];
+  readonly goal?: GoalState;
+}
+
 // The change of the state of the session, the host applies it.
-export type ToolStateUpdate = {
-  kind: 'todos';
-  todos: TodoItem[];
-};
+export type ToolStateUpdate =
+  | { kind: 'todos'; todos: TodoItem[] }
+  | { kind: 'goal'; status: 'complete' | 'blocked'; note?: string };
