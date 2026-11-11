@@ -90,6 +90,15 @@ export class HttpMiniMaxClient implements MiniMaxClient {
         }
       }
     } finally {
+      // The stream was abandoned: the budget of the goal ran out or the
+      // user stopped the turn. The request has to be closed on the wire,
+      // without the cancel the server keeps generating the answer to the
+      // end and the socket of the extension host stays open.
+      try {
+        await reader.cancel();
+      } catch {
+        // The stream is over or broken, there is nothing to cancel.
+      }
       reader.releaseLock();
     }
     for (const event of decoder.flush()) {

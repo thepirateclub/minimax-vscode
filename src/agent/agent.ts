@@ -316,8 +316,6 @@ export class Agent {
     blocks: AnthropicContentBlock[];
     stopReason: StopReason;
     usage: Usage;
-    // The budget of the goal ran out while the answer was streaming.
-    budgetStopped: boolean;
   }> {
     let attempt = 0;
     for (;;) {
@@ -367,7 +365,7 @@ export class Agent {
           blocks = [];
           stopReason = 'goal_limit';
         }
-        return { blocks, stopReason, usage, budgetStopped };
+        return { blocks, stopReason, usage };
       } catch (error) {
         const retryable = error instanceof MiniMaxApiError && error.retryable;
         // A request that the user stopped is not a failure of the server,
