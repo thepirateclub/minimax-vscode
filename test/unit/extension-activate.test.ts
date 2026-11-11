@@ -5,8 +5,7 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ExtensionContext } from 'vscode';
-import type { ExtToWeb, UiMessage, WebToExt } from '../../src/ui/protocol';
-import { endTool } from '../../src/ui/webview/App';
+import type { ExtToWeb, WebToExt } from '../../src/ui/protocol';
 
 const state = vi.hoisted(() => ({
   commands: new Map<string, (...args: unknown[]) => unknown>(),
@@ -2369,28 +2368,4 @@ describe('extension activation', () => {
     });
   });
 
-  it('the panel puts the result of the call into the last card with that id', () => {
-    const messages: UiMessage[] = [
-      {
-        id: 'm1',
-        role: 'tool',
-        tool: { id: 'toolu_1', name: 'write_file', input: {}, content: 'Wrote one.txt' }
-      },
-      {
-        id: 'm2',
-        role: 'tool',
-        tool: { id: 'toolu_1', name: 'write_file', input: {}, content: 'Wrote two.txt' }
-      }
-    ];
-    const next = endTool(messages, {
-      type: 'tool_end',
-      id: 'toolu_1',
-      name: 'write_file',
-      content: 'Wrote three.txt',
-      isError: false
-    });
-    // The card of the earlier turn keeps its own result.
-    expect(next[0]?.tool?.content).toBe('Wrote one.txt');
-    expect(next[1]?.tool?.content).toBe('Wrote three.txt');
-  });
 });

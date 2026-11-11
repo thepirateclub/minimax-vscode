@@ -18,6 +18,7 @@ import { SettingsView } from './components/SettingsView';
 import { TaskList } from './components/TaskList';
 import { appendNotice } from './notices';
 import { STRINGS } from './strings';
+import { endTool } from './toolEnd';
 
 interface VsCodeApi {
   postMessage(message: WebToExt): void;
@@ -403,33 +404,6 @@ function appendToAssistant(
     }
   }
   next.push({ id: 'assistant-' + Date.now(), role: 'assistant', [field]: delta });
-  return next;
-}
-
-// The result of the call goes into the last card with that id: the same id
-// of a tool call can come back in a later turn, the card of the earlier turn
-// keeps its own result.
-export function endTool(
-  messages: UiMessage[],
-  message: Extract<ExtToWeb, { type: 'tool_end' }>
-): UiMessage[] {
-  const next = [...messages];
-  for (let i = next.length - 1; i >= 0; i--) {
-    const item = next[i]!;
-    if (item.tool && item.tool.id === message.id) {
-      next[i] = {
-        ...item,
-        tool: {
-          ...item.tool,
-          content: message.content,
-          isError: message.isError,
-          running: false,
-          diff: message.diff
-        }
-      };
-      return next;
-    }
-  }
   return next;
 }
 
