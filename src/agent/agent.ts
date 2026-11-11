@@ -33,6 +33,7 @@ export type AgentEvent =
       state?: ToolStateUpdate;
     }
   | { type: 'approval_resolved'; id: string; approved: boolean }
+  | { type: 'tool_progress'; id: string; line: string }
   | { type: 'usage'; usage: Usage }
   | { type: 'done'; stopReason: StopReason; usage: Usage }
   | { type: 'error'; message: string };
@@ -63,6 +64,8 @@ export interface AgentOptions {
   budget?: () => boolean;
   // The state of the session, the tools read it.
   sessionState?: SessionState;
+  // The id of the session, the tools know who they work for.
+  sessionId?: string;
   logger: Logger;
   onEvent: (event: AgentEvent) => void;
 }
@@ -263,8 +266,16 @@ export class Agent {
             signal: this.controller.signal,
             logger: this.options.logger,
             depth: this.options.depth,
-            sessionState: this.options.sessionState
+            sessionId: this.options.sessionId,
+            sessionState: this.options.sessionState,
+            progress: (line) =>
+              this.options.onEvent({ type: 'tool_progress', id: toolUse.id, line })
           });
+          // The spend of the child belongs to the action of the parent, the
+          // column of the graph of the spend holds the sum.
+          if (result.usage) {
+            usage = addUsage(usage, result.usage);
+          }
           content = result.content;
           isError = result.isError === true;
           state = result.state;

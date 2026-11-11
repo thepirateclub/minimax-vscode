@@ -1,5 +1,5 @@
 import type { SessionState, ToolStateUpdate } from '../agent/state';
-import type { JsonSchema } from '../api/types';
+import type { JsonSchema, Usage } from '../api/types';
 import type { Logger } from '../logger';
 
 export interface ToolContext {
@@ -10,6 +10,10 @@ export interface ToolContext {
   depth?: number;
   // The state of the session, the tools read it.
   sessionState?: SessionState;
+  // The journal of a long action, the tool writes the lines into it.
+  progress?: (line: string) => void;
+  // The id of the session that runs the tool.
+  sessionId?: string;
 }
 
 export interface ToolExecutionResult {
@@ -18,6 +22,9 @@ export interface ToolExecutionResult {
   metadata?: Record<string, unknown>;
   // The change of the state of the session, the host applies it.
   state?: ToolStateUpdate;
+  // The spend of the sub-agents inside the call, it belongs to the same
+  // action of the graph of the spend.
+  usage?: Usage;
 }
 
 export type ApprovalPolicy = 'never' | 'always';
