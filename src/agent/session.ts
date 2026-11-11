@@ -80,6 +80,12 @@ export class AgentSession {
 
   stop(): void {
     this.agent?.abort();
+    // The turn waits for the answer of the reader, a stop must end it:
+    // every approval that waits is rejected.
+    for (const [id, resolve] of this.pending) {
+      this.pending.delete(id);
+      resolve({ approved: false, allowForSession: false });
+    }
   }
 
   approve(id: string, allowForSession: boolean): boolean {

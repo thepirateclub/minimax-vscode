@@ -95,6 +95,10 @@ interface RuntimeSession {
   // When the turn of this moment started, the panel shows how long it
   // took.
   turnStartedAt: number;
+  // The tools the reader allowed for the session. The permission of a
+  // child belongs to the chat of this session, it must not leak into
+  // another chat.
+  approvedTools: Set<string>;
 }
 
 const TITLE_LIMIT = 60;
@@ -130,9 +134,6 @@ class MiniMaxController {
     string,
     { toolName: string; resolve: (decision: ApprovalDecision) => void }
   >();
-  // The tools the reader allowed for the session. The gate of a child is new
-  // every time, the permission of the session lives here.
-  private readonly sessionApprovedTools = new Set<string>();
   // The index of the project, one per workspace folder.
   private readonly searches = new Map<string, ProjectSearch>();
   private activeSessionId: string | undefined;
@@ -574,9 +575,12 @@ class MiniMaxController {
   // The gate of a child is the gate of the session: a write of the child
   // asks the user too. The tools the reader allowed for the session are
   // allowed for every child.
-  private childApproval(signal: AbortSignal): ApprovalGate {
+  private childApproval(
+    runtime: RuntimeSession,
+    signal: AbortSignal
+  ): ApprovalGate {
     return new ApprovalGate({
-      autoApprove: [...getSettings().autoApprove, ...this.sessionApprovedTools],
+      autoApprove: [...getSettings().autoApprove, ...runtime.approvedTools],
       request: async (request) => await this.requestChildApproval(request, signal)
     });
   }
@@ -693,7 +697,7 @@ class MiniMaxController {
         apiKey: key
       }),
       registry,
-      approval: this.childApproval(ctx.signal),
+      approval: this.childApproval(runtime, ctx.signal),
       model: settings.model,
       maxTokens: model?.maxTokens ?? 65_536,
       maxIterations: CHILD_MAX_ITERATIONS,
@@ -779,15 +783,24 @@ class MiniMaxController {
     }
     if (event.type === 'tool_progress') {
       // The journal of the action: the lines that the tool writes while it
-      // runs. They stay in the card of the action.
-      for (const message of runtime.uiMessages) {
+      // runs. They stay in the card of the action. The same id of a tool
+      // call can come back in a later turn, the last card with that id
+      // takes the line.
+      for (let index = runtime.uiMessages.length - 1; index >= 0; index--) {
+        const message = runtime.uiMessages[index]!;
         if (message.tool && message.tool.id === event.id) {
-          const journal = message.tool.content ?? '';
-          message.tool.content =
-            journal.length > 0 ? journal + '\n' + event.line : event.line;
-          return;
+          message.tool.progress = [
+            ...(message.tool.progress ?? []),
+            event.line
+          ];
+          break;
         }
       }
+      this.panel.post({
+        type: 'tool_progress',
+        id: event.id,
+        line: event.line
+      });
       return;
     }
     if (event.type === 'tool_start') {
@@ -805,15 +818,11 @@ class MiniMaxController {
       const started = this.toolStarted.get(event.id);
       this.toolStarted.delete(event.id);
       const durationMs = started === undefined ? undefined : Date.now() - started;
-      // The journal of the action stays in the card, the result of the
-      // action comes first.
-      let output = event.content;
+      // The result of the call stands in the content of the card, the
+      // journal of the action lives in its own field.
       for (const message of runtime.uiMessages) {
         if (message.tool && message.tool.id === event.id) {
-          const journal = message.tool.content ?? '';
-          output =
-            journal.length > 0 ? event.content + '\n' + journal : event.content;
-          message.tool.content = output;
+          message.tool.content = event.content;
           message.tool.isError = event.isError;
           message.tool.running = false;
           if (event.diff) {
@@ -850,7 +859,7 @@ class MiniMaxController {
         type: 'tool_end',
         id: event.id,
         name: event.name,
-        content: output,
+        content: event.content,
         isError: event.isError,
         durationMs,
         diff: event.diff
@@ -1073,7 +1082,7 @@ class MiniMaxController {
           if (message.allowForSession) {
             // The permission belongs to the session, the gate of the next
             // child knows the tool.
-            this.sessionApprovedTools.add(pending.toolName);
+            runtime?.approvedTools.add(pending.toolName);
           }
           pending.resolve({ approved: true, allowForSession: message.allowForSession });
         }
@@ -1755,7 +1764,8 @@ class MiniMaxController {
       goal: stored.goal
         ? { ...stored.goal, used: { ...stored.goal.used } }
         : undefined,
-      turnStartedAt: 0
+      turnStartedAt: 0,
+      approvedTools: new Set()
     };
   }
 
@@ -1778,7 +1788,8 @@ class MiniMaxController {
       turns: [],
       todos: [],
       goal: undefined,
-      turnStartedAt: 0
+      turnStartedAt: 0,
+      approvedTools: new Set()
     });
     this.activeSessionId = id;
     // The id of the new chat goes to the state of the host together with the

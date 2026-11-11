@@ -19,6 +19,8 @@ export interface UiToolCall {
   name: string;
   input: Record<string, unknown>;
   content?: string;
+  // The journal of a long action, the sub-agent writes its lines here.
+  progress?: string[];
   isError?: boolean;
   running?: boolean;
   // How long the action took, the host measures it.
@@ -156,6 +158,8 @@ export type ExtToWeb =
       durationMs?: number;
       diff?: { path: string; lines: UiDiffLine[] };
     }
+  // The journal of a long action, one line at a time.
+  | { type: 'tool_progress'; id: string; line: string }
   | { type: 'approval_request'; approval: UiApproval }
   | { type: 'approval_resolved'; id: string; approved: boolean }
   | { type: 'status'; state: AgentState; tokens?: number }

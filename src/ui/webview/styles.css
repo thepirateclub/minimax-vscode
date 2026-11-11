@@ -948,6 +948,27 @@ input:focus {
   padding-right: 32px;
 }
 
+/* the card of a sub-agent */
+.agent-log {
+  margin-bottom: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  background: var(--code-bg);
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: var(--fs-sm);
+  border-radius: var(--radius-sm);
+}
+
+.agent-log-line {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.agent-answer {
+  font-size: var(--fs-md);
+}
+
 /* the copy button of a block, it shows itself when the mouse is over it */
 .tool-copy {
   position: absolute;

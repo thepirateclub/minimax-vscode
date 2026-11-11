@@ -37,6 +37,7 @@ export const STRINGS = {
   toolSearch: 'Find',
   toolList: 'List',
   toolTerminal: 'Run',
+  toolTask: 'Task',
   toolGitStatus: 'Git status',
   toolGitDiff: 'Git diff',
   toolGitStaged: 'staged',

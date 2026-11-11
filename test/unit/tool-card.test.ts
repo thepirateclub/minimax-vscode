@@ -496,3 +496,25 @@ describe('the body of a card', () => {
     expect(titleOf(markup)).toContain('hp: atk:');
   });
 });
+
+describe('the card of a sub-agent', () => {
+  it('names the task and shows the journal of the child', () => {
+    const markup = card({
+      name: 'task',
+      input: {
+        description: 'Find the parser',
+        prompt: 'Where is it?',
+        role: 'explore'
+      },
+      content: 'The parser is in src/app.ts.',
+      progress: ['read_file src/app.ts', 'search_code parser 3 matches']
+    });
+    // The title names the task of the child.
+    expect(markup).toContain('Find the parser');
+    // The journal of the child stands in its own block.
+    expect(markup).toContain('agent-log');
+    expect(markup).toContain('read_file src/app.ts');
+    // The answer of the child stands under the journal.
+    expect(markup).toContain('The parser is in src/app.ts.');
+  });
+});

@@ -117,6 +117,12 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
         );
         return;
       }
+      if (message.type === 'tool_progress') {
+        // The journal of the action goes to the last card with that id:
+        // the same id of a tool call can come back in a later turn.
+        setMessages((prev) => appendProgress(prev, message.id, message.line));
+        return;
+      }
       if (message.type === 'approval_request') {
         setMessages((prev) => [
           ...prev,
@@ -409,5 +415,29 @@ function appendToAssistant(
     }
   }
   next.push({ id: 'assistant-' + Date.now(), role: 'assistant', [field]: delta });
+  return next;
+}
+
+// The journal of an action goes to the last card with that id: the same id
+// of a tool call can come back in a later turn.
+function appendProgress(
+  messages: UiMessage[],
+  id: string,
+  line: string
+): UiMessage[] {
+  const next = [...messages];
+  for (let i = next.length - 1; i >= 0; i--) {
+    const item = next[i]!;
+    if (item.tool && item.tool.id === id) {
+      next[i] = {
+        ...item,
+        tool: {
+          ...item.tool,
+          progress: [...(item.tool.progress ?? []), line]
+        }
+      };
+      return next;
+    }
+  }
   return next;
 }

@@ -6,6 +6,7 @@ import {
   IconEdit,
   IconGit,
   IconList,
+  IconModel,
   IconRead,
   IconSearch,
   IconTerminal,
@@ -15,6 +16,7 @@ import { STRINGS } from '../strings';
 import { cardOpen } from '../toolCardState';
 import { diffStats } from '../diffStats';
 import { editDiff } from '../editDiff';
+import { AgentView } from './AgentView';
 import { DiffView } from './DiffView';
 import { FileReadView } from './FileReadView';
 import { TerminalView } from './TerminalView';
@@ -264,6 +266,18 @@ function describeTool(tool: UiToolCall, folded: boolean): ToolView {
       summary: firstLine(content)
     };
   }
+  if (tool.name === 'task') {
+    const description = text(tool.input['description']);
+    const role = text(tool.input['role']);
+    return {
+      icon: <IconModel />,
+      title:
+        STRINGS.toolTask +
+        (description.length > 0 ? ' ' + description : '') +
+        (role.length > 0 ? ' (' + role + ')' : ''),
+      summary: firstLine(content)
+    };
+  }
   return {
     icon: <IconRead />,
     title: tool.name,
@@ -358,6 +372,11 @@ export function ToolCard({
               command={String(tool.input['command'] ?? '')}
               content={tool.content ?? ''}
               running={tool.running === true}
+            />
+          ) : tool.name === 'task' ? (
+            <AgentView
+              progress={tool.progress ?? []}
+              content={tool.content ?? ''}
             />
           ) : (
             <>

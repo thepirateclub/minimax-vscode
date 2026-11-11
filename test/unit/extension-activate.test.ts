@@ -1939,10 +1939,17 @@ describe('extension activation', () => {
     await vi.waitFor(async () => {
       expect(await readFile(join(root, 'note.txt'), 'utf8')).toBe('written by the agent');
     });
-    // The change of the child stays in the card of the call.
+    // The change of the child stays in the card of the call: the
+    // journal of the child carries the lines of the diff.
+    await vi.waitFor(() => {
+      const lines = ofType('tool_progress').map((message) => message.line);
+      expect(lines).toContain('+ written by the agent');
+    });
+    // The result of the call stays in the content alone, the journal has
+    // its own field.
     await vi.waitFor(() => {
       const end = ofType('tool_end').pop();
-      expect(end?.content).toContain('+ written by the agent');
+      expect(end?.content).not.toContain('+ written by the agent');
     });
   });
 
