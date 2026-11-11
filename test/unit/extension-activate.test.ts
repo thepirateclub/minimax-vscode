@@ -252,7 +252,10 @@ function makeView(): unknown {
       cspSource: 'vscode-webview:',
       asWebviewUri: (uri: unknown) => uri,
       postMessage: (message: ExtToWeb) => {
-        state.posted.push(message);
+        // The webview gets a copy of the message, the host keeps the object
+        // and can change it later. A test that looks at the panel has to see
+        // the message as it was posted.
+        state.posted.push(structuredClone(message));
         return Promise.resolve(true);
       },
       onDidReceiveMessage: (handler: (message: WebToExt) => void) => {
@@ -1585,6 +1588,192 @@ describe('extension activation', () => {
       // The failed turn took five seconds, they are in the goal.
       await vi.waitFor(() => {
         expect(storedGoal()?.used.seconds).toBe(5);
+      });
+    } finally {
+      now.mockRestore();
+      vi.stubGlobal('fetch', base);
+    }
+    // The global is the stub of the file again, the next test is not
+    // touched by this one.
+    expect(globalThis.fetch).toBe(base);
+  });
+
+  it('returns the request to the input when the budget of the goal is over', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.secrets.set('minimax.apiKey', 'test-key');
+    state.responses.push(TEXT_SSE);
+    await boot();
+
+    state.receive?.({
+      type: 'set_goal',
+      objective: 'Rewrite the parser',
+      tokenBudget: 10
+    });
+    await vi.waitFor(() => {
+      expect(ofType('goal').length).toBe(1);
+    });
+
+    state.posted.length = 0;
+    state.receive?.({ type: 'send', text: 'hello', mentions: [], selections: [] });
+    await vi.waitFor(() => {
+      expect(ofType('status').pop()?.state).toBe('idle');
+    });
+
+    // The spend of the request (18 tokens) broke the limit of 10 tokens.
+    state.posted.length = 0;
+    state.receive?.({
+      type: 'send',
+      text: 'again',
+      mentions: ['src/app.ts'],
+      selections: []
+    });
+    await vi.waitFor(() => {
+      expect(ofType('notice').length).toBeGreaterThan(0);
+    });
+    // The request comes back to the input field, it is not lost.
+    const restored = ofType('restore_input')[0]!;
+    expect(restored.text).toBe('again');
+    expect(restored.mentions).toEqual(['src/app.ts']);
+    expect(restored.selections).toEqual([]);
+    // The request did not go out.
+    expect(state.fetched.filter((url) => url === MESSAGES_URL)).toHaveLength(1);
+  });
+
+  it('clears the goal of the session', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    await boot();
+
+    state.receive?.({
+      type: 'set_goal',
+      objective: 'Rewrite the parser',
+      tokenBudget: 12000
+    });
+    await vi.waitFor(() => {
+      expect(ofType('goal').length).toBe(1);
+    });
+
+    state.posted.length = 0;
+    state.receive?.({ type: 'clear_goal' });
+    await vi.waitFor(() => {
+      expect(ofType('goal').length).toBe(1);
+    });
+    // The panel sees that the goal is gone.
+    expect(ofType('goal')[0]!.goal).toBeUndefined();
+    // The saved session has no goal.
+    await vi.waitFor(() => {
+      const stored = state.globalState.get('minimax.sessions') as Array<{
+        goal?: { objective: string };
+      }>;
+      expect(stored[0]?.goal).toBeUndefined();
+    });
+  });
+
+  it('sends the time of the turn to the panel with the goal', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.secrets.set('minimax.apiKey', 'test-key');
+    state.responses.push(TEXT_SSE);
+    // The clock of the test: every request takes five seconds.
+    let clock = 3_000_000;
+    const now = vi.spyOn(Date, 'now').mockImplementation(() => clock);
+    const base = globalThis.fetch;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+        if (String(url).includes('/v1/messages')) {
+          clock += 5000;
+        }
+        return base(url, init);
+      })
+    );
+    try {
+      await boot();
+      state.receive?.({
+        type: 'set_goal',
+        objective: 'Rewrite the parser',
+        secondsLimit: 600
+      });
+      await vi.waitFor(() => {
+        expect(ofType('goal').length).toBe(1);
+      });
+
+      state.posted.length = 0;
+      state.receive?.({ type: 'send', text: 'hello', mentions: [], selections: [] });
+      await vi.waitFor(() => {
+        expect(ofType('status').pop()?.state).toBe('idle');
+      });
+      // The widget of the goal shows the time of the turn, the panel gets
+      // the goal with the seconds of the turn and not with the seconds of
+      // the turn before it.
+      const goal = ofType('goal').pop()!.goal!;
+      expect(goal.used.seconds).toBe(5);
+    } finally {
+      now.mockRestore();
+      vi.stubGlobal('fetch', base);
+    }
+    // The global is the stub of the file again, the next test is not
+    // touched by this one.
+    expect(globalThis.fetch).toBe(base);
+  });
+
+  it('does not charge the goal for the time between the turns', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.secrets.set('minimax.apiKey', 'test-key');
+    // The clock of the test: every failed request takes five seconds.
+    let clock = 4_000_000;
+    const now = vi.spyOn(Date, 'now').mockImplementation(() => clock);
+    const base = globalThis.fetch;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+        if (String(url).includes('/v1/messages')) {
+          clock += 5000;
+          return new Response(
+            JSON.stringify({ error: { message: 'bad request' } }),
+            { status: 400, headers: { 'content-type': 'application/json' } }
+          );
+        }
+        return base(url, init);
+      })
+    );
+    const storedGoal = () => {
+      const stored = state.globalState.get('minimax.sessions') as Array<{
+        goal?: { used: { seconds: number } };
+      }>;
+      return stored[0]?.goal;
+    };
+    try {
+      await boot();
+      state.receive?.({
+        type: 'set_goal',
+        objective: 'Rewrite the parser',
+        secondsLimit: 600
+      });
+      await vi.waitFor(() => {
+        expect(ofType('goal').length).toBe(1);
+      });
+
+      state.receive?.({ type: 'send', text: 'first', mentions: [], selections: [] });
+      await vi.waitFor(() => {
+        expect(ofType('error').length).toBe(1);
+      });
+      await vi.waitFor(() => {
+        expect(storedGoal()?.used.seconds).toBe(5);
+      });
+
+      // The user waits a minute between the turns, the waiting is not
+      // work.
+      clock += 60_000;
+      state.receive?.({ type: 'send', text: 'second', mentions: [], selections: [] });
+      await vi.waitFor(() => {
+        expect(ofType('error').length).toBe(2);
+      });
+      // Two turns of five seconds, the idle minute is not in the goal.
+      await vi.waitFor(() => {
+        expect(storedGoal()?.used.seconds).toBe(10);
       });
     } finally {
       now.mockRestore();

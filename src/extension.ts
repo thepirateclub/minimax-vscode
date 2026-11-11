@@ -636,12 +636,17 @@ class MiniMaxController {
       const goal = runtime.goal;
       if (goal && runtime.turnStartedAt > 0) {
         goal.used.seconds += (Date.now() - runtime.turnStartedAt) / 1000;
+        // The widget of the goal shows the time of the turn, the panel has
+        // to get the goal with the time that was added.
+        this.panel.post({ type: 'goal', goal: { ...goal } });
       }
       const notice = stopNotice(event.stopReason, getSettings().maxIterations, goal);
       if (notice) {
         this.panel.post({ type: 'notice', message: notice.message, kind: notice.kind });
       }
       this.setState('idle');
+      // The turn is over, the time of the turn is not running anymore.
+      runtime.turnStartedAt = 0;
       return;
     }
     if (event.type === 'error') {
@@ -652,6 +657,9 @@ class MiniMaxController {
       const goal = runtime.goal;
       if (goal && runtime.turnStartedAt > 0) {
         goal.used.seconds += (Date.now() - runtime.turnStartedAt) / 1000;
+        // The widget of the goal shows the time of the turn, the panel has
+        // to get the goal with the time that was added.
+        this.panel.post({ type: 'goal', goal: { ...goal } });
       }
       if (isAbortMessage(event.message)) {
         // The user stopped the turn, it is not a failure of the server.
@@ -662,10 +670,14 @@ class MiniMaxController {
         });
         this.markStepTime(runtime);
         this.setState('idle');
+        // The turn is over, the time of the turn is not running anymore.
+        runtime.turnStartedAt = 0;
         return;
       }
       this.panel.post({ type: 'error', message: event.message });
       this.setState('error');
+      // The turn is over, the time of the turn is not running anymore.
+      runtime.turnStartedAt = 0;
     }
   }
 
@@ -954,6 +966,9 @@ class MiniMaxController {
         message: notice?.message ?? 'The budget of the goal is exhausted.',
         kind: notice?.kind ?? 'warn'
       });
+      // The request does not go out, it comes back to the input field, the
+      // user does not lose it.
+      this.panel.post({ type: 'restore_input', text, mentions, selections });
       return;
     }
     const agent = await this.ensureAgent(runtime);
