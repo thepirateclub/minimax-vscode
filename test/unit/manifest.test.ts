@@ -18,6 +18,7 @@ interface ManifestProperty {
   type: string;
   default?: unknown;
   description?: string;
+  enum?: string[];
 }
 
 interface Manifest {
@@ -56,6 +57,15 @@ describe('the manifest of the extension', () => {
     // The key scmProvider is not set in every window, a hidden button looks
     // like a broken feature.
     expect(entry?.when).toBeUndefined();
+  });
+
+  it('offers the settings of the voice input', () => {
+    const properties = manifest.contributes.configuration.properties;
+    // An empty language lets the model pick the dominant one of the audio.
+    expect(properties['minimax.speechLanguage']).toMatchObject({ type: 'string', default: '' });
+    expect(properties['minimax.speechLanguage']?.enum).toEqual(expect.arrayContaining(['', 'ru', 'en']));
+    expect(properties['minimax.microphone']).toMatchObject({ type: 'string', default: '' });
+    expect(properties['minimax.ffmpegPath']).toMatchObject({ type: 'string', default: 'ffmpeg' });
   });
 
   it('offers the switches that fold the panels of the chat', () => {

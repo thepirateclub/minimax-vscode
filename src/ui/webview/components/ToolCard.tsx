@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import type { UiToolCall } from '../../protocol';
 import {
   Chevron,
+  IconCheck,
   IconEdit,
   IconGit,
   IconList,
@@ -17,6 +18,8 @@ import { cardOpen } from '../toolCardState';
 import { diffStats } from '../diffStats';
 import { editDiff } from '../editDiff';
 import { AgentView } from './AgentView';
+import { TaskRows } from './TaskList';
+import { todoItems } from '../todoItems';
 import { DiffView } from './DiffView';
 import { FileReadView } from './FileReadView';
 import { TerminalView } from './TerminalView';
@@ -275,7 +278,42 @@ function describeTool(tool: UiToolCall, folded: boolean): ToolView {
         STRINGS.toolTask +
         (description.length > 0 ? ' ' + description : '') +
         (role.length > 0 ? ' (' + role + ')' : ''),
-      summary: firstLine(content)
+      // An open card shows the answer of the child right under the title,
+      // the summary would print it twice.
+      summary: folded || tool.isError ? firstLine(content) : ''
+    };
+  }
+  if (tool.name === 'todo_write') {
+    const todos = todoItems(input['todos']);
+    const done = todos.filter((item) => item.status === 'completed').length;
+    return {
+      icon: <IconList />,
+      title: STRINGS.toolTodo,
+      summary: tool.isError
+        ? firstLine(content)
+        : done + '/' + todos.length + ' ' + STRINGS.toolTodoDone
+    };
+  }
+  if (tool.name === 'get_goal') {
+    return { icon: <IconCheck />, title: STRINGS.toolGetGoal, summary: '' };
+  }
+  if (tool.name === 'update_goal') {
+    const status = text(input['status']);
+    return {
+      icon: <IconCheck />,
+      title:
+        status === 'complete'
+          ? STRINGS.toolGoalComplete
+          : status === 'blocked'
+            ? STRINGS.toolGoalBlocked
+            : STRINGS.toolUpdateGoal,
+      // The result speaks to the model, the reader gets the note. An open
+      // card shows the whole note in its body, the summary would repeat it.
+      summary: tool.isError
+        ? firstLine(content)
+        : folded
+          ? firstLine(text(input['note']))
+          : ''
     };
   }
   return {
@@ -373,6 +411,12 @@ export function ToolCard({
               content={tool.content ?? ''}
               running={tool.running === true}
             />
+          ) : tool.name === 'todo_write' && !tool.isError ? (
+            <TaskRows todos={todoItems(tool.input['todos'])} />
+          ) : tool.name === 'update_goal' && !tool.isError ? (
+            text(tool.input['note']).length > 0 ? (
+              <p className="tool-note">{text(tool.input['note'])}</p>
+            ) : null
           ) : tool.name === 'task' ? (
             <AgentView
               progress={tool.progress ?? []}

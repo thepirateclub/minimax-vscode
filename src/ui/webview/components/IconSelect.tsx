@@ -15,13 +15,20 @@ export function IconSelect<T extends string>({
   options,
   onChange,
   icon,
-  title
+  title,
+  className,
+  align = 'start'
 }: {
   value: T;
   options: IconSelectOption<T>[];
   onChange: (value: T) => void;
   icon?: ReactNode;
   title?: string;
+  // A marker of the place of the select, the composer styles its own.
+  className?: string;
+  // The edge the menu grows from: a select at the right edge of the panel
+  // opens its menu to the left, or the menu runs out of the panel.
+  align?: 'start' | 'end';
 }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -46,7 +53,12 @@ export function IconSelect<T extends string>({
   };
 
   return (
-    <div className="icon-select" ref={rootRef}>
+    <div
+      className={
+        'icon-select' + (align === 'end' ? ' align-end' : '') + (className ? ' ' + className : '')
+      }
+      ref={rootRef}
+    >
       <button
         className={'icon-select-trigger' + (open ? ' open' : '')}
         title={title}

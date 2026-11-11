@@ -3,6 +3,7 @@ import { isAbsolute } from 'node:path';
 import * as vscode from 'vscode';
 import { HttpEmbeddingsClient } from './api/embeddings';
 import { HttpMiniMaxClient } from './api/client';
+import { HttpSpeechClient } from './api/speech';
 import { fetchQuota, type QuotaSnapshot } from './api/quota';
 import type { AnthropicMessage, EffortLevel } from './api/types';
 import { Agent, type AgentEvent, type AgentRunResult } from './agent/agent';
@@ -59,8 +60,11 @@ import {
 import { fileErrorMessage } from './ui/fileError';
 import { AgentPanelProvider } from './ui/panel';
 import { themeKind } from './ui/theme';
+import { VoiceController } from './voice/controller';
+import { Recorder } from './voice/recorder';
 import type {
   AgentState,
+  ExtToWeb,
   UiApproval,
   UiMessage,
   UiSelection,
@@ -148,6 +152,8 @@ class MiniMaxController {
   private quota: QuotaSnapshot | undefined;
   // When every action started, the duration goes to the panel.
   private readonly toolStarted = new Map<string, number>();
+  // The voice input: ffmpeg records, MiniMax asr-1.0 transcribes.
+  private readonly voice: VoiceController;
 
   constructor(context: vscode.ExtensionContext, channel: vscode.OutputChannel) {
     this.context = context;
@@ -159,6 +165,27 @@ class MiniMaxController {
       extensionUri: context.extensionUri,
       onMessage: (message) => {
         void this.handleWebviewMessage(message);
+      }
+    });
+
+    this.voice = new VoiceController({
+      post: (message) => this.panel.post(message),
+      getApiKey: () => getApiKey(this.context.secrets),
+      config: () => {
+        const settings = getSettings();
+        return {
+          ffmpeg: settings.ffmpegPath,
+          microphone: settings.microphone,
+          language: settings.speechLanguage,
+          vocabulary: settings.speechVocabulary,
+          baseUrl: resolveBaseUrl(settings.baseUrl, settings.customBaseUrl)
+        };
+      },
+      createRecorder: (config) => new Recorder(config.ffmpeg, config.microphone),
+      createClient: (config, apiKey) => new HttpSpeechClient({ baseUrl: config.baseUrl, apiKey }),
+      every: (ms, fn) => {
+        const timer = setInterval(fn, ms);
+        return () => clearInterval(timer);
       }
     });
 
@@ -188,6 +215,8 @@ class MiniMaxController {
     context.subscriptions.push(
       vscode.commands.registerCommand('minimax.openPanel', () => this.panel.reveal())
     );
+    // A recording left running would hold the microphone after the window closes.
+    context.subscriptions.push({ dispose: () => this.voice.cancel() });
     context.subscriptions.push(
       vscode.commands.registerCommand('minimax.newChat', () => this.startNewSession())
     );
@@ -788,18 +817,18 @@ class MiniMaxController {
     if (event.type === 'assistant_start') {
       runtime.uiMessages.push({ id: this.nextId('assistant'), role: 'assistant', text: '' });
       const last = runtime.uiMessages[runtime.uiMessages.length - 1];
-      this.panel.post({ type: 'assistant_start', id: last ? last.id : '' });
+      this.postFor(runtime, { type: 'assistant_start', id: last ? last.id : '' });
       return;
     }
     if (event.type === 'assistant_text') {
       this.appendToAssistant(runtime, 'text', event.text);
-      this.panel.post({ type: 'text_delta', text: event.text });
+      this.postFor(runtime, { type: 'text_delta', text: event.text });
       this.setState('streaming');
       return;
     }
     if (event.type === 'assistant_thinking') {
       this.appendToAssistant(runtime, 'thinking', event.text);
-      this.panel.post({ type: 'thinking_delta', text: event.text });
+      this.postFor(runtime, { type: 'thinking_delta', text: event.text });
       this.setState('thinking');
       return;
     }
@@ -818,7 +847,7 @@ class MiniMaxController {
           break;
         }
       }
-      this.panel.post({
+      this.postFor(runtime, {
         type: 'tool_progress',
         id: event.id,
         line: event.line
@@ -832,7 +861,7 @@ class MiniMaxController {
         role: 'tool',
         tool: { id: event.id, name: event.name, input: event.input, running: true }
       });
-      this.panel.post({ type: 'tool_start', id: event.id, name: event.name, input: event.input });
+      this.postFor(runtime, { type: 'tool_start', id: event.id, name: event.name, input: event.input });
       this.setState('tool');
       return;
     }
@@ -862,27 +891,21 @@ class MiniMaxController {
       }
       if (event.state?.kind === 'todos') {
         runtime.todos = event.state.todos;
-        this.panel.post({ type: 'todos', todos: runtime.todos });
+        this.postFor(runtime, { type: 'todos', todos: runtime.todos });
         this.persist(runtime);
       }
       if (event.state?.kind === 'goal') {
         const goal = runtime.goal;
         if (goal) {
           goal.status = event.state.status;
-          this.panel.post({ type: 'goal', goal: { ...goal } });
-          if (event.state.note) {
-            // The reason of the model reaches the user, the status of the
-            // goal alone says nothing about why it stopped.
-            this.panel.post({
-              type: 'notice',
-              message: event.state.note,
-              kind: 'info'
-            });
-          }
+          this.postFor(runtime, { type: 'goal', goal: { ...goal } });
+          // The reason of the model stands in the card of the call: a notice
+          // printed it twice and was lost on the reload of the panel, the
+          // card stays in the saved chat.
           this.persist(runtime);
         }
       }
-      this.panel.post({
+      this.postFor(runtime, {
         type: 'tool_end',
         id: event.id,
         name: event.name,
@@ -907,7 +930,7 @@ class MiniMaxController {
           (event.usage.cacheReadTokens ?? 0) +
           (event.usage.cacheCreationTokens ?? 0);
         goal.used.requests += 1;
-        this.panel.post({ type: 'goal', goal: { ...goal } });
+        this.postFor(runtime, { type: 'goal', goal: { ...goal } });
       }
       return;
     }
@@ -929,7 +952,7 @@ class MiniMaxController {
       if (runtime.usage.length > MAX_USAGE_TURNS) {
         runtime.usage = runtime.usage.slice(-MAX_USAGE_TURNS);
       }
-      this.panel.post({ type: 'usage', turns: runtime.usage });
+      this.postFor(runtime, { type: 'usage', turns: runtime.usage });
       // The last message of the step tells how long the step took, and
       // the reason of the stop is named, a silent stop confuses.
       this.markStepTime(runtime);
@@ -938,11 +961,11 @@ class MiniMaxController {
         goal.used.seconds += (Date.now() - runtime.turnStartedAt) / 1000;
         // The widget of the goal shows the time of the turn, the panel has
         // to get the goal with the time that was added.
-        this.panel.post({ type: 'goal', goal: { ...goal } });
+        this.postFor(runtime, { type: 'goal', goal: { ...goal } });
       }
       const notice = stopNotice(event.stopReason, getSettings().maxIterations, goal);
       if (notice) {
-        this.panel.post({ type: 'notice', message: notice.message, kind: notice.kind });
+        this.postFor(runtime, { type: 'notice', message: notice.message, kind: notice.kind });
       }
       this.setState('idle');
       // The turn is over, the time of the turn is not running anymore.
@@ -959,11 +982,11 @@ class MiniMaxController {
         goal.used.seconds += (Date.now() - runtime.turnStartedAt) / 1000;
         // The widget of the goal shows the time of the turn, the panel has
         // to get the goal with the time that was added.
-        this.panel.post({ type: 'goal', goal: { ...goal } });
+        this.postFor(runtime, { type: 'goal', goal: { ...goal } });
       }
       if (isAbortMessage(event.message)) {
         // The user stopped the turn, it is not a failure of the server.
-        this.panel.post({
+        this.postFor(runtime, {
           type: 'notice',
           message: 'The request was stopped.',
           kind: 'info'
@@ -974,7 +997,7 @@ class MiniMaxController {
         runtime.turnStartedAt = 0;
         return;
       }
-      this.panel.post({ type: 'error', message: event.message });
+      this.postFor(runtime, { type: 'error', message: event.message });
       this.setState('error');
       // The turn is over, the time of the turn is not running anymore.
       runtime.turnStartedAt = 0;
@@ -998,6 +1021,34 @@ class MiniMaxController {
       role: 'assistant',
       [field]: text
     });
+  }
+
+  // The agents that may wait for an answer of the reader: the open chat
+  // first, then the chats in the background. The reader can answer a card
+  // of a chat that is not open anymore, an answer that only reached the open
+  // chat was lost and the other turn waited forever.
+  private agentsByPriority(): AgentSession[] {
+    const active = this.activeSession();
+    const agents: AgentSession[] = [];
+    if (active?.agent) {
+      agents.push(active.agent);
+    }
+    for (const runtime of this.sessions.values()) {
+      if (runtime !== active && runtime.agent) {
+        agents.push(runtime.agent);
+      }
+    }
+    return agents;
+  }
+
+  // The events of a turn reach the panel only while their chat is open. A
+  // chat that runs in the background keeps its messages in the host and
+  // shows them when the user comes back; posted to the panel they landed in
+  // the open chat: its text, its tasks and its goal were overwritten.
+  private postFor(runtime: RuntimeSession, message: ExtToWeb): void {
+    if (runtime.id === this.activeSessionId) {
+      this.panel.post(message);
+    }
   }
 
   private setState(state: AgentState): void {
@@ -1099,9 +1150,9 @@ class MiniMaxController {
       return;
     }
     if (message.type === 'approve') {
-      const runtime = this.activeSession();
-      const handled =
-        runtime?.agent?.approve(message.id, message.allowForSession) ?? false;
+      const handled = this.agentsByPriority().some(
+        (agent) => agent.approve(message.id, message.allowForSession)
+      );
       if (!handled) {
         const pending = this.childApprovals.get(message.id);
         if (pending) {
@@ -1121,8 +1172,7 @@ class MiniMaxController {
       return;
     }
     if (message.type === 'reject') {
-      const runtime = this.activeSession();
-      const handled = runtime?.agent?.reject(message.id) ?? false;
+      const handled = this.agentsByPriority().some((agent) => agent.reject(message.id));
       if (!handled) {
         const pending = this.childApprovals.get(message.id);
         if (pending) {
@@ -1199,6 +1249,18 @@ class MiniMaxController {
       this.persist(runtime);
       return;
     }
+    if (message.type === 'clear_todos') {
+      const runtime = this.activeSession();
+      if (!runtime) {
+        return;
+      }
+      // The list lives in the host, the next turn shows the model an empty
+      // section of the tasks and the reload does not bring them back.
+      runtime.todos = [];
+      this.panel.post({ type: 'todos', todos: [] });
+      this.persist(runtime);
+      return;
+    }
     if (message.type === 'clear_goal') {
       const runtime = this.activeSession();
       if (!runtime) {
@@ -1254,6 +1316,18 @@ class MiniMaxController {
     }
     if (message.type === 'clear_api_key') {
       await this.clearApiKey();
+      return;
+    }
+    if (message.type === 'voice_start') {
+      await this.voice.start();
+      return;
+    }
+    if (message.type === 'voice_stop') {
+      await this.voice.stop();
+      return;
+    }
+    if (message.type === 'voice_cancel') {
+      this.voice.cancel();
       return;
     }
   }
@@ -1664,6 +1738,8 @@ class MiniMaxController {
       enableWebSearch: settings.enableWebSearch,
       collapseTools: settings.collapseTools,
       collapseCode: settings.collapseCode,
+      speechLanguage: settings.speechLanguage,
+      microphone: settings.microphone,
       hasApiKey: Boolean(key),
       tools: this.registry.list().map((tool) => tool.name)
     };
@@ -1688,7 +1764,9 @@ class MiniMaxController {
       ['rulesEnabled', values.rulesEnabled],
       ['enableWebSearch', values.enableWebSearch],
       ['collapseTools', values.collapseTools],
-      ['collapseCode', values.collapseCode]
+      ['collapseCode', values.collapseCode],
+      ['speechLanguage', values.speechLanguage],
+      ['microphone', values.microphone]
     ];
     for (const [key, value] of updates) {
       await config.update(key, value, vscode.ConfigurationTarget.Global);

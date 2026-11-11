@@ -1,6 +1,21 @@
-import { useEffect, useState } from 'react';
-import type { GoalState } from '../../../agent/state';
+import { useEffect, useRef, useState } from 'react';
+import type { KeyboardEvent } from 'react';
+import type { GoalState, GoalStatus } from '../../../agent/state';
+import { formatCount } from '../../format';
+import {
+  DEFAULT_GOAL_FORM,
+  GOAL_STEPS,
+  nextStep,
+  parseLimit,
+  previousStep,
+  stepError,
+  type GoalForm,
+  type GoalStep
+} from '../goalWizard';
+import { IconClose, IconEdit } from '../icons';
 import { STRINGS } from '../strings';
+
+export type { GoalForm } from '../goalWizard';
 
 export interface GoalValues {
   objective: string;
@@ -9,22 +24,11 @@ export interface GoalValues {
   secondsLimit?: number;
 }
 
-// The text of the form of the limits.
-export interface GoalForm {
+// A request to open the wizard from outside, the command /goal sends it.
+// The token tells a new request from the old one.
+export interface GoalWizardRequest {
+  token: number;
   objective: string;
-  tokens: string;
-  requests: string;
-  minutes: string;
-}
-
-// A big count of tokens is written in thousands, the panel is narrow.
-export function formatTokens(value: number): string {
-  if (value < 1000) {
-    return String(value);
-  }
-  const thousands = value / 1000;
-  const text = thousands >= 100 ? String(Math.round(thousands)) : thousands.toFixed(1);
-  return text.replace(/\.0$/, '') + 'k';
 }
 
 // The time of the goal is written in minutes and seconds.
@@ -41,29 +45,18 @@ export function formatDuration(seconds: number): string {
   return minutes + 'm ' + rest + 's';
 }
 
-// The form is filled from the goal when it opens.
+// The form is filled from the goal when it opens, a new goal starts from
+// the defaults.
 export function goalFormValues(goal: GoalState | undefined): GoalForm {
+  if (!goal) {
+    return { ...DEFAULT_GOAL_FORM };
+  }
   return {
-    objective: goal?.objective ?? '',
-    tokens: goal?.tokenBudget === undefined ? '' : String(goal.tokenBudget),
-    requests: goal?.requestLimit === undefined ? '' : String(goal.requestLimit),
-    minutes:
-      goal?.secondsLimit === undefined ? '' : String(Math.round(goal.secondsLimit / 60))
+    objective: goal.objective,
+    tokens: goal.tokenBudget === undefined ? '' : String(goal.tokenBudget),
+    requests: goal.requestLimit === undefined ? '' : String(goal.requestLimit),
+    minutes: goal.secondsLimit === undefined ? '' : String(Math.round(goal.secondsLimit / 60))
   };
-}
-
-// An empty field means "without a limit". A field with a wrong number is
-// an error, it never takes the limit away.
-function parseLimit(text: string): { ok: true; value?: number } | { ok: false } {
-  const value = text.trim();
-  if (value.length === 0) {
-    return { ok: true, value: undefined };
-  }
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    return { ok: false };
-  }
-  return { ok: true, value: Math.floor(parsed) };
 }
 
 export function parseGoalForm(form: GoalForm): {
@@ -81,7 +74,8 @@ export function parseGoalForm(form: GoalForm): {
   }
   return {
     values: {
-      objective: form.objective.trim(),
+      // The objective is one line, the textarea of the wizard may wrap it.
+      objective: form.objective.replace(/\s+/g, ' ').trim(),
       tokenBudget: tokens.value,
       requestLimit: requests.value,
       secondsLimit: minutes.value === undefined ? undefined : minutes.value * 60
@@ -103,38 +97,65 @@ export function goalMatches(values: GoalValues, goal: GoalState | undefined): bo
   );
 }
 
+const STEP_TITLE: Record<GoalStep, string> = {
+  objective: STRINGS.goalStepObjective,
+  limits: STRINGS.goalStepLimits,
+  review: STRINGS.goalStepReview
+};
+
+// The form of a request: the objective of /goal over the values of the goal.
+function requestedForm(goal: GoalState | undefined, objective: string): GoalForm {
+  const form = goalFormValues(goal);
+  return objective.length > 0 ? { ...form, objective } : form;
+}
+
 // The goal over the feed: the user sets it, the model only reads it and
-// changes its status. The limits are the business of the user.
+// changes its status. The limits are the business of the user. Setting and
+// editing go through a wizard of three steps: the objective, the limits and
+// the review.
 export function GoalBar({
   goal,
+  request,
   onSet,
   onClear
 }: {
   goal: GoalState | undefined;
+  request?: GoalWizardRequest;
   onSet: (values: GoalValues) => void;
   onClear: () => void;
 }) {
-  const [editing, setEditing] = useState(false);
-  const [form, setForm] = useState<GoalForm>({
-    objective: '',
-    tokens: '',
-    requests: '',
-    minutes: ''
-  });
+  const [editing, setEditing] = useState(request !== undefined);
+  const [step, setStep] = useState<GoalStep>('objective');
+  const [form, setForm] = useState<GoalForm>(() =>
+    requestedForm(goal, request?.objective ?? '')
+  );
   const [error, setError] = useState('');
   const [pending, setPending] = useState<GoalValues | undefined>(undefined);
 
-  // The form is filled from the goal when it opens. A form that keeps the
+  // The wizard is filled from the goal when it opens. A form that keeps the
   // values of the moment of the mount shows empty fields while the limits
   // are already set, and the user edits a blank goal.
-  const openEditor = (): void => {
-    setForm(goalFormValues(goal));
+  const openEditor = (objective = ''): void => {
+    setForm(requestedForm(goal, objective));
+    setStep('objective');
     setError('');
     setPending(undefined);
     setEditing(true);
   };
 
-  // The form closes only when the host confirms the goal. A refused save
+  // The command /goal opens the wizard. The first request is taken by the
+  // initial state, a later one by its new token.
+  const seen = useRef(request?.token);
+  const token = request?.token;
+  useEffect(() => {
+    if (request && request.token !== seen.current) {
+      seen.current = request.token;
+      openEditor(request.objective);
+    }
+    // The token alone decides, openEditor reads the goal of this render.
+  }, [token]);
+
+  // The wizard closes only when the host confirms the goal. A refused save
   // keeps the text of the user, otherwise the work of the user is lost.
   useEffect(() => {
     if (pending && goalMatches(pending, goal)) {
@@ -143,99 +164,217 @@ export function GoalBar({
     }
   }, [goal, pending]);
 
-  const submit = (): void => {
-    const parsed = parseGoalForm(form);
-    if (!parsed.values) {
-      setError(parsed.error === 'empty' ? STRINGS.goalEmpty : STRINGS.goalBadLimit);
+  const showError = (reason: 'empty' | 'badLimit'): void => {
+    setError(reason === 'empty' ? STRINGS.goalEmpty : STRINGS.goalBadLimit);
+  };
+
+  const forward = (): void => {
+    const reason = stepError(step, form);
+    if (reason) {
+      showError(reason);
       return;
     }
     setError('');
+    if (step !== 'review') {
+      setStep(nextStep(step));
+      return;
+    }
+    const parsed = parseGoalForm(form);
+    if (!parsed.values) {
+      showError(parsed.error ?? 'empty');
+      return;
+    }
     setPending(parsed.values);
     onSet(parsed.values);
   };
 
-  // Without a goal the widget still stands above the feed, otherwise the
-  // user has no way to set a goal at all.
+  const back = (): void => {
+    setError('');
+    setStep(previousStep(step));
+  };
+
+  // Enter goes to the next step and saves on the last one, Shift+Enter
+  // breaks the line of the objective, Escape drops the wizard.
+  const onKey = (event: KeyboardEvent<HTMLElement>): void => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      forward();
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      setEditing(false);
+    }
+  };
+
+  // Without a goal the widget takes no room: the goal is set from the
+  // button in the bottom row of the input field.
   if (!goal && !editing) {
+    return null;
+  }
+
+  if (editing) {
+    const index = GOAL_STEPS.indexOf(step);
+    const limit = (
+      key: 'tokens' | 'requests' | 'minutes',
+      label: string,
+      placeholder: string,
+      first: boolean
+    ) => (
+      <label className="goal-field">
+        <span className="goal-field-label">{label}</span>
+        <input
+          className="goal-input"
+          type="text"
+          inputMode="numeric"
+          autoFocus={first}
+          value={form[key]}
+          placeholder={placeholder}
+          aria-label={placeholder}
+          onKeyDown={onKey}
+          onChange={(event) => setForm({ ...form, [key]: event.target.value })}
+        />
+      </label>
+    );
+    const parsed = parseGoalForm(form).values;
+    const shown = (value: number | undefined, text: (n: number) => string): string =>
+      value === undefined ? STRINGS.goalNoLimit : text(value);
     return (
-      <div className="goal-bar">
-        <button className="goal-button" onClick={openEditor}>
-          {STRINGS.goalSet}
-        </button>
+      <div className="goal-bar goal-wizard">
+        <div className="goal-wizard-head">
+          <span className="goal-wizard-title">
+            {goal ? STRINGS.goalEditTitle : STRINGS.goalNewTitle}
+          </span>
+          <span className="goal-wizard-step">
+            {STEP_TITLE[step]} · {index + 1}/{GOAL_STEPS.length}
+          </span>
+        </div>
+        <div className="goal-wizard-dots" aria-hidden="true">
+          {GOAL_STEPS.map((item, at) => (
+            <span
+              key={item}
+              className={'goal-wizard-dot' + (at <= index ? ' goal-wizard-dot-done' : '')}
+            />
+          ))}
+        </div>
+        {step === 'objective' ? (
+          <textarea
+            className="goal-input goal-input-objective"
+            rows={2}
+            autoFocus
+            value={form.objective}
+            placeholder={STRINGS.goalObjectivePlaceholder}
+            aria-label={STRINGS.goalObjective}
+            onKeyDown={onKey}
+            onChange={(event) => setForm({ ...form, objective: event.target.value })}
+          />
+        ) : step === 'limits' ? (
+          <div className="goal-limits">
+            {limit('tokens', STRINGS.goalTokens, STRINGS.goalTokenLimit, true)}
+            {limit('requests', STRINGS.goalRequests, STRINGS.goalRequestLimit, false)}
+            {limit('minutes', STRINGS.goalMinutes, STRINGS.goalMinuteLimit, false)}
+          </div>
+        ) : (
+          // The review takes Enter too, the focus sits on the main button.
+          <dl className="goal-review">
+            <dt>{STRINGS.goalLabel}</dt>
+            <dd>{parsed?.objective}</dd>
+            <dt>{STRINGS.goalTokens}</dt>
+            <dd>{shown(parsed?.tokenBudget, formatCount)}</dd>
+            <dt>{STRINGS.goalRequests}</dt>
+            <dd>{shown(parsed?.requestLimit, String)}</dd>
+            <dt>{STRINGS.goalMinutes}</dt>
+            <dd>{shown(parsed?.secondsLimit, formatDuration)}</dd>
+          </dl>
+        )}
+        <div className="goal-actions">
+          <span className={error.length > 0 ? 'goal-error' : 'goal-hint'}>
+            {error.length > 0 ? error : step === 'limits' ? STRINGS.goalLimitsHint : ''}
+          </span>
+          <button className="goal-button" onClick={() => setEditing(false)}>
+            {STRINGS.goalCancel}
+          </button>
+          {index > 0 ? (
+            <button className="goal-button" onClick={back}>
+              {STRINGS.goalBack}
+            </button>
+          ) : null}
+          <button
+            className="goal-button goal-button-primary"
+            autoFocus={step === 'review'}
+            onClick={forward}
+          >
+            {step === 'review' ? STRINGS.goalSave : STRINGS.goalNext}
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="goal-bar">
-      {editing ? (
-        <div className="goal-form">
-          <input
-            className="goal-input"
-            type="text"
-            value={form.objective}
-            placeholder={STRINGS.goalObjective}
-            aria-label={STRINGS.goalObjective}
-            onChange={(event) => setForm({ ...form, objective: event.target.value })}
-          />
-          <input
-            className="goal-input"
-            type="text"
-            value={form.tokens}
-            placeholder={STRINGS.goalTokenLimit}
-            aria-label={STRINGS.goalTokenLimit}
-            onChange={(event) => setForm({ ...form, tokens: event.target.value })}
-          />
-          <input
-            className="goal-input"
-            type="text"
-            value={form.requests}
-            placeholder={STRINGS.goalRequestLimit}
-            aria-label={STRINGS.goalRequestLimit}
-            onChange={(event) => setForm({ ...form, requests: event.target.value })}
-          />
-          <input
-            className="goal-input"
-            type="text"
-            value={form.minutes}
-            placeholder={STRINGS.goalMinuteLimit}
-            aria-label={STRINGS.goalMinuteLimit}
-            onChange={(event) => setForm({ ...form, minutes: event.target.value })}
-          />
-          <button className="goal-button" onClick={submit}>
-            {STRINGS.goalSave}
-          </button>
-          <button className="goal-button" onClick={() => setEditing(false)}>
-            {STRINGS.goalCancel}
-          </button>
-          {error.length > 0 ? <span className="goal-error">{error}</span> : null}
-        </div>
-      ) : (
-        <div className="goal-row">
-          <span className="goal-objective">{goal?.objective}</span>
-          <span className="goal-spend">
-            {formatTokens(goal?.used.tokens ?? 0)}/
-            {goal && goal.tokenBudget !== undefined ? formatTokens(goal.tokenBudget) : '∞'} tokens
-          </span>
-          <span className="goal-spend">
-            {goal?.used.requests ?? 0}/
-            {goal && goal.requestLimit !== undefined ? goal.requestLimit : '∞'} requests
-          </span>
-          <span className="goal-spend">
-            {formatDuration(goal?.used.seconds ?? 0)}/
-            {goal && goal.secondsLimit !== undefined ? formatDuration(goal.secondsLimit) : '∞'}
-          </span>
-          {goal && goal.status !== 'active' ? (
-            <span className="goal-status">{goal.status}</span>
-          ) : null}
-          <button className="goal-button" onClick={openEditor}>
-            {STRINGS.goalEdit}
-          </button>
-          <button className="goal-button" onClick={onClear}>
-            {STRINGS.goalClear}
-          </button>
-        </div>
-      )}
+    <div
+      className={
+        'goal-bar' + (goal && goal.status !== 'active' ? ' goal-status-' + goal.status : '')
+      }
+    >
+      <div className="goal-row">
+        <span className="goal-label">{STRINGS.goalLabel}</span>
+        <span className="goal-objective" title={goal?.objective}>
+          {goal?.objective}
+        </span>
+        <button
+          className="goal-icon-button"
+          title={STRINGS.goalEdit}
+          aria-label={STRINGS.goalEdit}
+          onClick={() => openEditor()}
+        >
+          <IconEdit />
+        </button>
+        <button
+          className="goal-icon-button"
+          title={STRINGS.goalClear}
+          aria-label={STRINGS.goalClear}
+          onClick={onClear}
+        >
+          <IconClose />
+        </button>
+      </div>
+      {goal ? <GoalMeta goal={goal} /> : null}
+    </div>
+  );
+}
+
+const STATUS_TEXT: Record<Exclude<GoalStatus, 'active'>, string> = {
+  complete: STRINGS.goalComplete,
+  blocked: STRINGS.goalBlocked
+};
+
+// The spend under the objective. A limit that is not set shows the spend
+// alone: an infinity sign read like a broken number.
+function GoalMeta({ goal }: { goal: GoalState }) {
+  const spend = (used: string, limit: string | undefined, unit: string): string =>
+    used + (limit === undefined ? '' : ' / ' + limit) + ' ' + unit;
+  return (
+    <div className="goal-meta">
+      {goal.status !== 'active' ? (
+        <span className="goal-status">{STATUS_TEXT[goal.status]}</span>
+      ) : null}
+      <span className="goal-spend">
+        {spend(
+          formatCount(goal.used.tokens),
+          goal.tokenBudget === undefined ? undefined : formatCount(goal.tokenBudget),
+          STRINGS.goalTokens
+        )}
+      </span>
+      <span className="goal-spend">
+        {spend(
+          String(goal.used.requests),
+          goal.requestLimit === undefined ? undefined : String(goal.requestLimit),
+          STRINGS.goalRequests
+        )}
+      </span>
+      <span className="goal-spend">
+        {formatDuration(goal.used.seconds) +
+          (goal.secondsLimit === undefined ? '' : ' / ' + formatDuration(goal.secondsLimit))}
+      </span>
     </div>
   );
 }

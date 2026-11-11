@@ -518,3 +518,69 @@ describe('the card of a sub-agent', () => {
     expect(markup).toContain('The parser is in src/app.ts.');
   });
 });
+
+describe('the cards of the session state', () => {
+  it('names the update of the tasks and shows the list, not a dump', () => {
+    const markup = card({
+      name: 'todo_write',
+      input: {
+        todos: [
+          { content: 'Read the parser', status: 'completed', priority: 'high' },
+          { content: 'Add tests', status: 'in_progress', priority: 'medium' }
+        ]
+      },
+      content: 'The list of tasks has 2 items, 1 of them are done.'
+    });
+    expect(titleOf(markup)).toBe('Update tasks');
+    expect(summaryOf(markup)).toBe('1/2 done');
+    expect(markup).toContain('Add tests');
+    expect(markup).not.toContain('tool-input');
+    expect(markup).not.toContain('&quot;status&quot;');
+  });
+
+  it('names the status the model gave the goal and keeps the note', () => {
+    const markup = card({
+      name: 'update_goal',
+      input: { status: 'complete', note: 'Rounding works' },
+      content: 'The goal is marked as complete: Rounding works The status of the goal is set by the model, the limits stay with the user.'
+    });
+    expect(titleOf(markup)).toBe('Mark goal complete');
+    // The whole note stands in the body of the open card, the summary of a
+    // folded card carries it.
+    expect(markup).toContain('<p class="tool-note">Rounding works</p>');
+    expect(summaryOf(markup)).toBe('');
+    const folded = card(
+      { name: 'update_goal', input: { status: 'complete', note: 'Rounding works' }, content: 'ok' },
+      true
+    );
+    expect(summaryOf(folded)).toBe('Rounding works');
+    // The words for the model stay out of the panel.
+    expect(markup).not.toContain('the limits stay with the user');
+    expect(markup).not.toContain('tool-input');
+  });
+
+  it('keeps the text of a refused goal update', () => {
+    const markup = card({
+      name: 'update_goal',
+      input: { status: 'done' },
+      content: 'The status of the goal is "complete" or "blocked", not "done".',
+      isError: true
+    });
+    expect(markup).toContain('not &quot;done&quot;');
+  });
+
+  it('names the read of the goal', () => {
+    expect(titleOf(card({ name: 'get_goal', input: {}, content: 'Objective: x' }))).toBe('Read goal');
+  });
+
+  it('does not repeat the answer of a sub-agent in the summary of an open card', () => {
+    const tool = {
+      name: 'task',
+      input: { description: 'Find the parser', role: 'explore' },
+      content: 'The parser is in src/app.ts.'
+    };
+    expect(summaryOf(card(tool))).toBe('');
+    // A folded card hides the answer, the summary carries its first line.
+    expect(summaryOf(card(tool, true))).toBe('The parser is in src/app.ts.');
+  });
+});

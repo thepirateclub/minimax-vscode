@@ -420,6 +420,38 @@ input:focus {
   background: var(--hover);
 }
 
+/* the toggle takes the row, the clear button sits at its right end */
+.task-head-row {
+  display: flex;
+  align-items: center;
+}
+
+.task-head-row > .task-head {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.task-clear {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-h);
+  height: var(--control-h);
+  margin-right: 4px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.task-clear:hover {
+  background: var(--hover);
+  color: var(--fg);
+}
+
 .task-title {
   font-weight: 600;
 }
@@ -482,16 +514,20 @@ input:focus {
 }
 
 .task-high .task-priority {
-  color: var(--accent);
+  color: var(--warn);
 }
 
-.task-medium .task-priority {
-  color: var(--muted);
+/* the note of the model on the card of update_goal */
+.tool-note {
+  margin: 4px 0;
+  color: var(--fg);
+  font-size: var(--fs-md);
+  white-space: pre-wrap;
 }
 
-.task-low .task-priority {
-  color: var(--muted);
-  opacity: 0.75;
+/* the list inside the card of todo_write sits on the card, not in a frame */
+.tool-body > .task-rows {
+  padding: 4px 0;
 }
 /* the goal over the feed */
 .goal-bar {
@@ -508,47 +544,137 @@ input:focus {
 .goal-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  min-width: 0;
 }
 
+.goal-label {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+
+/* The objective takes the row, the buttons keep their size. Next to the
+   spend it had no room and fell to a width of zero. */
 .goal-objective {
   flex: 1 1 auto;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.goal-spend {
-  flex: 0 0 auto;
+.goal-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  margin-top: 2px;
   color: var(--muted);
+  font-size: var(--fs-sm);
+}
+
+.goal-spend {
+  white-space: nowrap;
 }
 
 .goal-status {
+  font-weight: 600;
+}
+
+.goal-status-complete .goal-status {
+  color: var(--ok);
+}
+
+.goal-status-blocked .goal-status {
+  color: var(--err);
+}
+
+.goal-icon-button {
   flex: 0 0 auto;
-  color: var(--accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-h);
+  height: var(--control-h);
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.goal-icon-button:hover {
+  background: var(--hover);
+  color: var(--fg);
 }
 
 .goal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.goal-limits {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
 }
 
+.goal-field {
+  flex: 1 1 72px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.goal-field-label {
+  color: var(--muted);
+  font-size: var(--fs-xs);
+}
+
 .goal-input {
-  flex: 1 1 120px;
   min-width: 0;
   padding: 2px 6px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--vscode-input-border, var(--border));
   border-radius: var(--radius-sm);
-  background: var(--bg);
-  color: var(--fg);
+  background: var(--vscode-input-background, var(--bg));
+  color: var(--vscode-input-foreground, var(--fg));
   font-size: var(--fs-sm);
+  line-height: var(--lh);
+}
+
+.goal-input:focus {
+  outline: none;
+  border-color: var(--vscode-focusBorder, #007fd4);
+}
+
+.goal-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.goal-hint,
+.goal-error {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--fs-xs);
+}
+
+.goal-hint {
+  color: var(--muted);
+}
+
+.goal-error {
+  color: var(--err);
 }
 
 .goal-button {
   flex: 0 0 auto;
   padding: 2px 8px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--vscode-button-border, var(--border));
   border-radius: var(--radius-sm);
   background: none;
   color: var(--fg);
@@ -560,10 +686,85 @@ input:focus {
   background: var(--hover);
 }
 
-.goal-error {
-  flex: 0 0 auto;
-  color: var(--err);
+/* The wizard of the goal: a title with the step, a row of dots and one
+   step at a time. */
+.goal-wizard {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.goal-wizard-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.goal-wizard-title {
+  font-weight: 600;
+}
+
+.goal-wizard-step {
+  margin-left: auto;
+  color: var(--muted);
   font-size: var(--fs-sm);
+}
+
+.goal-wizard-dots {
+  display: flex;
+  gap: 4px;
+}
+
+.goal-wizard-dot {
+  flex: 1 1 0;
+  height: 2px;
+  border-radius: var(--radius-sm);
+  background: var(--border);
+}
+
+.goal-wizard-dot.goal-wizard-dot-done {
+  background: var(--accent);
+}
+
+.goal-input.goal-input-objective {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  font-family: inherit;
+  font-size: var(--fs-md);
+}
+
+/* the review of the wizard: the name of a value and the value */
+.goal-review {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 12px;
+  margin: 0;
+  font-size: var(--fs-sm);
+}
+
+.goal-review dt {
+  color: var(--muted);
+  /* the names share the words of the limit fields, the review starts them
+     with a capital like the name of the goal */
+  text-transform: capitalize;
+}
+
+.goal-review dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* the one main button of the form */
+.goal-button.goal-button-primary {
+  border-color: transparent;
+  background: var(--vscode-button-background, var(--accent));
+  color: var(--vscode-button-foreground, #fff);
+}
+
+.goal-button.goal-button-primary:hover {
+  background: var(--vscode-button-hoverBackground, var(--accent));
 }
 
 /* messages */
@@ -1241,9 +1442,19 @@ input:focus {
   gap: 6px;
 }
 
-/* the paperclip and the send icon live in the corners of the input field */
+/* The field holds the text, the paperclip in its corner and the row of the
+   controls under the text: the model, the reasoning and the send button. */
 .composer-input-wrap {
   position: relative;
+  display: flex;
+  flex-direction: column;
+  background: var(--vscode-input-background, #2b2b2b);
+  border: 1px solid var(--vscode-input-border, var(--border));
+  border-radius: var(--radius);
+}
+
+.composer-input-wrap:focus-within {
+  border-color: var(--vscode-focusBorder, #007fd4);
 }
 
 .composer-input {
@@ -1254,18 +1465,19 @@ input:focus {
   font-size: var(--fs-md);
   line-height: var(--lh);
   color: var(--vscode-input-foreground, var(--fg));
-  background: var(--vscode-input-background, #2b2b2b);
-  border: 1px solid var(--vscode-input-border, var(--border));
-  border-radius: var(--radius);
-  /* The room on the right belongs to the paperclip and the send icon. */
-  padding: 6px 32px 6px 8px;
+  background: transparent;
+  border: none;
+  /* The room on the right belongs to the paperclip. */
+  padding: 6px 32px 2px 8px;
   outline: none;
   white-space: pre-wrap;
   word-break: break-word;
 }
 
-.composer-input:focus {
-  border-color: var(--vscode-focusBorder, #007fd4);
+/* The live text of the speech is gray until the recording ends, the reader
+   sees which words may still change. */
+.dictation-live {
+  color: var(--muted);
 }
 
 /* the placeholder lives in the attribute, the field itself stays empty */
@@ -1340,12 +1552,144 @@ input:focus {
   color: var(--fg);
 }
 
-/* The send icon lives in the bottom right corner of the input field, it has
-   no fill, the word stays in the tooltip. */
+/* the last row of the field */
+.composer-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 2px 4px 4px;
+}
+
+.composer-toolbar-start,
+.composer-toolbar-end {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.composer-toolbar-start {
+  flex: 1 1 auto;
+}
+
+.composer-toolbar-end {
+  flex: 0 0 auto;
+}
+
+/* In a narrow panel the labels give way, the icons stay: a select without
+   min-width 0 keeps its full width and runs over its neighbour. */
+.composer-toolbar .icon-select {
+  min-width: 0;
+  flex: 0 1 auto;
+}
+
+/* The mode is a short word and keeps it, the name of the model gives way
+   first: "C…" said nothing, "M3.1 Fl…" still names the model. */
+.composer-toolbar .icon-select:first-child {
+  flex-shrink: 0;
+}
+
+.composer-toolbar .icon-select-trigger .icon {
+  flex: 0 0 auto;
+}
+
+/* The selects inside the field are quiet text with a chevron, like the
+   switches of the chat of VS Code. The frame shows on the mouse only. */
+.composer-toolbar .icon-select-trigger {
+  border-color: transparent;
+  background: transparent;
+}
+
+.composer-toolbar .icon-select-trigger:hover,
+.composer-toolbar .icon-select-trigger.open {
+  background: var(--hover);
+}
+
+/* The goal button stands after the model, an icon button of the field. */
+.composer-goal {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-h);
+  height: var(--control-h);
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.composer-goal:hover {
+  background: var(--hover);
+  color: var(--fg);
+}
+
+/* the pressed button: the field takes the goal */
+.composer-goal.active {
+  color: var(--accent);
+}
+
+.composer-goal.active:hover {
+  color: var(--accent);
+}
+
+/* The frame of the field says that the text is the goal, not a request. */
+.composer-input-wrap.goal-mode {
+  border-color: var(--accent);
+}
+
+.composer-input-wrap.goal-mode:focus-within {
+  border-color: var(--accent);
+}
+
+/* The microphone stands right before the send button, an icon button of
+   the field like the paperclip. */
+.composer-mic {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-h);
+  height: var(--control-h);
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.composer-mic:hover {
+  background: var(--hover);
+  color: var(--fg);
+}
+
+/* A running recording is red and pulses, the reader sees that the panel
+   listens. A click stops it and sends the speech to the recognition. */
+.composer-mic.recording {
+  color: var(--err);
+  animation: mm-pulse 1.2s ease-in-out infinite;
+}
+
+.composer-mic.recording:hover {
+  color: var(--err);
+}
+
+/* the speech goes to MiniMax, the button waits for the text */
+.composer-mic.transcribing,
+.composer-mic.transcribing:hover {
+  background: transparent;
+  color: var(--accent);
+  opacity: 1;
+  cursor: progress;
+  animation: mm-pulse 0.8s ease-in-out infinite;
+}
+
+/* The send icon ends the row of the controls, it has no fill, the word
+   stays in the tooltip. */
 .composer-send {
-  position: absolute;
-  right: 4px;
-  bottom: 4px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1371,13 +1715,6 @@ input:focus {
 
 .composer-send.stop:hover {
   color: var(--err);
-}
-
-.composer-selects {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 4px;
 }
 
 /* a compact dropdown, a native select cannot carry an icon */
@@ -1411,6 +1748,12 @@ input:focus {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* a select at the right edge opens its menu to the left */
+.icon-select.align-end .icon-select-menu {
+  left: auto;
+  right: 0;
 }
 
 /* the menu opens upward, the panel sits at the bottom of the screen */

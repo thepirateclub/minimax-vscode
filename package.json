@@ -2,7 +2,7 @@
   "name": "minimax-agent",
   "displayName": "MiniMax Agent",
   "description": "Coding agent for VS Code powered by MiniMax models",
-  "version": "0.12.1",
+  "version": "0.13.0",
   "publisher": "local",
   "license": "MIT",
   "engines": {
@@ -181,6 +181,29 @@
           "type": "boolean",
           "default": false,
           "description": "Collapses the code blocks of the answers. The header with the file name stays, the code opens on a click."
+        },
+        "minimax.speechLanguage": {
+          "type": "string",
+          "default": "",
+          "enum": ["", "ru", "en", "uk", "de", "fr", "es", "it", "pt", "pl", "tr", "ar", "zh", "yue", "ja", "ko", "th", "vi", "id", "ms", "fil"],
+          "enumDescriptions": ["Auto: the model picks the dominant language", "Russian", "English", "Ukrainian", "German", "French", "Spanish", "Italian", "Portuguese", "Polish", "Turkish", "Arabic", "Chinese", "Cantonese", "Japanese", "Korean", "Thai", "Vietnamese", "Indonesian", "Malay", "Filipino"],
+          "description": "The language of the voice input. A pinned language is more stable on short phrases and jargon."
+        },
+        "minimax.speechVocabulary": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "Foreign words of the voice input: names, brands, terms. A bare term (PreSonus) replaces a word that sounds like it, a pair (радиатор=Revelator) replaces the heard word exactly. The recognition writes such words in the letters of the spoken language."
+        },
+        "minimax.microphone": {
+          "type": "string",
+          "default": "",
+          "description": "The microphone of the voice input, as ffmpeg names it. Empty picks a device named as a microphone."
+        },
+        "minimax.ffmpegPath": {
+          "type": "string",
+          "default": "ffmpeg",
+          "description": "The ffmpeg that records the voice input. The webview of VS Code has no access to the microphone."
         },
         "minimax.fontSize": {
           "type": "number",

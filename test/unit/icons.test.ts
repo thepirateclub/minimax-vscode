@@ -7,6 +7,7 @@ import {
   IconCaret,
   IconCheck,
   IconCode,
+  IconGoal,
   IconClose,
   IconCopy,
   IconEdit,
@@ -14,9 +15,11 @@ import {
   IconGraph,
   IconHistory,
   IconList,
+  IconMic,
   IconModel,
   IconPlan,
   IconPlus,
+  IconRetry,
   IconRead,
   IconRewind,
   IconSearch,
@@ -41,6 +44,7 @@ const ICONS: Array<[string, () => ReactNode]> = [
   ['IconGraph', IconGraph],
   ['IconHistory', IconHistory],
   ['IconList', IconList],
+  ['IconMic', IconMic],
   ['IconModel', IconModel],
   ['IconPlan', IconPlan],
   ['IconPlus', IconPlus],
@@ -201,4 +205,32 @@ describe('send and stop icons of the codicon set', () => {
     );
     expect(cssRule(css, '.composer-send.stop:hover')).toContain('color: var(--err)');
   });
+});
+
+// The icons that stand side by side in the panel are one family: the lucide
+// grid of 24 units, a line of 2 units and 14 pixels on the screen. A hand
+// drawn icon on the grid of 16 looked thinner, a 16 pixel one looked louder.
+describe('one family of the icons', () => {
+  const FAMILY: Array<[string, () => ReactNode]> = [
+    ['IconAttach', IconAttach],
+    ['IconClose', IconClose],
+    ['IconCode', IconCode],
+    ['IconGoal', IconGoal],
+    ['IconHistory', IconHistory],
+    ['IconMic', IconMic],
+    ['IconModel', IconModel],
+    ['IconPlan', IconPlan],
+    ['IconPlus', IconPlus],
+    ['IconRetry', IconRetry],
+    ['IconRewind', IconRewind],
+    ['IconThinking', IconThinking]
+  ];
+  for (const [name, render] of FAMILY) {
+    it(name + ' sits on the lucide grid with the common line and size', () => {
+      const { markup, viewBox } = renderIcon(render);
+      expect(viewBox).toEqual([0, 0, 24, 24]);
+      expect(markup).toContain('stroke-width="2"');
+      expect(sizeOf(markup)).toBe(14);
+    });
+  }
 });

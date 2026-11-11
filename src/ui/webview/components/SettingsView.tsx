@@ -21,9 +21,37 @@ function toValues(settings: UiSettings): UiSettingsValues {
     rulesEnabled: settings.rulesEnabled,
     enableWebSearch: settings.enableWebSearch,
     collapseTools: settings.collapseTools,
-    collapseCode: settings.collapseCode
+    collapseCode: settings.collapseCode,
+    speechLanguage: settings.speechLanguage,
+    microphone: settings.microphone
   };
 }
+
+// The languages of the recognition of MiniMax, an empty code lets the model
+// pick the dominant language of the audio.
+const SPEECH_LANGUAGES: Array<[string, string]> = [
+  ['', 'Auto'],
+  ['ru', 'Russian'],
+  ['en', 'English'],
+  ['uk', 'Ukrainian'],
+  ['de', 'German'],
+  ['fr', 'French'],
+  ['es', 'Spanish'],
+  ['it', 'Italian'],
+  ['pt', 'Portuguese'],
+  ['pl', 'Polish'],
+  ['tr', 'Turkish'],
+  ['ar', 'Arabic'],
+  ['zh', 'Chinese'],
+  ['yue', 'Cantonese'],
+  ['ja', 'Japanese'],
+  ['ko', 'Korean'],
+  ['th', 'Thai'],
+  ['vi', 'Vietnamese'],
+  ['id', 'Indonesian'],
+  ['ms', 'Malay'],
+  ['fil', 'Filipino']
+];
 
 // The limit of the answer belongs to the model, the panel only shows it.
 function modelMaxTokens(settings: UiSettings, model: string): string {
@@ -263,6 +291,34 @@ export function SettingsView({
           <span>{STRINGS.collapseCode}</span>
         </label>
         <p className="hint">{STRINGS.collapseCodeHint}</p>
+      </section>
+
+      <section className="settings-section">
+        <h3>{STRINGS.voice}</h3>
+        <p className="hint">{STRINGS.voiceHint}</p>
+        <label className="field">
+          <span>{STRINGS.speechLanguage}</span>
+          <select
+            value={values.speechLanguage}
+            onChange={(event) => patch({ speechLanguage: event.target.value })}
+          >
+            {SPEECH_LANGUAGES.map(([code, name]) => (
+              <option key={code} value={code}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="field">
+          <span>{STRINGS.microphone}</span>
+          <input
+            type="text"
+            value={values.microphone}
+            placeholder={STRINGS.microphoneAuto}
+            onChange={(event) => patch({ microphone: event.target.value })}
+          />
+          <span className="hint">{STRINGS.microphoneHint}</span>
+        </label>
       </section>
 
       <section className="settings-section">

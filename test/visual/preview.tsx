@@ -58,7 +58,25 @@ const STATE: UiState = {
   collapseTools: params.get('collapse') === '1',
   collapseCode: params.get('collapse') === '1',
   version: manifest.version,
-  todos: []
+  // The widgets over the feed: ?goal=1 shows the goal and the tasks.
+  todos:
+    params.get('goal') === '1'
+      ? [
+          { content: 'Read format.ts', status: 'completed', priority: 'high' },
+          { content: 'Add the B suffix to formatCount and keep the status bar on the same helper', status: 'in_progress', priority: 'high' },
+          { content: 'Run the tests', status: 'pending', priority: 'low' }
+        ]
+      : [],
+  goal:
+    params.get('goal') === '1'
+      ? {
+          objective: 'Round the token counts with K, M and B everywhere in the panel',
+          tokenBudget: 500_000,
+          requestLimit: 40,
+          status: 'active',
+          used: { tokens: 184_320, requests: 12, seconds: 754 }
+        }
+      : undefined
 };
 
 const SETTINGS: UiSettings = {
@@ -78,6 +96,8 @@ const SETTINGS: UiSettings = {
   enableWebSearch: false,
   collapseTools: false,
   collapseCode: false,
+  speechLanguage: 'ru',
+  microphone: '',
   hasApiKey: true,
   models: MODELS,
   tools: ['read_file', 'write_file', 'edit_file', 'list_files', 'search_code', 'run_terminal']
@@ -91,6 +111,11 @@ const vscode = {
   postMessage(message: { type: string }): void {
     if (message.type === 'ready') {
       post({ type: 'init', state: STATE });
+      // The microphone in a given state: ?voice=recording or ?voice=transcribing.
+      const voice = params.get('voice');
+      if (voice === 'recording' || voice === 'transcribing') {
+        post({ type: 'voice_state', state: voice });
+      }
       // The composer with its chips and the popup of the file suggestions.
       if (params.get('composer') === '1') {
         post({ type: 'selection', selection: { id: 'sel1', path: 'src/ui/format.ts', label: 'format.ts', detail: '3-9' } });
@@ -105,6 +130,10 @@ const vscode = {
           ]
         });
       }
+    }
+    // The host drops the tasks, the stand does the same.
+    if (message.type === 'clear_todos') {
+      post({ type: 'todos', todos: [] });
     }
     if (message.type === 'request_settings') {
       post({ type: 'settings', settings: SETTINGS });

@@ -5,7 +5,6 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import {
   GoalBar,
   formatDuration,
-  formatTokens,
   goalFormValues,
   goalMatches,
   parseGoalForm
@@ -26,10 +25,11 @@ const GOAL: GoalState = {
   used: { tokens: 4300, requests: 2, seconds: 0 }
 };
 
-function render(goal?: GoalState): string {
+function render(goal?: GoalState, request?: { token: number; objective: string }): string {
   return renderToStaticMarkup(
     createElement(GoalBar, {
       goal,
+      request,
       onSet: () => undefined,
       onClear: () => undefined
     })
@@ -40,8 +40,31 @@ describe('the widget of the goal', () => {
   it('shows the goal and the spend', () => {
     const markup = render(GOAL);
     expect(markup).toContain('Rewrite the parser');
-    expect(markup).toContain('4.3k');
-    expect(markup).toContain('12k');
+    // One rule of rounding for the whole panel: the header writes 184K.
+    expect(markup).toContain('4.3K');
+    expect(markup).toContain('12K');
+  });
+
+  it('writes no infinity for a limit that is not set', () => {
+    const markup = render({ ...GOAL, tokenBudget: undefined, requestLimit: undefined });
+    expect(markup).not.toContain('∞');
+    expect(markup).toContain('4.3K');
+  });
+
+  it('names the status in the words of the interface', () => {
+    expect(render({ ...GOAL, status: 'complete' })).toContain(STRINGS.goalComplete);
+    expect(render({ ...GOAL, status: 'blocked' })).toContain(STRINGS.goalBlocked);
+    expect(render({ ...GOAL, status: 'blocked' })).toContain('goal-status-blocked');
+  });
+
+  it('keeps the objective on its own row, the buttons are icons', () => {
+    const markup = render(GOAL);
+    // The objective had no room next to the spend and the buttons, its
+    // width fell to zero and the Clear button ran out of the panel.
+    expect(markup.indexOf('goal-objective')).toBeLessThan(markup.indexOf('goal-meta'));
+    expect(markup).toContain('aria-label="' + STRINGS.goalEdit + '"');
+    expect(markup).toContain('aria-label="' + STRINGS.goalClear + '"');
+    expect(markup).not.toContain('>' + STRINGS.goalClear + '<');
   });
 
   it('shows the limit of the time', () => {
@@ -54,9 +77,9 @@ describe('the widget of the goal', () => {
     expect(markup).toContain('5m');
   });
 
-  it('offers to set the goal when there is none', () => {
-    const markup = render(undefined);
-    expect(markup).toContain(STRINGS.goalSet);
+  it('takes no room over the feed when there is no goal', () => {
+    // The goal is set from the button in the bottom row of the input field.
+    expect(render(undefined)).toBe('');
   });
 
   it('has a rule for every class of the widget', () => {
@@ -71,13 +94,6 @@ describe('the widget of the goal', () => {
 });
 
 describe('the numbers of the goal', () => {
-  it('writes a big count of tokens in thousands', () => {
-    expect(formatTokens(430)).toBe('430');
-    expect(formatTokens(4300)).toBe('4.3k');
-    expect(formatTokens(12000)).toBe('12k');
-    expect(formatTokens(120000)).toBe('120k');
-  });
-
   it('writes the time in minutes and seconds', () => {
     expect(formatDuration(20)).toBe('20s');
     expect(formatDuration(80)).toBe('1m 20s');
@@ -150,5 +166,51 @@ describe('the confirmation of the goal', () => {
     expect(goalMatches(values, { ...GOAL, secondsLimit: 300 })).toBe(true);
     expect(goalMatches(values, GOAL)).toBe(false);
     expect(goalMatches(values, undefined)).toBe(false);
+  });
+});
+
+describe('the wizard of the goal', () => {
+  it('opens on the first step with the objective of /goal', () => {
+    const markup = render(undefined, { token: 1, objective: 'Ship the parser' });
+    expect(markup).toContain('goal-wizard');
+    expect(markup).toContain(STRINGS.goalNewTitle);
+    expect(markup).toContain(STRINGS.goalStepObjective + ' · 1/3');
+    expect(markup).toContain('Ship the parser');
+    // The first step has no way back, the main button goes forward.
+    expect(markup).not.toContain('>' + STRINGS.goalBack + '<');
+    expect(markup).toContain('goal-button-primary">' + STRINGS.goalNext + '<');
+  });
+
+  it('edits the goal that is set, the title says so', () => {
+    const markup = render(GOAL, { token: 1, objective: '' });
+    expect(markup).toContain(STRINGS.goalEditTitle);
+    expect(markup).toContain('Rewrite the parser');
+  });
+
+  it('marks the steps that are passed', () => {
+    const markup = render(undefined, { token: 1, objective: '' });
+    expect(markup.match(/goal-wizard-dot-done/g)).toHaveLength(1);
+    expect(markup.match(/class="goal-wizard-dot[ "]/g)).toHaveLength(3);
+  });
+
+  it('has a rule for every class of the wizard', () => {
+    const markup = render(GOAL, { token: 1, objective: '' });
+    const classes = Array.from(markup.matchAll(/class="([^"]*)"/g)).flatMap((match) =>
+      (match[1] ?? '').split(/\s+/).filter(Boolean)
+    );
+    for (const name of classes) {
+      expect(CSS).toMatch(new RegExp('\\.' + name + '\\b'));
+    }
+  });
+});
+
+describe('the defaults of a goal', () => {
+  it('starts a new goal without limits', () => {
+    expect(goalFormValues(undefined)).toEqual({ objective: '', tokens: '', requests: '', minutes: '' });
+  });
+
+  it('keeps an objective of the wizard on one line', () => {
+    const parsed = parseGoalForm({ objective: 'Ship\nthe parser', tokens: '', requests: '', minutes: '' });
+    expect(parsed.values?.objective).toBe('Ship the parser');
   });
 });

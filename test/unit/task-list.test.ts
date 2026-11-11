@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { TaskList } from '../../src/ui/webview/components/TaskList';
+import { STRINGS } from '../../src/ui/webview/strings';
 
 const CSS = readFileSync(
   new URL('../../src/ui/webview/styles.css', import.meta.url),
@@ -12,7 +13,8 @@ const CSS = readFileSync(
 function render(todos: Array<{ content: string; status: string; priority: string }>): string {
   return renderToStaticMarkup(
     createElement(TaskList, {
-      todos: todos as never
+      todos: todos as never,
+      onClear: () => undefined
     })
   );
 }
@@ -35,11 +37,20 @@ describe('the widget of the list of tasks', () => {
     expect(markup).toContain('task-in_progress');
   });
 
+  it('offers to clear the list with an icon button', () => {
+    const markup = render([{ content: 'Read the parser', status: 'pending', priority: 'high' }]);
+    expect(markup).toContain('task-clear');
+    expect(markup).toContain('aria-label="' + STRINGS.taskClear + '"');
+    // The toggle and the clear button are siblings, a button in a button is
+    // not valid markup.
+    expect(markup).not.toMatch(/<button[^>]*task-head[^>]*>(?:(?!<\/button>).)*<button/);
+  });
+
   it('shows nothing when the list is empty', () => {
     expect(render([])).toBe('');
   });
 
-  it('gives every state and every priority its class', () => {
+  it('gives every state and the high priority its class', () => {
     const markup = render([
       { content: 'Read the parser', status: 'pending', priority: 'high' },
       { content: 'Add tests', status: 'in_progress', priority: 'medium' },
@@ -49,19 +60,27 @@ describe('the widget of the list of tasks', () => {
     expect(markup).toContain('task-in_progress');
     expect(markup).toContain('task-completed');
     expect(markup).toContain('task-high');
-    expect(markup).toContain('task-medium');
-    expect(markup).toContain('task-low');
+    // The default priorities carry no class, a class without a rule is a dead end.
+    expect(markup).not.toContain('task-medium');
+    expect(markup).not.toContain('task-low');
   });
 
-  it('shows the priority in the words of the interface', () => {
+  it('marks only the high priority, the rest is the default', () => {
     const markup = render([
       { content: 'Read the parser', status: 'pending', priority: 'high' },
       { content: 'Add tests', status: 'pending', priority: 'medium' },
       { content: 'Ship it', status: 'pending', priority: 'low' }
     ]);
+    // A word on every row is noise, the reader looks for the urgent one.
     expect(markup).toContain('High');
-    expect(markup).toContain('Medium');
-    expect(markup).toContain('Low');
+    expect(markup).not.toContain('Medium');
+    expect(markup).not.toContain('>Low<');
+  });
+
+  it('does not paint the priority with the accent', () => {
+    // The accent means interaction and the active state only.
+    const body = /\.task-high \.task-priority \{([^}]*)\}/.exec(CSS)?.[1] ?? '';
+    expect(body).not.toContain('--accent');
   });
 
   it('has a rule for every class of the widget', () => {

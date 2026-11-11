@@ -61,6 +61,34 @@ export const MESSAGES: UiMessage[] = [
     tool: { id: 't1', name: 'read_file', input: { path: 'src/ui/format.ts', start_line: 1, end_line: 14 }, content: README, durationMs: 4 }
   },
   {
+    id: 't-task',
+    role: 'tool',
+    tool: {
+      id: 't-task',
+      name: 'task',
+      input: { description: 'Find the callers of formatCount', role: 'explore', prompt: 'Find every caller of formatCount.' },
+      content: 'formatCount is called in **statusBar.ts** and **Header.tsx**.',
+      durationMs: 8400,
+      progress: ['Search formatCount', 'Read src/ui/statusBar.ts', 'Read src/ui/webview/components/Header.tsx']
+    }
+  },
+  {
+    id: 't-todo',
+    role: 'tool',
+    tool: {
+      id: 't-todo',
+      name: 'todo_write',
+      input: { todos: [{ content: 'Read format.ts', status: 'completed', priority: 'high' }, { content: 'Add the B suffix', status: 'in_progress', priority: 'high' }] },
+      content: 'Tasks updated: 1/3 done',
+      durationMs: 1
+    }
+  },
+  {
+    id: 't-goal',
+    role: 'tool',
+    tool: { id: 't-goal', name: 'update_goal', input: { status: 'complete', note: 'Rounding works' }, content: 'Goal marked complete', durationMs: 1 }
+  },
+  {
     id: 't2',
     role: 'tool',
     tool: { id: 't2', name: 'search_code', input: { query: 'formatCount' }, content: 'src/ui/format.ts:3\nsrc/ui/statusBar.ts:12\nsrc/ui/webview/components/Header.tsx:5', durationMs: 18 }

@@ -2,23 +2,35 @@ import { useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent, MouseEvent } from 'react';
 import type { EffortLevel } from '../../../api/types';
 import type { AgentMode, ModelInfo } from '../../../config/models';
-import type { UiSelection, UiSuggestion } from '../../protocol';
+import type { UiSelection, UiSuggestion, VoiceState } from '../../protocol';
+import { dictationPiece } from '../dictation';
 import {
   IconAttach,
   IconClose,
   IconCode,
+  IconMic,
   IconModel,
   IconPlan,
+  IconGoal,
   IconSend,
   IconStop,
   IconThinking
 } from '../icons';
 import { splitRestore } from '../restoreInput';
 import { STRINGS } from '../strings';
+import { parseSlashCommand } from '../slashCommand';
 import { IconSelect, type IconSelectOption } from './IconSelect';
 
 export interface InsertRequest {
   paths: string[];
+  token: number;
+}
+
+// The text the microphone has heard, it goes after the draft of the field.
+export interface DictationRequest {
+  text: string;
+  // A live text is replaced by the next one, a final text stays in the field.
+  final: boolean;
   token: number;
 }
 
@@ -272,7 +284,13 @@ export function Composer({
   onPickFiles,
   onRemoveSelection,
   onSuggest,
-  onContentChange
+  onContentChange,
+  voice = 'idle',
+  dictation,
+  onVoiceStart,
+  onVoiceStop,
+  goalMode = false,
+  onGoalMode
 }: {
   busy: boolean;
   selections: UiSelection[];
@@ -297,6 +315,13 @@ export function Composer({
   onRemoveSelection: (id: string) => void;
   onSuggest: (prefix: string | undefined) => void;
   onContentChange?: (content: EditorContent) => void;
+  voice?: VoiceState;
+  dictation?: DictationRequest;
+  onVoiceStart?: () => void;
+  onVoiceStop?: () => void;
+  // The field takes the goal of the session instead of a request.
+  goalMode?: boolean;
+  onGoalMode?: (on: boolean) => void;
 }) {
   const currentModel = models.find((item) => item.id === model);
   const modelOptions: IconSelectOption<string>[] = models.map((item) => ({
@@ -371,6 +396,46 @@ export function Composer({
     report();
   }, [restore?.token]);
 
+  // The text the microphone hears lives in one span after the draft: every
+  // live update replaces it, the final text turns it into plain text and the
+  // caret follows it. The span cannot be edited, the typing of the reader
+  // goes around it and is not lost on the next update.
+  useEffect(() => {
+    if (!dictation) {
+      return;
+    }
+    const root = editorRef.current;
+    if (!root) {
+      return;
+    }
+    let live = root.querySelector<HTMLElement>('.dictation-live');
+    if (!live) {
+      live = document.createElement('span');
+      live.className = 'dictation-live';
+      live.contentEditable = 'false';
+      // The space before the speech is chosen once, against the draft.
+      live.dataset['spacer'] = dictationPiece(readContent(root).text, 'x').startsWith(' ')
+        ? ' '
+        : '';
+      root.appendChild(live);
+    }
+    const spoken = dictation.text.trim();
+    const shown = spoken.length > 0 ? (live.dataset['spacer'] ?? '') + spoken : '';
+    if (!dictation.final) {
+      live.textContent = shown;
+      report();
+      return;
+    }
+    if (shown.length > 0) {
+      live.replaceWith(document.createTextNode(shown));
+    } else {
+      live.remove();
+    }
+    root.focus();
+    placeCaretAtEnd(root);
+    report();
+  }, [dictation?.token]);
+
   const report = (): void => {
     const root = editorRef.current;
     if (!root) {
@@ -397,17 +462,28 @@ export function Composer({
 
   const submit = (): void => {
     const root = editorRef.current;
-    if (!root || busy) {
+    if (!root) {
       return;
     }
     const content = readContent(root);
     if (content.text.trim().length === 0) {
       return;
     }
+    // A running turn holds the requests, a command of the panel does not
+    // reach the model and goes through: the goal is set while the agent works.
+    if (busy && !goalMode && !parseSlashCommand(content.text)) {
+      return;
+    }
     onSend(content.text.trim(), content.mentions, selections);
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
+    // Escape leaves the field of the goal, the draft stays.
+    if (goalMode && suggestions.length === 0 && event.key === 'Escape') {
+      event.preventDefault();
+      onGoalMode?.(false);
+      return;
+    }
     if (suggestions.length > 0) {
       if (event.key === 'ArrowDown') {
         event.preventDefault();
@@ -503,7 +579,7 @@ export function Composer({
           ))}
         </div>
       ) : null}
-      <div className="composer-input-wrap">
+      <div className={'composer-input-wrap' + (goalMode ? ' goal-mode' : '')}>
         <div
           ref={editorRef}
           className={'composer-input' + (empty ? ' is-empty' : '')}
@@ -511,7 +587,7 @@ export function Composer({
           suppressContentEditableWarning
           role="textbox"
           aria-multiline="true"
-          data-placeholder={STRINGS.placeholder}
+          data-placeholder={goalMode ? STRINGS.goalPlaceholder : STRINGS.placeholder}
           onInput={report}
           onKeyDown={handleKeyDown}
           onMouseDown={handleMouseDown}
@@ -524,60 +600,111 @@ export function Composer({
         >
           <IconAttach />
         </button>
-        {busy ? (
-          <button
-            className="composer-send stop"
-            title={STRINGS.stop}
-            aria-label={STRINGS.stop}
-            onMouseDown={(event) => event.preventDefault()}
-            onClick={onStop}
-          >
-            <IconStop />
-          </button>
-        ) : (
-          <button
-            className="composer-send"
-            title={STRINGS.send}
-            aria-label={STRINGS.send}
-            onMouseDown={(event) => event.preventDefault()}
-            onClick={submit}
-          >
-            <IconSend />
-          </button>
-        )}
-      </div>
-      <div className="composer-selects">
-        <IconSelect
-          value={mode}
-          options={MODE_OPTIONS}
-          icon={mode === 'plan' ? <IconPlan /> : <IconCode />}
-          title={mode === 'plan' ? STRINGS.modePlanHint : STRINGS.modeCodeHint}
-          onChange={onMode}
-        />
-        <IconSelect
-          value={model}
-          options={modelOptions}
-          icon={<IconModel />}
-          title={STRINGS.model}
-          onChange={onModel}
-        />
-        {currentModel?.reasoning === 'variants' ? (
-          <IconSelect
-            value={thinking ? 'adaptive' : 'off'}
-            options={REASONING_VARIANT_OPTIONS}
-            icon={<IconThinking />}
-            title={STRINGS.reasoningVariantsHint}
-            onChange={(value) => onThinking(value === 'adaptive')}
-          />
-        ) : (
-          <IconSelect
-            value={effort}
-            options={EFFORT_OPTIONS}
-            icon={<IconThinking />}
-            title={STRINGS.reasoningDepthHint}
-            onChange={onEffort}
-          />
-        )}
+        {/* The controls live in the last row of the field: the mode and the
+            model on the left, the reasoning next to the send button. */}
+        <div className="composer-toolbar">
+          <div className="composer-toolbar-start">
+            <IconSelect
+              value={mode}
+              options={MODE_OPTIONS}
+              icon={mode === 'plan' ? <IconPlan /> : <IconCode />}
+              title={mode === 'plan' ? STRINGS.modePlanHint : STRINGS.modeCodeHint}
+              onChange={onMode}
+            />
+            <IconSelect
+              value={model}
+              options={modelOptions}
+              icon={<IconModel />}
+              title={STRINGS.model}
+              className="composer-model"
+              onChange={onModel}
+            />
+            {/* The goal is set in the same field: the button switches the
+                field from a request to the goal of the session. */}
+            <button
+              className={'composer-goal' + (goalMode ? ' active' : '')}
+              title={goalMode ? STRINGS.goalModeOff : STRINGS.goalModeOn}
+              aria-label={STRINGS.goalModeOn}
+              aria-pressed={goalMode}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => {
+                onGoalMode?.(!goalMode);
+                editorRef.current?.focus();
+              }}
+            >
+              <IconGoal />
+            </button>
+          </div>
+          <div className="composer-toolbar-end">
+            {currentModel?.reasoning === 'variants' ? (
+              <IconSelect
+                value={thinking ? 'adaptive' : 'off'}
+                options={REASONING_VARIANT_OPTIONS}
+                icon={<IconThinking />}
+                title={STRINGS.reasoningVariantsHint}
+                className="composer-reasoning"
+                align="end"
+                onChange={(value) => onThinking(value === 'adaptive')}
+              />
+            ) : (
+              <IconSelect
+                value={effort}
+                options={EFFORT_OPTIONS}
+                icon={<IconThinking />}
+                title={STRINGS.reasoningDepthHint}
+                className="composer-reasoning"
+                align="end"
+                onChange={onEffort}
+              />
+            )}
+            {/* The microphone records in the extension host, MiniMax turns
+                the speech into text, the text lands in the field. */}
+            <button
+              className={'composer-mic' + (voice === 'idle' ? '' : ' ' + voice)}
+              title={
+                voice === 'recording'
+                  ? STRINGS.voiceStop
+                  : voice === 'transcribing'
+                    ? STRINGS.voiceTranscribing
+                    : STRINGS.voiceStart
+              }
+              aria-label={
+                voice === 'recording'
+                  ? STRINGS.voiceStop
+                  : voice === 'transcribing'
+                    ? STRINGS.voiceTranscribing
+                    : STRINGS.voiceStart
+              }
+              aria-pressed={voice === 'recording'}
+              disabled={voice === 'transcribing'}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => (voice === 'recording' ? onVoiceStop?.() : onVoiceStart?.())}
+            >
+              <IconMic />
+            </button>
+            {busy ? (
+              <button
+                className="composer-send stop"
+                title={STRINGS.stop}
+                aria-label={STRINGS.stop}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={onStop}
+              >
+                <IconStop />
+              </button>
+            ) : (
+              <button
+                className="composer-send"
+                title={STRINGS.send}
+                aria-label={STRINGS.send}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={submit}
+              >
+                <IconSend />
+              </button>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -7,11 +7,20 @@ import type {
   UiSettings,
   UiState,
   UiSuggestion,
-  WebToExt
+  WebToExt,
+  VoiceState
 } from '../protocol';
-import { Composer, type InsertRequest, type RestoreRequest } from './components/Composer';
+import {
+  Composer,
+  type DictationRequest,
+  type InsertRequest,
+  type RestoreRequest
+} from './components/Composer';
 import { EmptyState } from './components/EmptyState';
-import { GoalBar, type GoalValues } from './components/GoalBar';
+import { GoalBar, type GoalValues, type GoalWizardRequest } from './components/GoalBar';
+import { parseSlashCommand } from './slashCommand';
+import { DEFAULT_GOAL_FORM } from './goalWizard';
+import { goalFormValues, parseGoalForm } from './components/GoalBar';
 import { Header, type PanelTab } from './components/Header';
 import { MessageList } from './components/MessageList';
 import { SettingsView } from './components/SettingsView';
@@ -50,6 +59,10 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
   const [messages, setMessages] = useState<UiMessage[]>([]);
   const [todos, setTodos] = useState<TodoItem[]>([]);
   const [goal, setGoal] = useState<GoalState | undefined>(undefined);
+  // The command /goal without a text opens the wizard of the goal.
+  // The input field takes the goal instead of a request.
+  const [goalMode, setGoalMode] = useState(false);
+  const [goalRequest, setGoalRequest] = useState<GoalWizardRequest | undefined>(undefined);
   const [selections, setSelections] = useState<UiSelection[]>([]);
   const [suggestions, setSuggestions] = useState<UiSuggestion[]>([]);
   const [settings, setSettings] = useState<UiSettings | undefined>(undefined);
@@ -60,6 +73,9 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
   const insertToken = useRef(0);
   const [restore, setRestore] = useState<RestoreRequest | undefined>(undefined);
   const restoreToken = useRef(0);
+  const [voice, setVoice] = useState<VoiceState>('idle');
+  const [dictation, setDictation] = useState<DictationRequest | undefined>(undefined);
+  const dictationToken = useRef(0);
 
   useEffect(() => {
     const onMessage = (event: MessageEvent<ExtToWeb>): void => {
@@ -195,6 +211,20 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
         );
         return;
       }
+      if (message.type === 'voice_state') {
+        setVoice(message.state);
+        return;
+      }
+      if (message.type === 'voice_partial' || message.type === 'voice_text') {
+        dictationToken.current += 1;
+        setDictation({
+          text: message.text,
+          final: message.type === 'voice_text',
+          token: dictationToken.current
+        });
+        setTab('chat');
+        return;
+      }
       if (message.type === 'restore_input') {
         // The rollback of the chat puts the request back into the
         // input field, the agent waits for the next command.
@@ -306,13 +336,14 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
         version={state.version}
       />
       <div className={'view' + (tab === 'chat' ? '' : ' view-hidden')}>
-        <TaskList todos={todos} />
+        <TaskList todos={todos} onClear={() => vscode.postMessage({ type: 'clear_todos' })} />
         <GoalBar
           // The key of the chat, the form of the goal does not survive a
           // switch to another chat, otherwise it writes the goal of the
           // old chat into the new one.
           key={state.activeSessionId ?? 'none'}
           goal={goal}
+          request={goalRequest}
           onSet={(values: GoalValues) =>
             vscode.postMessage({
               type: 'set_goal',
@@ -357,6 +388,32 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
           onMode={(mode) => vscode.postMessage({ type: 'set_mode', mode })}
           onThinking={(thinking) => vscode.postMessage({ type: 'set_thinking', thinking })}
           onSend={(sent, mentions, sentSelections) => {
+            // A command of the panel never reaches the model. The field of
+            // the goal works as the command with the text of the field.
+            const command = goalMode
+              ? { kind: 'goal' as const, objective: sent.replace(/\s+/g, ' ').trim() }
+              : parseSlashCommand(sent);
+            setGoalMode(false);
+            if (command?.kind === 'goal') {
+              if (command.objective.length === 0) {
+                setGoalRequest((prev) => ({ token: (prev?.token ?? 0) + 1, objective: '' }));
+              } else {
+                // "/goal text" takes the default limits, the wizard is for
+                // the user who wants to set them.
+                // The same objective keeps its limits: the command must not
+                // take away the limits the user set in the wizard.
+                const values = parseGoalForm(
+                  goal && goal.objective === command.objective
+                    ? goalFormValues(goal)
+                    : { ...DEFAULT_GOAL_FORM, objective: command.objective }
+                ).values;
+                if (values) {
+                  vscode.postMessage({ type: 'set_goal', ...values });
+                }
+              }
+              setResetToken((value) => value + 1);
+              return;
+            }
             vscode.postMessage({
               type: 'send',
               text: sent,
@@ -366,12 +423,18 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
             setResetToken((value) => value + 1);
             setSelections([]);
           }}
+          goalMode={goalMode}
+          onGoalMode={setGoalMode}
           onStop={() => vscode.postMessage({ type: 'stop' })}
           onPickFiles={() => vscode.postMessage({ type: 'pick_files', requestId: 'attach' })}
           onRemoveSelection={(id) =>
             setSelections((prev) => prev.filter((item) => item.id !== id))
           }
           onSuggest={suggest}
+          voice={voice}
+          dictation={dictation}
+          onVoiceStart={() => vscode.postMessage({ type: 'voice_start' })}
+          onVoiceStop={() => vscode.postMessage({ type: 'voice_stop' })}
         />
       </div>
       <div className={'view' + (tab === 'settings' ? '' : ' view-hidden')}>

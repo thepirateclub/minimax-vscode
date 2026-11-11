@@ -6,6 +6,7 @@ import { Composer } from '../../src/ui/webview/components/Composer';
 import { Header } from '../../src/ui/webview/components/Header';
 import { UsageGraph } from '../../src/ui/webview/components/UsageGraph';
 import { MODELS } from '../../src/config/models';
+import { STRINGS } from '../../src/ui/webview/strings';
 import type { ReactElement } from 'react';
 
 // The layout of the panel is drawn with css, the markup cannot express it,
@@ -27,7 +28,7 @@ function rule(selector: string): string {
 
 const noop = (): void => undefined;
 
-function renderComposer(busy: boolean): string {
+function renderComposer(busy: boolean, goalMode = false): string {
   return renderToStaticMarkup(
     createElement(Composer, {
       busy,
@@ -51,7 +52,9 @@ function renderComposer(busy: boolean): string {
       onStop: noop,
       onPickFiles: noop,
       onRemoveSelection: noop,
-      onSuggest: noop
+      onSuggest: noop,
+      goalMode,
+      onGoalMode: noop
     }) as ReactElement
   );
 }
@@ -98,20 +101,81 @@ describe('panel layout', () => {
     expect(markup).not.toContain('>Stop<');
   });
 
-  it('puts the send icon into the bottom right corner of the input field', () => {
+  it('keeps the controls inside the input field, the model on the left', () => {
     const markup = renderComposer(false);
     const wrapAt = markup.indexOf('composer-input-wrap');
-    const sendAt = markup.indexOf('composer-send');
-    const selectsAt = markup.indexOf('composer-selects');
+    const inputAt = markup.indexOf('composer-input"');
+    const toolbarAt = markup.indexOf('composer-toolbar"');
+    const startAt = markup.indexOf('composer-toolbar-start');
+    const modelAt = markup.indexOf('composer-model');
+    const endAt = markup.indexOf('composer-toolbar-end');
     expect(wrapAt).toBeGreaterThan(-1);
-    expect(sendAt).toBeGreaterThan(wrapAt);
-    expect(sendAt).toBeLessThan(selectsAt);
-    const style = rule('.composer-send');
-    expect(style).toMatch(/position:\s*absolute/);
-    expect(style).toMatch(/bottom:\s*\d+px/);
-    expect(style).toMatch(/right:\s*\d+px/);
-    expect(style).toMatch(/background:\s*transparent/);
-    expect(style).not.toMatch(/border-radius:\s*50%/);
+    // The toolbar is the last row of the field, under the text.
+    expect(toolbarAt).toBeGreaterThan(inputAt);
+    expect(startAt).toBeGreaterThan(toolbarAt);
+    expect(modelAt).toBeGreaterThan(startAt);
+    expect(modelAt).toBeLessThan(endAt);
+    // No row of selects under the field any more.
+    expect(markup).not.toContain('composer-selects');
+  });
+
+  it('puts the microphone right before the send button', () => {
+    for (const busy of [false, true]) {
+      const markup = renderComposer(busy);
+      const reasoningAt = markup.indexOf('composer-reasoning');
+      const micAt = markup.indexOf('composer-mic');
+      const sendAt = markup.indexOf('composer-send');
+      expect(micAt).toBeGreaterThan(reasoningAt);
+      expect(sendAt).toBeGreaterThan(micAt);
+    }
+    // The microphone is an icon button of the field, like the paperclip.
+    expect(rule('.composer-mic')).toMatch(/color:\s*var\(--muted\)/);
+    // A running recording is red and pulses, the reader sees that the panel listens.
+    expect(rule('.composer-mic.recording')).toMatch(/color:\s*var\(--err\)/);
+  });
+
+  it('puts the reasoning switch right before the send button', () => {
+    for (const busy of [false, true]) {
+      const markup = renderComposer(busy);
+      const endAt = markup.indexOf('composer-toolbar-end');
+      const reasoningAt = markup.indexOf('composer-reasoning');
+      const sendAt = markup.indexOf('composer-send');
+      expect(reasoningAt).toBeGreaterThan(endAt);
+      expect(sendAt).toBeGreaterThan(reasoningAt);
+    }
+    // The switch inside the field is a quiet text, not a framed control.
+    expect(rule('.composer-toolbar .icon-select-trigger')).toMatch(/border-color:\s*transparent/);
+    // Its menu opens to the left, the right edge of the panel is near.
+    expect(rule('.icon-select.align-end .icon-select-menu')).toMatch(/right:\s*0/);
+  });
+
+  it('lets the selects shrink in a narrow panel instead of overlapping', () => {
+    // Without min-width 0 the model select keeps its full width and its
+    // label runs over the reasoning switch.
+    expect(rule('.composer-toolbar .icon-select')).toMatch(/min-width:\s*0/);
+    expect(rule('.composer-toolbar-start')).toMatch(/flex:\s*1 1 auto/);
+    // The icon never shrinks, the label takes the ellipsis.
+    expect(rule('.composer-toolbar .icon-select-trigger .icon')).toMatch(/flex:\s*0 0 auto/);
+  });
+
+  it('puts the goal button into the bottom row of the field', () => {
+    const markup = renderComposer(false);
+    const toolbarAt = markup.indexOf('composer-toolbar-start');
+    const goalAt = markup.indexOf('composer-goal');
+    expect(goalAt).toBeGreaterThan(toolbarAt);
+    expect(markup.indexOf('composer-toolbar-end')).toBeGreaterThan(goalAt);
+    expect(markup).toContain('aria-label="' + STRINGS.goalModeOn + '"');
+    expect(markup).toContain('aria-pressed="false"');
+  });
+
+  it('turns the field into the field of the goal', () => {
+    const markup = renderComposer(false, true);
+    expect(markup).toContain('data-placeholder="' + STRINGS.goalPlaceholder + '"');
+    expect(markup).toContain('composer-input-wrap goal-mode');
+    expect(markup).toContain('aria-pressed="true"');
+    // The frame of the field and the pressed button say the mode.
+    expect(rule('.composer-input-wrap.goal-mode')).toMatch(/border-color:\s*var\(--accent\)/);
+    expect(rule('.composer-goal.active')).toMatch(/color:\s*var\(--accent\)/);
   });
 
   it('stretches the graph but keeps the width of the steps', () => {

@@ -39,40 +39,70 @@ function Svg({
 
 // A checklist, the agent only reads in plan mode.
 export function IconPlan(): ReactNode {
+  // lucide "list-checks"
   return (
-    <Svg>
-      <path d="M4.5 5.5h2M4.5 8.5h2M4.5 11.5h2" />
-      <path d="M8.5 5.5h3M8.5 8.5h3M8.5 11.5h3" />
+    <Svg viewBox="0 0 24 24" strokeWidth={2}>
+      <path d="m3 17 2 2 4-4" />
+      <path d="m3 7 2 2 4-4" />
+      <path d="M13 6h8" />
+      <path d="M13 12h8" />
+      <path d="M13 18h8" />
     </Svg>
   );
 }
 
 // Angle brackets, the agent edits files in code mode.
 export function IconCode(): ReactNode {
+  // lucide "code"
   return (
-    <Svg>
-      <path d="M6 4.5 3 8l3 3.5" />
-      <path d="M10 4.5 13 8l-3 3.5" />
+    <Svg viewBox="0 0 24 24" strokeWidth={2}>
+      <path d="m16 18 6-6-6-6" />
+      <path d="m8 6-6 6 6 6" />
     </Svg>
   );
 }
 
 // A chip, the model runs on the server.
 export function IconModel(): ReactNode {
+  // lucide "cpu"
   return (
-    <Svg>
-      <rect x="5" y="5" width="6" height="6" rx="1" />
-      <path d="M7 5V3M9 5V3M7 13v-2M9 13v-2M5 7H3M5 9H3M13 7h-2M13 9h-2" />
+    <Svg viewBox="0 0 24 24" strokeWidth={2}>
+      <rect x="4" y="4" width="16" height="16" rx="2" />
+      <rect x="9" y="9" width="6" height="6" rx="1" />
+      <path d="M15 2v2M15 20v2M2 15h2M2 9h2M20 15h2M20 9h2M9 2v2M9 20v2" />
     </Svg>
   );
 }
 
 // A spark, the model thinks before it answers.
 export function IconThinking(): ReactNode {
+  // lucide "sparkles"
   return (
-    <Svg>
-      <path d="M7.6 2.6 9 5.8l3.2 1.4L9 8.6l-1.4 3.2L6.2 8.6 3 7.2 6.2 5.8z" />
-      <path d="M12.2 9.4l.7 1.6 1.6.7-1.6.7-.7 1.6-.7-1.6-1.6-.7 1.6-.7z" />
+    <Svg viewBox="0 0 24 24" strokeWidth={2}>
+      <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z" />
+      <path d="M20 3v4M22 5h-4M4 17v2M5 18H3" />
+    </Svg>
+  );
+}
+
+// A target of the lucide set, the field takes the goal instead of a request.
+export function IconGoal(): ReactNode {
+  return (
+    <Svg viewBox="0 0 24 24" strokeWidth={2}>
+      <circle cx="12" cy="12" r="10" />
+      <circle cx="12" cy="12" r="6" />
+      <circle cx="12" cy="12" r="2" />
+    </Svg>
+  );
+}
+
+// A microphone of the lucide set, the request is spoken instead of typed.
+export function IconMic(): ReactNode {
+  return (
+    <Svg viewBox="0 0 24 24" strokeWidth={2}>
+      <path d="M12 19v3" />
+      <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+      <rect x="9" y="2" width="6" height="13" rx="3" />
     </Svg>
   );
 }
@@ -233,12 +263,14 @@ export function IconRetry(): ReactNode {
 // The arrow that takes the chat back to a request. It points at the
 // message it belongs to, so it stands on the left of the words. The
 // shape comes from the drawing of the reader: a loop on the left and
-// the nose to the right.
+// the nose to the right. It sits on the lucide grid with the inset, the
+// line and the size of its neighbours: the first drawing ran to the edge
+// of the box with a thinner line and 16 pixels, and looked louder.
 export function IconRewind(): ReactNode {
   return (
-    <Svg viewBox="0 0 24 24" strokeWidth={1.73} size={16}>
-      <path d="M20.07 22.11H5.01A3.19 3.19 0 0 1 1.82 18.92V10.58A3.19 3.19 0 0 1 5.01 7.39H22.1" />
-      <path d="M16.57 1.84 22.1 7.37 16.57 12.9" />
+    <Svg viewBox="0 0 24 24" strokeWidth={2}>
+      <path d="M19 20H7a3 3 0 0 1-3-3v-6a3 3 0 0 1 3-3h13" />
+      <path d="m16 4 4 4-4 4" />
     </Svg>
   );
 }

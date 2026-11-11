@@ -39,6 +39,9 @@ export interface UiApproval {
 // The kind of a notice: a note, a warning or a failure.
 export type NoticeKind = 'info' | 'warn' | 'error';
 
+// The voice input: the microphone records, then MiniMax turns it into text.
+export type VoiceState = 'idle' | 'recording' | 'transcribing';
+
 export interface UiMessage {
   id: string;
   // A notice is a failure of the panel itself, it is not the answer of the
@@ -99,6 +102,8 @@ export interface UiSettingsValues {
   collapseTools: boolean;
   // The code blocks of the answers fold to their header.
   collapseCode: boolean;
+  speechLanguage: string;
+  microphone: string;
 }
 
 export interface UiSettings extends UiSettingsValues {
@@ -180,7 +185,12 @@ export type ExtToWeb =
   | { type: 'selection'; selection: UiSelection }
   | { type: 'mention'; path: string }
   | { type: 'suggestions'; requestId: string; items: UiSuggestion[] }
-  | { type: 'settings'; settings: UiSettings };
+  | { type: 'settings'; settings: UiSettings }
+  | { type: 'voice_state'; state: VoiceState }
+  // The live text of the speech, it is replaced by the next one.
+  | { type: 'voice_partial'; text: string }
+  // The final text of the speech, it takes the place of the live text.
+  | { type: 'voice_text'; text: string };
 
 export type WebToExt =
   | { type: 'ready' }
@@ -201,6 +211,8 @@ export type WebToExt =
       secondsLimit?: number;
     }
   | { type: 'clear_goal' }
+  // The reader drops the list of the tasks, the model starts from an empty one.
+  | { type: 'clear_todos' }
   | { type: 'set_model'; model: string }
   | { type: 'set_effort'; effort: EffortLevel }
   | { type: 'set_mode'; mode: AgentMode }
@@ -213,4 +225,7 @@ export type WebToExt =
   | { type: 'request_settings' }
   | { type: 'save_settings'; values: UiSettingsValues }
   | { type: 'set_api_key'; key: string }
-  | { type: 'clear_api_key' };
+  | { type: 'clear_api_key' }
+  | { type: 'voice_start' }
+  | { type: 'voice_stop' }
+  | { type: 'voice_cancel' };

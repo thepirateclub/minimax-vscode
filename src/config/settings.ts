@@ -24,6 +24,12 @@ export interface MiniMaxSettings {
   autoApprove: string[];
   enableWebSearch: boolean;
   rulesEnabled: boolean;
+  // The language of the voice input, empty lets the model pick it.
+  speechLanguage: string;
+  // The device of the voice input, empty picks a microphone by its name.
+  microphone: string;
+  speechVocabulary: string[];
+  ffmpegPath: string;
 }
 
 export function getSettings(): MiniMaxSettings {
@@ -44,7 +50,11 @@ export function getSettings(): MiniMaxSettings {
     collapseCode: cfg.get<boolean>('collapseCode', false),
     autoApprove: cfg.get<string[]>('autoApprove', []),
     enableWebSearch: cfg.get<boolean>('enableWebSearch', false),
-    rulesEnabled: cfg.get<boolean>('rulesEnabled', true)
+    rulesEnabled: cfg.get<boolean>('rulesEnabled', true),
+    speechLanguage: cfg.get<string>('speechLanguage', ''),
+    microphone: cfg.get<string>('microphone', ''),
+    speechVocabulary: cfg.get<string[]>('speechVocabulary', []),
+    ffmpegPath: cfg.get<string>('ffmpegPath', 'ffmpeg')
   };
 }
 

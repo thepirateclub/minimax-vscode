@@ -668,7 +668,9 @@ describe('extension activation', () => {
         rulesEnabled: false,
         enableWebSearch: false,
         collapseTools: true,
-        collapseCode: true
+        collapseCode: true,
+        speechLanguage: 'ru',
+        microphone: 'Mic 1'
       }
     });
     await vi.waitFor(() => {
@@ -686,6 +688,8 @@ describe('extension activation', () => {
     expect(state.config.get('rulesEnabled')).toBe(false);
     expect(state.config.get('collapseTools')).toBe(true);
     expect(state.config.get('collapseCode')).toBe(true);
+    expect(state.config.get('speechLanguage')).toBe('ru');
+    expect(state.config.get('microphone')).toBe('Mic 1');
   });
 
   it('adds the selection to the prompt sent to the model', async () => {
@@ -1483,11 +1487,13 @@ describe('extension activation', () => {
     // The host applies the status that the model set.
     const goal = ofType('goal').pop()!.goal!;
     expect(goal.status).toBe('complete');
-    // The reason of the model reaches the user.
-    const notice = ofType('notice').find((message) =>
-      message.message.includes('The parser is rewritten')
-    );
-    expect(notice?.kind).toBe('info');
+    // The reason of the model reaches the user in the card of the call,
+    // the card stays in the saved chat, a notice printed it twice.
+    const start = ofType('tool_start').find((message) => message.name === 'update_goal');
+    expect(start?.input['note']).toBe('The parser is rewritten');
+    expect(
+      ofType('notice').some((message) => message.message.includes('The parser is rewritten'))
+    ).toBe(false);
   });
 
   it('keeps the limit of the goal when the model closes it', async () => {
@@ -1728,6 +1734,34 @@ describe('extension activation', () => {
         goal?: { objective: string };
       }>;
       expect(stored[0]?.goal).toBeUndefined();
+    });
+  });
+
+  it('clears the list of the tasks on the button of the reader', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.secrets.set('minimax.apiKey', 'test-key');
+    state.responses.push(TODO_SSE, TEXT_SSE);
+    await boot();
+
+    state.receive?.({ type: 'send', text: 'plan the work', mentions: [], selections: [] });
+    await vi.waitFor(() => {
+      expect(ofType('todos').some((message) => message.todos.length > 0)).toBe(true);
+    });
+    await vi.waitFor(() => {
+      expect(ofType('status').at(-1)?.state).toBe('idle');
+    });
+
+    state.posted.length = 0;
+    state.receive?.({ type: 'clear_todos' });
+    await vi.waitFor(() => {
+      expect(ofType('todos')).toHaveLength(1);
+    });
+    expect(ofType('todos')[0]!.todos).toEqual([]);
+    // The saved session has no tasks, the reload does not bring them back.
+    await vi.waitFor(() => {
+      const stored = state.globalState.get('minimax.sessions') as Array<{ todos?: unknown[] }>;
+      expect(stored[0]?.todos ?? []).toEqual([]);
     });
   });
 
@@ -2158,6 +2192,52 @@ describe('extension activation', () => {
       expect(await readFile(join(root, 'third.txt'), 'utf8')).toBe('written once more');
     });
     expect(ofType('approval_request').length).toBe(0);
+  });
+
+  it('keeps the events of a chat in the background out of the open chat', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.secrets.set('minimax.apiKey', 'test-key');
+    // The first chat writes a file, then the tasks, then it answers.
+    state.responses.push(
+      writeSse('toolu_1', 'note.txt', 'written by the agent'),
+      TODO_SSE,
+      TEXT_SSE
+    );
+    await boot();
+    const first = ofType('init')[0]!.state.activeSessionId;
+
+    state.receive?.({ type: 'send', text: 'write a note', mentions: [], selections: [] });
+    await vi.waitFor(() => {
+      expect(ofType('approval_request').length).toBe(1);
+    });
+    const approval = ofType('approval_request')[0]!.approval;
+
+    // The reader opens another chat while the first one waits.
+    state.receive?.({ type: 'new_session' });
+    await vi.waitFor(() => {
+      expect(ofType('init').length).toBeGreaterThan(1);
+    });
+    state.posted.length = 0;
+    state.receive?.({ type: 'approve', id: approval.id, allowForSession: false });
+    await vi.waitFor(async () => {
+      expect(await readFile(join(root, 'note.txt'), 'utf8')).toBe('written by the agent');
+    });
+    await vi.waitFor(() => {
+      expect(state.responses.length).toBe(0);
+    });
+    // The tasks and the text of the first chat did not land in the open one.
+    expect(ofType('todos').filter((message) => message.todos.length > 0)).toHaveLength(0);
+    expect(ofType('text_delta')).toHaveLength(0);
+    expect(ofType('tool_start')).toHaveLength(0);
+
+    // Back in the first chat everything is there.
+    state.receive?.({ type: 'select_session', id: first! });
+    await vi.waitFor(() => {
+      const init = ofType('init').at(-1);
+      expect(init?.state.activeSessionId).toBe(first);
+      expect(init?.state.todos.length).toBeGreaterThan(0);
+    });
   });
 
   it('the prompt of the child carries the goal, the tasks and the state of the repository', async () => {
