@@ -1037,3 +1037,14 @@ code --install-extension 'H:\personal_project\minimax-vscode\minimax-agent-0.12.
 ```
 
 Ask the model: "delegate the reading of the parser to a sub-agent and tell me what it found". The card of the call has to show the journal of the child and the answer, the answer has to come back into the turn of the parent. Ask it to delegate a change of a file: the approval of the child has to reach the panel, and the child has to stop when the user rejects it. Ask it to delegate from a sub-agent: the model has to get the refusal of the depth.
+
+## Отклонения от плана
+
+Реализация разошлась с планом в шести местах, все изменения приняты ревью:
+
+1. `src/extension.ts`, `buildPrompt` принимает реестр инструментов (`buildPrompt(registry = this.registry)`): промпт ребёнка перечисляет инструменты ребёнка, а не родителя, иначе ребёнок видит в промпте инструмент `task`, которого у него нет.
+2. `src/extension.ts`, `spawnTask` слушает `ctx.signal`: остановка родителя прерывает ребёнка, и ожидающие подтверждения ребёнка снимаются отказом. Без этого ход мог не завершиться никогда.
+3. `src/extension.ts`, `requestChildApproval` строит превью изменения через `buildPreview`: читатель видит диф до одобрения. Сам диф ребёнка идёт в журнал вызова строками со знаками `+` и `-`.
+4. `src/extension.ts`, разрешение на всю сессию живёт в runtime сессии, а не в контроллере: разрешение ребёнка не протекает в другой чат.
+5. `src/agent/session.ts`, `stop()` отпускает ожидающие подтверждения родителя: ход, который ждёт одобрения, заканчивается по кнопке Stop.
+6. `src/extension.ts` и `src/ui/webview/App.tsx`, строка журнала идёт в последнюю карточку с тем же id: сервер может повторить id вызова в следующем ходе. `src/storage/sessions.ts` ограничивает журнал при сохранении сессии (`MAX_STORED_PROGRESS_LINES`).
