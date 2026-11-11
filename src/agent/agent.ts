@@ -169,6 +169,21 @@ export class Agent {
             'The same tool call was repeated ' +
             MAX_IDENTICAL_CALLS +
             ' times with identical arguments. Change the approach instead of repeating it.';
+          // The refusal is a card of its own. The model sees the reason, the
+          // reader has to see it too, a silent refusal is a defect.
+          this.options.onEvent({
+            type: 'tool_start',
+            id: toolUse.id,
+            name: toolUse.name,
+            input: toolUse.input
+          });
+          this.options.onEvent({
+            type: 'tool_end',
+            id: toolUse.id,
+            name: toolUse.name,
+            content: message,
+            isError: true
+          });
           results.push({
             type: 'tool_result',
             tool_use_id: toolUse.id,
@@ -180,10 +195,25 @@ export class Agent {
 
         const entry = this.options.registry.get(toolUse.name);
         if (!entry) {
+          const message = 'Unknown tool: ' + toolUse.name;
+          // The refusal is a card of its own, the reader sees the reason.
+          this.options.onEvent({
+            type: 'tool_start',
+            id: toolUse.id,
+            name: toolUse.name,
+            input: toolUse.input
+          });
+          this.options.onEvent({
+            type: 'tool_end',
+            id: toolUse.id,
+            name: toolUse.name,
+            content: message,
+            isError: true
+          });
           results.push({
             type: 'tool_result',
             tool_use_id: toolUse.id,
-            content: 'Unknown tool: ' + toolUse.name,
+            content: message,
             is_error: true
           });
           continue;

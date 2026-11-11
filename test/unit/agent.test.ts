@@ -166,6 +166,43 @@ describe('Agent', () => {
     expect(result.messages.length).toBeGreaterThan(2);
   });
 
+  it('shows the refusal of a repeated identical call in the panel', async () => {
+    const client = new FakeClient([
+      toolResponse('read_file', { path: 'a.ts' }),
+      toolResponse('read_file', { path: 'a.ts' }),
+      toolResponse('read_file', { path: 'a.ts' }),
+      toolResponse('read_file', { path: 'a.ts' }),
+      textResponse('done')
+    ]);
+    const { agent, events } = makeAgent(client);
+    await agent.run('read it', []);
+    const starts = events.filter((event) => event.type === 'tool_start');
+    const ends = events.filter(
+      (event): event is Extract<AgentEvent, { type: 'tool_end' }> => event.type === 'tool_end'
+    );
+    // The refusal has a card of its own, the reader sees the reason.
+    expect(starts).toHaveLength(4);
+    expect(ends[3]?.isError).toBe(true);
+    expect(ends[3]?.content).toContain('repeated');
+  });
+
+  it('shows the refusal of an unknown tool in the panel', async () => {
+    const client = new FakeClient([
+      toolResponse('no_such_tool', { path: 'a.ts' }),
+      textResponse('done')
+    ]);
+    const { agent, events } = makeAgent(client);
+    await agent.run('call it', []);
+    const starts = events.filter((event) => event.type === 'tool_start');
+    const ends = events.filter(
+      (event): event is Extract<AgentEvent, { type: 'tool_end' }> => event.type === 'tool_end'
+    );
+    expect(starts).toHaveLength(1);
+    expect(ends).toHaveLength(1);
+    expect(ends[0]?.isError).toBe(true);
+    expect(ends[0]?.content).toContain('Unknown tool');
+  });
+
   it('asks the gate for a tool that always needs approval', async () => {
     const client = new FakeClient([
       toolResponse('write_file', { path: 'a.ts', content: 'x' }),
