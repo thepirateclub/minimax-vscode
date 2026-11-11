@@ -11,6 +11,8 @@ import { ApprovalGate, type ApprovalDecision, type ApprovalRequest } from '../..
 
 class FakeClient implements MiniMaxClient {
   readonly requests: ChatRequest[] = [];
+  // The number of answers that were streamed to the end.
+  streamed = 0;
   private index = 0;
 
   constructor(private readonly responses: StreamEvent[][]) {}
@@ -25,6 +27,7 @@ class FakeClient implements MiniMaxClient {
     for (const event of response) {
       yield event;
     }
+    this.streamed += 1;
   }
 }
 
@@ -457,7 +460,9 @@ describe('Agent', () => {
       mode: 'code',
       systemPrompt: 'system',
       workspaceRoot: '/tmp/root',
-      budget: () => false,
+      // The budget holds while the answer streams and is over right after
+      // the request, the tools of the request do not run then.
+      budget: () => client.streamed === 0,
       logger: { info: () => undefined, error: () => undefined },
       onEvent: (event) => events.push(event)
     });
@@ -470,5 +475,79 @@ describe('Agent', () => {
       (event): event is Extract<AgentEvent, { type: 'done' }> => event.type === 'done'
     );
     expect(done?.stopReason).toBe('goal_limit');
+  });
+
+  it('stops in the middle of the answer when the budget of the goal is over', async () => {
+    const client = new FakeClient([
+      [
+        { type: 'text_delta', text: 'the first part of the answer' },
+        { type: 'tool_use_start', id: 'toolu_1', name: 'read_file' },
+        { type: 'tool_use_delta', id: 'toolu_1', partialJson: '{"path":"a.ts"}' },
+        {
+          type: 'message_stop',
+          stopReason: 'tool_use',
+          usage: { inputTokens: 10, outputTokens: 5 },
+          blocks: [
+            { type: 'tool_use', id: 'toolu_1', name: 'read_file', input: { path: 'a.ts' } }
+          ]
+        }
+      ]
+    ]);
+    const events: AgentEvent[] = [];
+    let toolRuns = 0;
+    let checks = 0;
+    const registry = new ToolRegistry();
+    registry.register({
+      name: 'read_file',
+      description: 'read',
+      approval: 'never',
+      sideEffect: false,
+      inputSchema: { type: 'object', properties: {} },
+      execute: async () => {
+        toolRuns += 1;
+        return { content: 'file content' };
+      }
+    });
+    const agent = new Agent({
+      client,
+      registry,
+      approval: new ApprovalGate({
+        autoApprove: [],
+        request: async () => ({ approved: true, allowForSession: false })
+      }),
+      model: 'MiniMax-M3.1-Flash',
+      maxTokens: 32000,
+      maxIterations: 5,
+      effort: 'max',
+      mode: 'code',
+      systemPrompt: 'system',
+      workspaceRoot: '/tmp/root',
+      // The budget holds for the first two checks of the stream and is over
+      // before the tool call of the answer is complete.
+      budget: () => checks++ < 3,
+      logger: { info: () => undefined, error: () => undefined },
+      onEvent: (event) => events.push(event)
+    });
+    const result = await agent.run('read it', []);
+    // The turn ends with the reason of the budget.
+    expect(result.stopReason).toBe('goal_limit');
+    const done = events.find(
+      (event): event is Extract<AgentEvent, { type: 'done' }> => event.type === 'done'
+    );
+    expect(done?.stopReason).toBe('goal_limit');
+    // The text that was streamed before the stop stays in the events.
+    const texts = events
+      .filter((event): event is Extract<AgentEvent, { type: 'assistant_text' }> =>
+        event.type === 'assistant_text'
+      )
+      .map((event) => event.text);
+    expect(texts).toEqual(['the first part of the answer']);
+    // The tools of the request do not run.
+    expect(toolRuns).toBe(0);
+    // No call without a result goes into the history.
+    const calls = result.messages
+      .flatMap((message) => message.content)
+      .filter((block) => block.type === 'tool_use');
+    expect(calls).toHaveLength(0);
   });
 });

@@ -312,13 +312,21 @@ export class Agent {
 
   private async streamWithRetry(
     messages: AnthropicMessage[]
-  ): Promise<{ blocks: AnthropicContentBlock[]; stopReason: StopReason; usage: Usage }> {
+  ): Promise<{
+    blocks: AnthropicContentBlock[];
+    stopReason: StopReason;
+    usage: Usage;
+    // The budget of the goal ran out while the answer was streaming.
+    budgetStopped: boolean;
+  }> {
     let attempt = 0;
     for (;;) {
       let emitted = false;
       let blocks: AnthropicContentBlock[] = [];
       let stopReason: StopReason = 'end_turn';
       let usage: Usage = { inputTokens: 0, outputTokens: 0 };
+      // The budget of the goal ran out in the middle of the answer.
+      let budgetStopped = false;
       try {
         const stream = this.options.client.stream(
           {
@@ -334,6 +342,14 @@ export class Agent {
           { signal: this.controller.signal }
         );
         for await (const event of stream) {
+          // The budget of the goal is checked before every event of the
+          // stream: a long answer stops in the middle of the turn when
+          // the time of the goal is over. Only the limit of the time can
+          // trip here, the spend of the request is counted after it.
+          if (this.options.budget && !this.options.budget()) {
+            budgetStopped = true;
+            break;
+          }
           this.handleEvent(event);
           if (event.type === 'text_delta' || event.type === 'thinking_delta') {
             emitted = true;
@@ -344,7 +360,14 @@ export class Agent {
             usage = event.usage;
           }
         }
-        return { blocks, stopReason, usage };
+        if (budgetStopped) {
+          // The answer was cut. The text that came stays visible in the
+          // panel, the tools of the request do not run and the history
+          // keeps no call without a result.
+          blocks = [];
+          stopReason = 'goal_limit';
+        }
+        return { blocks, stopReason, usage, budgetStopped };
       } catch (error) {
         const retryable = error instanceof MiniMaxApiError && error.retryable;
         // A request that the user stopped is not a failure of the server,
