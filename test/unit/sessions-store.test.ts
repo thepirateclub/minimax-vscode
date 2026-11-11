@@ -4,6 +4,7 @@ import { trimHistory } from '../../src/api/history';
 import {
   MAX_STORED_DIFF_LINES,
   MAX_STORED_MESSAGES,
+  MAX_STORED_PROGRESS_LINES,
   MAX_STORED_SESSIONS,
   MAX_STORED_TODOS,
   SessionStore,
@@ -129,6 +130,71 @@ describe('capSession', () => {
     const diff = stored.uiMessages[0]?.tool?.diff;
     expect(diff?.lines.length).toBeLessThanOrEqual(MAX_STORED_DIFF_LINES + 1);
     expect(diff?.lines.some((line) => line.text.includes('cut'))).toBe(true);
+  });
+
+  it('cuts a long journal of a sub-agent', () => {
+    const lines = Array.from({ length: 1200 }, (_, index) => '+ line ' + index);
+    const stored = capSession({
+      ...session('s', 1),
+      uiMessages: [
+        {
+          id: 'm',
+          role: 'tool',
+          tool: {
+            id: 'm',
+            name: 'task',
+            input: {},
+            content: 'done',
+            progress: lines
+          }
+        }
+      ]
+    });
+    const progress = stored.uiMessages[0]?.tool?.progress ?? [];
+    expect(progress.length).toBeLessThanOrEqual(MAX_STORED_PROGRESS_LINES + 1);
+    // The marker stands in the middle of the journal.
+    expect(progress[Math.floor(progress.length / 2)]).toBe(
+      '... the journal is cut ...'
+    );
+    // The head and the tail of the journal survive.
+    expect(progress[0]).toBe('+ line 0');
+    expect(progress[progress.length - 1]).toBe('+ line 1199');
+  });
+
+  it('keeps a short journal of a sub-agent as it is', () => {
+    const lines = ['read_file src/app.ts', 'search_code parser 3 matches'];
+    const stored = capSession({
+      ...session('s', 1),
+      uiMessages: [
+        {
+          id: 'm',
+          role: 'tool',
+          tool: {
+            id: 'm',
+            name: 'task',
+            input: {},
+            content: 'done',
+            progress: lines
+          }
+        }
+      ]
+    });
+    expect(stored.uiMessages[0]?.tool?.progress).toEqual(lines);
+  });
+
+  it('keeps a card without a journal as it is', () => {
+    const stored = capSession({
+      ...session('s', 1),
+      uiMessages: [
+        {
+          id: 'm',
+          role: 'tool',
+          tool: { id: 'm', name: 'write_file', input: {}, content: 'done' }
+        }
+      ]
+    });
+    expect(stored.uiMessages[0]?.tool?.content).toBe('done');
+    expect(stored.uiMessages[0]?.tool?.progress).toBeUndefined();
   });
 
   it('keeps the list of tasks of a session', () => {

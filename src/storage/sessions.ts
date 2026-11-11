@@ -32,6 +32,7 @@ export const MAX_STORED_MESSAGES = 400;
 export const MAX_STORED_HISTORY = MAX_HISTORY_MESSAGES;
 export const MAX_STORED_MESSAGE_CHARS = 200_000;
 export const MAX_STORED_DIFF_LINES = 600;
+export const MAX_STORED_PROGRESS_LINES = 600;
 export const MAX_STORED_USAGE_TURNS = 24;
 export const MAX_STORED_TURNS = 50;
 export const MAX_STORED_TODOS = 200;
@@ -61,6 +62,20 @@ function capDiff(diff: { path: string; lines: UiDiffLine[] }): { path: string; l
   };
 }
 
+// A long journal of a sub-agent would fill the state of the host, the
+// middle of it is cut.
+function capProgress(lines: string[]): string[] {
+  if (lines.length <= MAX_STORED_PROGRESS_LINES) {
+    return lines;
+  }
+  const half = Math.floor(MAX_STORED_PROGRESS_LINES / 2);
+  return [
+    ...lines.slice(0, half),
+    '... the journal is cut ...',
+    ...lines.slice(-half)
+  ];
+}
+
 function capMessage(message: UiMessage): UiMessage {
   return {
     ...message,
@@ -70,7 +85,10 @@ function capMessage(message: UiMessage): UiMessage {
       ? {
           ...message.tool,
           content: capText(message.tool.content),
-          diff: message.tool.diff ? capDiff(message.tool.diff) : undefined
+          diff: message.tool.diff ? capDiff(message.tool.diff) : undefined,
+          progress: message.tool.progress
+            ? capProgress(message.tool.progress)
+            : undefined
         }
       : undefined
   };
