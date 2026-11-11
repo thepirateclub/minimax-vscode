@@ -107,6 +107,11 @@ const TOOL_LINES: Array<{ name: string; line: string }> = [
     name: 'update_goal',
     line:
       '- update_goal(status, note?) - mark the goal as complete or blocked, the limits belong to the user'
+  },
+  {
+    name: 'task',
+    line:
+      '- task(description, prompt, role?) - start a sub-agent that works on its own and answers with a report, the role is "explore" (reads), "worker" (changes files) or "verifier" (checks the work)'
   }
 ];
 

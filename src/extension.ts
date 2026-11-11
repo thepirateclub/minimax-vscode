@@ -5,7 +5,7 @@ import { HttpEmbeddingsClient } from './api/embeddings';
 import { HttpMiniMaxClient } from './api/client';
 import { fetchQuota, type QuotaSnapshot } from './api/quota';
 import type { AnthropicMessage, EffortLevel } from './api/types';
-import { Agent, type AgentEvent } from './agent/agent';
+import { Agent, type AgentEvent, type AgentRunResult } from './agent/agent';
 import { buildWorkspaceSnapshot, renderSnapshot } from './agent/context';
 import { readMentionedFiles } from './agent/mentions';
 import {
@@ -37,6 +37,7 @@ import { UsageLedger } from './storage/usage';
 import { createExploreTools, isTextFile } from './tools/explore';
 import { createFileTools, resolveWorkspacePath } from './tools/fs';
 import { createGoalTools } from './tools/goal';
+import { buildPreview } from './tools/preview';
 import { ToolRegistry } from './tools/registry';
 import { createGitTools } from './tools/git';
 import { createTerminalTools } from './tools/terminal';
@@ -123,8 +124,15 @@ class MiniMaxController {
   private readonly statusBar = new StatusBarController();
   private readonly sessions = new Map<string, RuntimeSession>();
   // The approvals of the sub-agents wait here, the id of the request of the
-  // child starts with "child-".
-  private readonly childApprovals = new Map<string, (decision: ApprovalDecision) => void>();
+  // child starts with "child-". The map remembers the name of the tool, the
+  // reader can allow it for the whole session.
+  private readonly childApprovals = new Map<
+    string,
+    { toolName: string; resolve: (decision: ApprovalDecision) => void }
+  >();
+  // The tools the reader allowed for the session. The gate of a child is new
+  // every time, the permission of the session lives here.
+  private readonly sessionApprovedTools = new Set<string>();
   // The index of the project, one per workspace folder.
   private readonly searches = new Map<string, ProjectSearch>();
   private activeSessionId: string | undefined;
@@ -564,21 +572,53 @@ class MiniMaxController {
   }
 
   // The gate of a child is the gate of the session: a write of the child
-  // asks the user too.
-  private childApproval(): ApprovalGate {
+  // asks the user too. The tools the reader allowed for the session are
+  // allowed for every child.
+  private childApproval(signal: AbortSignal): ApprovalGate {
     return new ApprovalGate({
-      autoApprove: getSettings().autoApprove,
-      request: async (request) => await this.requestChildApproval(request)
+      autoApprove: [...getSettings().autoApprove, ...this.sessionApprovedTools],
+      request: async (request) => await this.requestChildApproval(request, signal)
     });
   }
 
-  private requestChildApproval(request: ApprovalRequest): Promise<ApprovalDecision> {
+  private async requestChildApproval(
+    request: ApprovalRequest,
+    signal: AbortSignal
+  ): Promise<ApprovalDecision> {
     const id = 'child-' + request.id;
     const approval: UiApproval = { id, name: request.toolName, input: request.input };
-    return new Promise<ApprovalDecision>((resolve) => {
-      this.childApprovals.set(id, resolve);
+    // The reader sees the change before he answers. A path outside of the
+    // workspace breaks the preview, the approval goes on without it.
+    try {
+      const preview = await buildPreview(
+        request.toolName,
+        request.input,
+        this.workspaceRoot()
+      );
+      if (preview) {
+        approval.preview = { path: preview.path, lines: preview.lines };
+      }
+    } catch {
+      // The preview is optional, a failure of it must not break the
+      // approval.
+    }
+    if (signal.aborted) {
+      // The turn was stopped while the preview was built, nobody answers.
+      return { approved: false, allowForSession: false };
+    }
+    return await new Promise<ApprovalDecision>((resolve) => {
+      this.childApprovals.set(id, { toolName: request.toolName, resolve });
       this.panel.post({ type: 'approval_request', approval });
     });
+  }
+
+  // The approvals of the children that wait are released when the turn is
+  // stopped, a child must not wait for an answer that never comes.
+  private releaseChildApprovals(): void {
+    for (const [id, pending] of this.childApprovals) {
+      this.childApprovals.delete(id);
+      pending.resolve({ approved: false, allowForSession: false });
+    }
   }
 
   // The events of the child: the spend goes to the counter of the goal,
@@ -600,6 +640,17 @@ class MiniMaxController {
     }
     if (event.type === 'tool_end') {
       progress(event.name + (event.isError ? ' failed' : ' done'));
+      // The change of the child must not be lost: the lines of the diff go
+      // into the journal of the call.
+      if (event.diff) {
+        for (const line of event.diff.lines) {
+          if (line.type === 'add') {
+            progress('+ ' + line.text);
+          } else if (line.type === 'remove') {
+            progress('- ' + line.text);
+          }
+        }
+      }
       return;
     }
     if (event.type === 'assistant_text') {
@@ -642,7 +693,7 @@ class MiniMaxController {
         apiKey: key
       }),
       registry,
-      approval: this.childApproval(),
+      approval: this.childApproval(ctx.signal),
       model: settings.model,
       maxTokens: model?.maxTokens ?? 65_536,
       maxIterations: CHILD_MAX_ITERATIONS,
@@ -666,7 +717,33 @@ class MiniMaxController {
       logger: this.logger,
       onEvent: (event) => this.handleChildEvent(runtime, event, progress)
     });
-    const result = await child.run(request.prompt, []);
+    // The stop of the parent stops the child too, and the approvals that
+    // wait are released: a child must not wait for an answer that never
+    // comes. The listener goes away with the child.
+    const onAbort = (): void => {
+      child.abort();
+      this.releaseChildApprovals();
+    };
+    ctx.signal.addEventListener('abort', onAbort);
+    if (ctx.signal.aborted) {
+      onAbort();
+    }
+    let result: AgentRunResult;
+    try {
+      result = await child.run(request.prompt, []);
+    } catch (error) {
+      // The child was stopped or it failed, the tool reports the error and
+      // the parent continues.
+      const reason = error instanceof Error ? error.message : String(error);
+      return {
+        content: ctx.signal.aborted
+          ? 'The sub-agent was stopped.'
+          : 'The sub-agent failed: ' + reason,
+        isError: true
+      };
+    } finally {
+      ctx.signal.removeEventListener('abort', onAbort);
+    }
     const text = finalText(result.messages);
     if (text.length === 0) {
       return {
@@ -700,6 +777,19 @@ class MiniMaxController {
       this.setState('thinking');
       return;
     }
+    if (event.type === 'tool_progress') {
+      // The journal of the action: the lines that the tool writes while it
+      // runs. They stay in the card of the action.
+      for (const message of runtime.uiMessages) {
+        if (message.tool && message.tool.id === event.id) {
+          const journal = message.tool.content ?? '';
+          message.tool.content =
+            journal.length > 0 ? journal + '\n' + event.line : event.line;
+          return;
+        }
+      }
+      return;
+    }
     if (event.type === 'tool_start') {
       this.toolStarted.set(event.id, Date.now());
       runtime.uiMessages.push({
@@ -715,9 +805,15 @@ class MiniMaxController {
       const started = this.toolStarted.get(event.id);
       this.toolStarted.delete(event.id);
       const durationMs = started === undefined ? undefined : Date.now() - started;
+      // The journal of the action stays in the card, the result of the
+      // action comes first.
+      let output = event.content;
       for (const message of runtime.uiMessages) {
         if (message.tool && message.tool.id === event.id) {
-          message.tool.content = event.content;
+          const journal = message.tool.content ?? '';
+          output =
+            journal.length > 0 ? event.content + '\n' + journal : event.content;
+          message.tool.content = output;
           message.tool.isError = event.isError;
           message.tool.running = false;
           if (event.diff) {
@@ -754,7 +850,7 @@ class MiniMaxController {
         type: 'tool_end',
         id: event.id,
         name: event.name,
-        content: event.content,
+        content: output,
         isError: event.isError,
         durationMs,
         diff: event.diff
@@ -971,10 +1067,15 @@ class MiniMaxController {
       const handled =
         runtime?.agent?.approve(message.id, message.allowForSession) ?? false;
       if (!handled) {
-        const resolve = this.childApprovals.get(message.id);
-        if (resolve) {
+        const pending = this.childApprovals.get(message.id);
+        if (pending) {
           this.childApprovals.delete(message.id);
-          resolve({ approved: true, allowForSession: message.allowForSession });
+          if (message.allowForSession) {
+            // The permission belongs to the session, the gate of the next
+            // child knows the tool.
+            this.sessionApprovedTools.add(pending.toolName);
+          }
+          pending.resolve({ approved: true, allowForSession: message.allowForSession });
         }
       }
       this.panel.post({ type: 'approval_resolved', id: message.id, approved: true });
@@ -984,10 +1085,10 @@ class MiniMaxController {
       const runtime = this.activeSession();
       const handled = runtime?.agent?.reject(message.id) ?? false;
       if (!handled) {
-        const resolve = this.childApprovals.get(message.id);
-        if (resolve) {
+        const pending = this.childApprovals.get(message.id);
+        if (pending) {
           this.childApprovals.delete(message.id);
-          resolve({ approved: false, allowForSession: false });
+          pending.resolve({ approved: false, allowForSession: false });
         }
       }
       this.panel.post({ type: 'approval_resolved', id: message.id, approved: false });
