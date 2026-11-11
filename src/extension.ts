@@ -128,11 +128,16 @@ class MiniMaxController {
   private readonly statusBar = new StatusBarController();
   private readonly sessions = new Map<string, RuntimeSession>();
   // The approvals of the sub-agents wait here, the id of the request of the
-  // child starts with "child-". The map remembers the name of the tool, the
-  // reader can allow it for the whole session.
+  // child starts with "child-". The map remembers the name of the tool and
+  // the chat the child belongs to, the reader can allow the tool for the
+  // whole session of that chat.
   private readonly childApprovals = new Map<
     string,
-    { toolName: string; resolve: (decision: ApprovalDecision) => void }
+    {
+      toolName: string;
+      sessionId: string;
+      resolve: (decision: ApprovalDecision) => void;
+    }
   >();
   // The index of the project, one per workspace folder.
   private readonly searches = new Map<string, ProjectSearch>();
@@ -534,6 +539,8 @@ class MiniMaxController {
       systemPrompt: await this.buildPrompt(),
       contextProvider: async () => await this.sessionContext(runtime),
       sessionId: runtime.id,
+      // The gate of the session, a child of this session shares it.
+      sessionApproved: runtime.approvedTools,
       sessionState: {
         get todos() {
           return runtime.todos;
@@ -580,12 +587,17 @@ class MiniMaxController {
     signal: AbortSignal
   ): ApprovalGate {
     return new ApprovalGate({
-      autoApprove: [...getSettings().autoApprove, ...runtime.approvedTools],
-      request: async (request) => await this.requestChildApproval(request, signal)
+      autoApprove: [...getSettings().autoApprove],
+      request: async (request) =>
+        await this.requestChildApproval(runtime, request, signal),
+      // The gate of the child is the gate of the session: a permission that
+      // the reader gave to the parent works for the child too.
+      sessionApproved: runtime.approvedTools
     });
   }
 
   private async requestChildApproval(
+    runtime: RuntimeSession,
     request: ApprovalRequest,
     signal: AbortSignal
   ): Promise<ApprovalDecision> {
@@ -611,7 +623,11 @@ class MiniMaxController {
       return { approved: false, allowForSession: false };
     }
     return await new Promise<ApprovalDecision>((resolve) => {
-      this.childApprovals.set(id, { toolName: request.toolName, resolve });
+      this.childApprovals.set(id, {
+        toolName: request.toolName,
+        sessionId: runtime.id,
+        resolve
+      });
       this.panel.post({ type: 'approval_request', approval });
     });
   }
@@ -639,7 +655,10 @@ class MiniMaxController {
       return;
     }
     if (event.type === 'tool_start') {
-      progress(event.name + ' ' + describeInput(event.input));
+      // The line names the target of the action, the content of a file is
+      // not a line of the journal.
+      const target = describeInput(event.input);
+      progress(target.length > 0 ? event.name + ' ' + target : event.name);
       return;
     }
     if (event.type === 'tool_end') {
@@ -654,13 +673,6 @@ class MiniMaxController {
             progress('- ' + line.text);
           }
         }
-      }
-      return;
-    }
-    if (event.type === 'assistant_text') {
-      const text = event.text.trim();
-      if (text.length > 0) {
-        progress(text.length > 160 ? text.slice(0, 160) + '…' : text);
       }
       return;
     }
@@ -691,6 +703,17 @@ class MiniMaxController {
     // The tools of the child, the prompt of the child names them and the
     // child calls only them.
     const registry = this.registryForRole(request.role);
+    // The child works in the session of its parent, it gets the same context
+    // of the turn as the parent: the goal, the list of the tasks and the
+    // state of the repository.
+    const context = await this.sessionContext(runtime);
+    const systemPrompt = [
+      await this.buildPrompt(registry),
+      ROLE_PROMPTS[request.role],
+      context
+    ]
+      .filter((part) => part.length > 0)
+      .join('\n\n');
     const child = new Agent({
       client: new HttpMiniMaxClient({
         baseUrl: resolveBaseUrl(settings.baseUrl, settings.customBaseUrl),
@@ -704,8 +727,7 @@ class MiniMaxController {
       effort: settings.effort,
       thinking: this.thinkingMode(settings),
       mode: settings.mode,
-      systemPrompt:
-        (await this.buildPrompt(registry)) + '\n\n' + ROLE_PROMPTS[request.role],
+      systemPrompt,
       workspaceRoot: this.workspaceRoot(),
       depth: 1,
       sessionId: runtime.id,
@@ -819,8 +841,12 @@ class MiniMaxController {
       this.toolStarted.delete(event.id);
       const durationMs = started === undefined ? undefined : Date.now() - started;
       // The result of the call stands in the content of the card, the
-      // journal of the action lives in its own field.
-      for (const message of runtime.uiMessages) {
+      // journal of the action lives in its own field. The same id of a tool
+      // call can come back in a later turn, the content goes into the last
+      // card with that id, the card of the earlier turn keeps its own
+      // result.
+      for (let index = runtime.uiMessages.length - 1; index >= 0; index--) {
+        const message = runtime.uiMessages[index]!;
         if (message.tool && message.tool.id === event.id) {
           message.tool.content = event.content;
           message.tool.isError = event.isError;
@@ -831,6 +857,7 @@ class MiniMaxController {
           if (durationMs !== undefined) {
             message.tool.durationMs = durationMs;
           }
+          break;
         }
       }
       if (event.state?.kind === 'todos') {
@@ -1080,9 +1107,12 @@ class MiniMaxController {
         if (pending) {
           this.childApprovals.delete(message.id);
           if (message.allowForSession) {
-            // The permission belongs to the session, the gate of the next
-            // child knows the tool.
-            runtime?.approvedTools.add(pending.toolName);
+            // The permission belongs to the chat of the child. The chat that
+            // is active now has nothing to do with it, the reader answered
+            // from another chat.
+            this.sessions
+              .get(pending.sessionId)
+              ?.approvedTools.add(pending.toolName);
           }
           pending.resolve({ approved: true, allowForSession: message.allowForSession });
         }

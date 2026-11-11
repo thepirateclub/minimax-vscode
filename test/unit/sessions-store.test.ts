@@ -3,7 +3,9 @@ import type { AnthropicMessage } from '../../src/api/types';
 import { trimHistory } from '../../src/api/history';
 import {
   MAX_STORED_DIFF_LINES,
+  MAX_STORED_MESSAGE_CHARS,
   MAX_STORED_MESSAGES,
+  MAX_STORED_PROGRESS_CHARS,
   MAX_STORED_PROGRESS_LINES,
   MAX_STORED_SESSIONS,
   MAX_STORED_TODOS,
@@ -159,6 +161,56 @@ describe('capSession', () => {
     // The head and the tail of the journal survive.
     expect(progress[0]).toBe('+ line 0');
     expect(progress[progress.length - 1]).toBe('+ line 1199');
+  });
+
+  it('cuts a journal that is long in characters', () => {
+    const lines = ['x'.repeat(150_000), 'y'.repeat(150_000)];
+    const stored = capSession({
+      ...session('s', 1),
+      uiMessages: [
+        {
+          id: 'm',
+          role: 'tool',
+          tool: {
+            id: 'm',
+            name: 'task',
+            input: {},
+            content: 'done',
+            progress: lines
+          }
+        }
+      ]
+    });
+    const progress = stored.uiMessages[0]?.tool?.progress ?? [];
+    const total = progress.reduce((sum, line) => sum + line.length, 0);
+    // The journal is bounded by the characters, the way the content of a
+    // message is bounded.
+    expect(MAX_STORED_PROGRESS_CHARS).toBe(MAX_STORED_MESSAGE_CHARS);
+    expect(total).toBeLessThanOrEqual(MAX_STORED_MESSAGE_CHARS);
+    expect(progress.some((line) => line.includes('the journal is cut'))).toBe(true);
+  });
+
+  it('cuts one very long line of the journal', () => {
+    const stored = capSession({
+      ...session('s', 1),
+      uiMessages: [
+        {
+          id: 'm',
+          role: 'tool',
+          tool: {
+            id: 'm',
+            name: 'task',
+            input: {},
+            content: 'done',
+            progress: ['x'.repeat(300_000)]
+          }
+        }
+      ]
+    });
+    const progress = stored.uiMessages[0]?.tool?.progress ?? [];
+    const total = progress.reduce((sum, line) => sum + line.length, 0);
+    expect(total).toBeLessThanOrEqual(MAX_STORED_MESSAGE_CHARS);
+    expect(progress.some((line) => line.includes('the journal is cut'))).toBe(true);
   });
 
   it('keeps a short journal of a sub-agent as it is', () => {

@@ -31,16 +31,31 @@ export interface TaskOptions {
   ) => Promise<TaskOutcome>;
 }
 
-// The arguments of a tool as a short line for the journal of the card.
+// The fields that carry the payload of the action. The journal names the
+// target of the action, the payload of it does not belong there.
+const PAYLOAD_FIELDS = ['content', 'new_string', 'old_string', 'text', 'prompt'];
+
+// The arguments of a tool as a short line for the journal of the card. The
+// line names the target of the action and not its payload: the content of a
+// file is not a line of the journal.
 export function describeInput(input: Record<string, unknown>): string {
-  const parts: string[] = [];
-  for (const value of Object.values(input)) {
-    if (typeof value === 'string' && value.trim().length > 0) {
-      const text = value.trim();
-      parts.push(text.length > 60 ? text.slice(0, 60) + '…' : text);
+  const path = input['path'];
+  let target = typeof path === 'string' ? path.trim() : '';
+  if (target.length === 0) {
+    for (const [key, value] of Object.entries(input)) {
+      if (PAYLOAD_FIELDS.includes(key)) {
+        continue;
+      }
+      if (typeof value === 'string' && value.trim().length > 0) {
+        target = value.trim();
+        break;
+      }
     }
   }
-  return parts.join(' ');
+  if (target.length === 0) {
+    return '';
+  }
+  return target.length > 60 ? target.slice(0, 60) + '…' : target;
 }
 
 export function createTaskTools(options: TaskOptions): ToolEntry[] {

@@ -34,6 +34,9 @@ export interface SessionOptions {
   sessionState?: SessionState;
   // The id of the session, the tools know who they work for.
   sessionId?: string;
+  // The permissions of the session. The gate of the agent uses this list,
+  // the gate of a child of this session shares it.
+  sessionApproved?: Set<string>;
   // The state of the repository is read before every turn, the prompt of
   // the model carries the fresh one.
   contextProvider?: () => Promise<string>;
@@ -58,7 +61,9 @@ export class AgentSession {
     this.systemPrompt = options.systemPrompt;
     this.approval = new ApprovalGate({
       autoApprove: options.autoApprove,
-      request: (request) => this.requestApproval(request.toolName, request.input)
+      request: (request) => this.requestApproval(request.toolName, request.input),
+      // The gate of the session, a child of this session shares it.
+      sessionApproved: options.sessionApproved
     });
   }
 

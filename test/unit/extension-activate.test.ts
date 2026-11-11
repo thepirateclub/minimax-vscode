@@ -1,9 +1,12 @@
+import { execFile } from 'node:child_process';
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { promisify } from 'node:util';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ExtensionContext } from 'vscode';
-import type { ExtToWeb, WebToExt } from '../../src/ui/protocol';
+import type { ExtToWeb, UiMessage, WebToExt } from '../../src/ui/protocol';
+import { endTool } from '../../src/ui/webview/App';
 
 const state = vi.hoisted(() => ({
   commands: new Map<string, (...args: unknown[]) => unknown>(),
@@ -176,6 +179,10 @@ vi.mock('vscode', () => {
 
 const MESSAGES_URL = 'https://api.minimax.io/anthropic/v1/messages';
 
+// The workspace of a test can be a repository, the state of it goes into
+// the prompt of the model.
+const runGit = promisify(execFile);
+
 const QUOTA_JSON = JSON.stringify({
   model_remains: [
     {
@@ -229,6 +236,48 @@ function taskSse(role: string, prompt: string): string {
     'event: message_stop\ndata: {"type":"message_stop"}\n\n'
   ].join('');
 }
+
+// The request of a write. The id of the call can be the same in two
+// turns, the server is free to send it again.
+function writeSse(id: string, path: string, content: string): string {
+  const input = JSON.stringify({ path, content });
+  return [
+    'event: content_block_start\ndata: ' +
+      JSON.stringify({
+        type: 'content_block_start',
+        index: 0,
+        content_block: { type: 'tool_use', id, name: 'write_file', input: {} }
+      }) +
+      '\n\n',
+    'event: content_block_delta\ndata: ' +
+      JSON.stringify({
+        type: 'content_block_delta',
+        index: 0,
+        delta: { type: 'input_json_delta', partial_json: input }
+      }) +
+      '\n\n',
+    'event: message_delta\ndata: ' +
+      JSON.stringify({
+        type: 'message_delta',
+        delta: { stop_reason: 'tool_use' },
+        usage: { output_tokens: 9 }
+      }) +
+      '\n\n',
+    'event: message_stop\ndata: ' + JSON.stringify({ type: 'message_stop' }) + '\n\n'
+  ].join('');
+}
+
+// The answer of a model comes in pieces, the deltas stand on the token
+// borders.
+const CHILD_TEXT_SSE = [
+  'event: message_start\ndata: {"type":"message_start","message":{"usage":{"input_tokens":11}}}\n\n',
+  'event: content_block_start\ndata: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}\n\n',
+  'event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"The parser "}}\n\n',
+  'event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"is in "}}\n\n',
+  'event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"src/app.ts."}}\n\n',
+  'event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":7}}\n\n',
+  'event: message_stop\ndata: {"type":"message_stop"}\n\n'
+].join('');
 
 function makeContext(): ExtensionContext {
   return {
@@ -2022,5 +2071,326 @@ describe('extension activation', () => {
     await vi.waitFor(() => {
       expect(ofType('text_delta').length).toBeGreaterThan(0);
     });
+  });
+
+  it('the permission of a child stays in the chat of the child', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.secrets.set('minimax.apiKey', 'test-key');
+    // The parent starts a worker, the child asks to write a file. The same
+    // happens in the second chat and once more in the first one.
+    state.responses.push(
+      taskSse('worker', 'write a note'),
+      writeSse('toolu_1', 'note.txt', 'written by the agent'),
+      TEXT_SSE,
+      TEXT_SSE,
+      taskSse('worker', 'write in the other chat'),
+      writeSse('toolu_1', 'other.txt', 'written in the other chat'),
+      TEXT_SSE,
+      TEXT_SSE,
+      taskSse('worker', 'write once more'),
+      writeSse('toolu_1', 'third.txt', 'written once more'),
+      TEXT_SSE,
+      TEXT_SSE
+    );
+    await boot();
+
+    const first = ofType('init')[0]!.state.activeSessionId;
+    expect(first).toBeDefined();
+
+    state.posted.length = 0;
+    state.receive?.({
+      type: 'send',
+      text: 'let the worker write',
+      mentions: [],
+      selections: []
+    });
+
+    // The child asks the reader for a permission.
+    await vi.waitFor(() => {
+      expect(ofType('approval_request').length).toBe(1);
+    });
+    const approval = ofType('approval_request')[0]!.approval;
+    expect(approval.id.startsWith('child-')).toBe(true);
+
+    // The reader switches to another chat and answers there.
+    state.receive?.({ type: 'new_session' });
+    await vi.waitFor(() => {
+      expect(ofType('init').length).toBeGreaterThan(0);
+    });
+    state.receive?.({ type: 'approve', id: approval.id, allowForSession: true });
+
+    // The child writes the file, the answer of the reader was heard.
+    await vi.waitFor(async () => {
+      expect(await readFile(join(root, 'note.txt'), 'utf8')).toBe('written by the agent');
+    });
+
+    // The other chat has no permission, the child of it asks again.
+    state.posted.length = 0;
+    state.receive?.({
+      type: 'send',
+      text: 'let the worker write here too',
+      mentions: [],
+      selections: []
+    });
+    await vi.waitFor(() => {
+      expect(ofType('approval_request').length).toBe(1);
+    });
+    const other = ofType('approval_request')[0]!.approval;
+    expect(other.id.startsWith('child-')).toBe(true);
+    state.receive?.({ type: 'approve', id: other.id, allowForSession: false });
+    await vi.waitFor(async () => {
+      expect(await readFile(join(root, 'other.txt'), 'utf8')).toBe(
+        'written in the other chat'
+      );
+    });
+
+    // The permission stayed in the first chat, the child of it writes
+    // without a question.
+    state.posted.length = 0;
+    state.receive?.({ type: 'select_session', id: first! });
+    state.receive?.({
+      type: 'send',
+      text: 'let the worker write once more',
+      mentions: [],
+      selections: []
+    });
+    await vi.waitFor(async () => {
+      expect(await readFile(join(root, 'third.txt'), 'utf8')).toBe('written once more');
+    });
+    expect(ofType('approval_request').length).toBe(0);
+  });
+
+  it('the prompt of the child carries the goal, the tasks and the state of the repository', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.secrets.set('minimax.apiKey', 'test-key');
+    // The workspace is a repository, its state goes into the prompt.
+    await runGit('git', ['init'], { cwd: root });
+    // The model writes the tasks and then it starts the child.
+    state.responses.push(
+      TODO_SSE,
+      taskSse('explore', 'find the parser'),
+      TEXT_SSE,
+      TEXT_SSE
+    );
+    await boot();
+
+    state.receive?.({
+      type: 'set_goal',
+      objective: 'Rewrite the parser',
+      tokenBudget: 12000,
+      requestLimit: 8
+    });
+    await vi.waitFor(() => {
+      expect(ofType('goal').length).toBe(1);
+    });
+
+    state.posted.length = 0;
+    state.receive?.({
+      type: 'send',
+      text: 'explore the project',
+      mentions: [],
+      selections: []
+    });
+
+    await vi.waitFor(() => {
+      expect(state.bodies.length).toBeGreaterThan(2);
+    });
+    // The third request is the request of the child.
+    const child = JSON.parse(state.bodies[2]!) as { system: string };
+    expect(child.system).toContain('Goal: Rewrite the parser');
+    expect(child.system).toContain('Tasks:');
+    expect(child.system).toContain('Repository:');
+  });
+
+  it('the permission of the parent works for the child', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.secrets.set('minimax.apiKey', 'test-key');
+    // The parent writes a file, then it starts a worker that writes too.
+    state.responses.push(
+      writeSse('toolu_1', 'note.txt', 'written by the agent'),
+      taskSse('worker', 'write another note'),
+      writeSse('toolu_1', 'child.txt', 'written by the child'),
+      TEXT_SSE,
+      TEXT_SSE
+    );
+    await boot();
+
+    state.posted.length = 0;
+    state.receive?.({
+      type: 'send',
+      text: 'write and delegate',
+      mentions: [],
+      selections: []
+    });
+
+    // The parent asks the reader for a permission.
+    await vi.waitFor(() => {
+      expect(ofType('approval_request').length).toBe(1);
+    });
+    const approval = ofType('approval_request')[0]!.approval;
+    expect(approval.id.startsWith('child-')).toBe(false);
+    state.receive?.({ type: 'approve', id: approval.id, allowForSession: true });
+
+    // The write of the child needs no permission, the reader allowed the
+    // tool for the session.
+    await vi.waitFor(async () => {
+      expect(await readFile(join(root, 'child.txt'), 'utf8')).toBe('written by the child');
+    });
+    expect(ofType('approval_request').length).toBe(1);
+  });
+
+  it('the permission of the child works for the next child', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.secrets.set('minimax.apiKey', 'test-key');
+    // The parent starts two workers, both of them write a file.
+    state.responses.push(
+      taskSse('worker', 'write the first note'),
+      writeSse('toolu_1', 'first.txt', 'first'),
+      TEXT_SSE,
+      taskSse('worker', 'write the second note'),
+      writeSse('toolu_1', 'second.txt', 'second'),
+      TEXT_SSE,
+      TEXT_SSE
+    );
+    await boot();
+
+    state.posted.length = 0;
+    state.receive?.({
+      type: 'send',
+      text: 'delegate twice',
+      mentions: [],
+      selections: []
+    });
+
+    // The first child asks the reader.
+    await vi.waitFor(() => {
+      expect(ofType('approval_request').length).toBe(1);
+    });
+    state.receive?.({
+      type: 'approve',
+      id: ofType('approval_request')[0]!.approval.id,
+      allowForSession: true
+    });
+
+    // The second child writes without a question.
+    await vi.waitFor(async () => {
+      expect(await readFile(join(root, 'second.txt'), 'utf8')).toBe('second');
+    });
+    expect(ofType('approval_request').length).toBe(1);
+  });
+
+  it('the answer of the child is the content of the call and not the journal', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.secrets.set('minimax.apiKey', 'test-key');
+    // The child answers in three pieces.
+    state.responses.push(taskSse('explore', 'find the parser'), CHILD_TEXT_SSE, TEXT_SSE);
+    await boot();
+
+    state.posted.length = 0;
+    state.receive?.({
+      type: 'send',
+      text: 'explore the project',
+      mentions: [],
+      selections: []
+    });
+
+    await vi.waitFor(() => {
+      const end = ofType('tool_end').find((message) => message.name === 'task');
+      expect(end?.content).toContain('src/app.ts');
+    });
+    // The journal of the call holds the actions of the child, the answer of
+    // the child is not shredded into it.
+    const lines = ofType('tool_progress').map((message) => message.line);
+    expect(lines).not.toContain('The parser');
+    expect(lines.some((line) => line.includes('src/app.ts'))).toBe(false);
+    // The card shows the answer once, in the content of the call.
+    const end = ofType('tool_end').find((message) => message.name === 'task');
+    expect(end?.content).toContain('The parser is in src/app.ts.');
+  });
+
+  it('the card of an earlier turn keeps its own result when the id of the call repeats', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.secrets.set('minimax.apiKey', 'test-key');
+    // The server sends the same id of the call in two turns.
+    state.responses.push(
+      writeSse('toolu_1', 'one.txt', 'first'),
+      writeSse('toolu_1', 'two.txt', 'second'),
+      TEXT_SSE
+    );
+    await boot();
+
+    state.posted.length = 0;
+    state.receive?.({
+      type: 'send',
+      text: 'write twice',
+      mentions: [],
+      selections: []
+    });
+
+    await vi.waitFor(() => {
+      expect(ofType('approval_request').length).toBe(1);
+    });
+    state.receive?.({
+      type: 'approve',
+      id: ofType('approval_request')[0]!.approval.id,
+      allowForSession: false
+    });
+    await vi.waitFor(() => {
+      expect(ofType('approval_request').length).toBe(2);
+    });
+    state.receive?.({
+      type: 'approve',
+      id: ofType('approval_request')[1]!.approval.id,
+      allowForSession: false
+    });
+    await vi.waitFor(() => {
+      expect(ofType('tool_end').length).toBe(2);
+    });
+
+    // The state of the host keeps two cards, each one with its own result.
+    await vi.waitFor(() => {
+      const stored = state.globalState.get('minimax.sessions') as Array<{
+        uiMessages: Array<{
+          role: string;
+          tool?: { id: string; content?: string };
+        }>;
+      }>;
+      const cards = stored[0]?.uiMessages.filter((message) => message.role === 'tool') ?? [];
+      expect(cards).toHaveLength(2);
+      expect(cards[0]?.tool?.id).toBe('toolu_1');
+      expect(cards[0]?.tool?.content).toBe('Wrote one.txt');
+      expect(cards[1]?.tool?.content).toBe('Wrote two.txt');
+    });
+  });
+
+  it('the panel puts the result of the call into the last card with that id', () => {
+    const messages: UiMessage[] = [
+      {
+        id: 'm1',
+        role: 'tool',
+        tool: { id: 'toolu_1', name: 'write_file', input: {}, content: 'Wrote one.txt' }
+      },
+      {
+        id: 'm2',
+        role: 'tool',
+        tool: { id: 'toolu_1', name: 'write_file', input: {}, content: 'Wrote two.txt' }
+      }
+    ];
+    const next = endTool(messages, {
+      type: 'tool_end',
+      id: 'toolu_1',
+      name: 'write_file',
+      content: 'Wrote three.txt',
+      isError: false
+    });
+    // The card of the earlier turn keeps its own result.
+    expect(next[0]?.tool?.content).toBe('Wrote one.txt');
+    expect(next[1]?.tool?.content).toBe('Wrote three.txt');
   });
 });

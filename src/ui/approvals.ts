@@ -19,16 +19,23 @@ export interface ApprovalDecision {
 }
 
 export class ApprovalGate {
-  private readonly sessionApproved = new Set<string>();
+  // The permissions of the session. The gate of the parent and the gate of
+  // a child share one list, a permission that the reader gave to one of
+  // them works for the other too.
+  private readonly sessionApproved: Set<string>;
   private autoApprove: string[];
   private readonly request: (request: ApprovalRequest) => Promise<ApprovalDecision>;
 
   constructor(options: {
     autoApprove: string[];
     request: (request: ApprovalRequest) => Promise<ApprovalDecision>;
+    // The list of the permissions of the session. The gate keeps a list of
+    // its own when it is not given.
+    sessionApproved?: Set<string>;
   }) {
     this.autoApprove = options.autoApprove;
     this.request = options.request;
+    this.sessionApproved = options.sessionApproved ?? new Set<string>();
   }
 
   setAutoApprove(names: string[]): void {

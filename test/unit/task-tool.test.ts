@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createTaskTools, type TaskOutcome } from '../../src/tools/task';
+import { createTaskTools, describeInput, type TaskOutcome } from '../../src/tools/task';
 import type { ToolContext } from '../../src/tools/types';
 
 function makeContext(over: Partial<ToolContext> = {}): ToolContext {
@@ -180,5 +180,20 @@ describe('the tool of a sub-agent', () => {
       makeContext()
     );
     expect(result.isError).toBeUndefined();
+  });
+
+  it('names the target of the action and not its payload', () => {
+    // The journal of a write names the file, the content of the file is not
+    // a line of the journal.
+    expect(
+      describeInput({ path: 'note.txt', content: 'written by the agent' })
+    ).toBe('note.txt');
+    // The first field that is not a payload names the target.
+    expect(describeInput({ command: 'npm test' })).toBe('npm test');
+    // A tool without a target has no description.
+    expect(describeInput({ content: 'written by the agent' })).toBe('');
+    expect(describeInput({})).toBe('');
+    // A long name is cut.
+    expect(describeInput({ path: 'a'.repeat(80) })).toBe('a'.repeat(60) + '…');
   });
 });

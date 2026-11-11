@@ -295,4 +295,54 @@ describe('AgentSession', () => {
     expect(session.approve('nobody-waits', false)).toBe(false);
     expect(session.reject('nobody-waits')).toBe(false);
   });
+
+  it('keeps the permission of the reader in the list of the session', async () => {
+    const registry = new ToolRegistry();
+    registry.register({
+      name: 'write_file',
+      description: 'write',
+      approval: 'always',
+      sideEffect: true,
+      inputSchema: { type: 'object', properties: {} },
+      execute: async () => ({ content: 'written' })
+    });
+    const approvals: UiApproval[] = [];
+    // The list of the session, the gate of a child of it shares it.
+    const approved = new Set<string>();
+    const session = new AgentSession({
+      client: new FakeClient([
+        toolResponse('write_file', { path: 'a.ts' }),
+        textResponse('done'),
+        toolResponse('write_file', { path: 'b.ts' }),
+        textResponse('done')
+      ]),
+      registry,
+      model: 'MiniMax-M3.1-Flash',
+      maxTokens: 32000,
+      maxIterations: 5,
+      historyLimit: 120,
+      contextThreshold: 50,
+      effort: 'max',
+      mode: 'code',
+      systemPrompt: 'system',
+      workspaceRoot: '/tmp/root',
+      logger: { info: () => undefined, error: () => undefined },
+      autoApprove: [],
+      sessionApproved: approved,
+      onEvent: () => undefined,
+      onApproval: (approval) => approvals.push(approval)
+    });
+
+    const running = session.send('write it');
+    await vi.waitFor(() => expect(approvals).toHaveLength(1));
+    session.approve(approvals[0]!.id, true);
+    await running;
+
+    // The permission is in the list of the session.
+    expect(approved.has('write_file')).toBe(true);
+
+    // The next action of the session needs no question.
+    await session.send('write again');
+    expect(approvals).toHaveLength(1);
+  });
 });

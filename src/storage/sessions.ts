@@ -33,6 +33,9 @@ export const MAX_STORED_HISTORY = MAX_HISTORY_MESSAGES;
 export const MAX_STORED_MESSAGE_CHARS = 200_000;
 export const MAX_STORED_DIFF_LINES = 600;
 export const MAX_STORED_PROGRESS_LINES = 600;
+// The journal is bounded by the characters too, the same way the content of
+// a message is bounded.
+export const MAX_STORED_PROGRESS_CHARS = MAX_STORED_MESSAGE_CHARS;
 export const MAX_STORED_USAGE_TURNS = 24;
 export const MAX_STORED_TURNS = 50;
 export const MAX_STORED_TODOS = 200;
@@ -62,18 +65,63 @@ function capDiff(diff: { path: string; lines: UiDiffLine[] }): { path: string; l
   };
 }
 
+// The marker of the cut, it stands in the middle of the journal.
+const PROGRESS_CUT = '... the journal is cut ...';
+
 // A long journal of a sub-agent would fill the state of the host, the
-// middle of it is cut.
+// middle of it is cut. The bound of the lines and the bound of the
+// characters hold it.
 function capProgress(lines: string[]): string[] {
+  return capProgressChars(capProgressLines(lines));
+}
+
+// The bound of the lines, the head and the tail of the journal survive.
+function capProgressLines(lines: string[]): string[] {
   if (lines.length <= MAX_STORED_PROGRESS_LINES) {
     return lines;
   }
   const half = Math.floor(MAX_STORED_PROGRESS_LINES / 2);
-  return [
-    ...lines.slice(0, half),
-    '... the journal is cut ...',
-    ...lines.slice(-half)
-  ];
+  return [...lines.slice(0, half), PROGRESS_CUT, ...lines.slice(-half)];
+}
+
+// The bound of the characters. One very long line would fill the state of
+// the host, the journal is cut the same way a change is cut: the first half,
+// the marker, the last half.
+function capProgressChars(lines: string[]): string[] {
+  const total = lines.reduce((sum, line) => sum + line.length, 0);
+  if (total <= MAX_STORED_PROGRESS_CHARS) {
+    return lines;
+  }
+  const budget = Math.floor((MAX_STORED_PROGRESS_CHARS - PROGRESS_CUT.length) / 2);
+  const head: string[] = [];
+  let headChars = 0;
+  for (const line of lines) {
+    if (headChars + line.length > budget) {
+      // The line is longer than its share, it is cut by itself.
+      const room = budget - headChars;
+      if (room > 0) {
+        head.push(line.slice(0, room));
+      }
+      break;
+    }
+    head.push(line);
+    headChars += line.length;
+  }
+  const tail: string[] = [];
+  let tailChars = 0;
+  for (let index = lines.length - 1; index >= 0; index--) {
+    const line = lines[index]!;
+    if (tailChars + line.length > budget) {
+      const room = budget - tailChars;
+      if (room > 0) {
+        tail.unshift(line.slice(line.length - room));
+      }
+      break;
+    }
+    tail.unshift(line);
+    tailChars += line.length;
+  }
+  return [...head, PROGRESS_CUT, ...tail];
 }
 
 function capMessage(message: UiMessage): UiMessage {
