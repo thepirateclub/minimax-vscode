@@ -99,4 +99,86 @@ describe('the tool of a sub-agent', () => {
     );
     expect(result.usage).toEqual({ inputTokens: 100, outputTokens: 20 });
   });
+
+  it('refuses a task without a prompt', async () => {
+    let called = false;
+    const tools = createTaskTools({
+      spawn: async () => {
+        called = true;
+        return { content: 'done' };
+      }
+    });
+    const task = tools.find((tool) => tool.name === 'task');
+    const empty = await task!.execute(
+      { description: 'Look', prompt: '' },
+      makeContext()
+    );
+    const spaces = await task!.execute(
+      { description: 'Look', prompt: '   ' },
+      makeContext()
+    );
+    expect(empty.isError).toBe(true);
+    expect(spaces.isError).toBe(true);
+    expect(called).toBe(false);
+  });
+
+  it('refuses a prompt that is not a text', async () => {
+    let called = false;
+    const tools = createTaskTools({
+      spawn: async () => {
+        called = true;
+        return { content: 'done' };
+      }
+    });
+    const task = tools.find((tool) => tool.name === 'task');
+    const result = await task!.execute(
+      { description: 'Look', prompt: 42 },
+      makeContext()
+    );
+    expect(result.isError).toBe(true);
+    expect(called).toBe(false);
+  });
+
+  it('trims the role and falls back to explore when it is empty', async () => {
+    const seen: string[] = [];
+    const tools = createTaskTools({
+      spawn: async (request) => {
+        seen.push(request.role);
+        return { content: 'done' };
+      }
+    });
+    const task = tools.find((tool) => tool.name === 'task');
+    await task!.execute(
+      { description: 'Look', prompt: 'Look around', role: '  worker  ' },
+      makeContext()
+    );
+    await task!.execute(
+      { description: 'Look', prompt: 'Look around', role: '   ' },
+      makeContext()
+    );
+    expect(seen).toEqual(['worker', 'explore']);
+  });
+
+  it('passes the error of the child through', async () => {
+    const tools = createTaskTools({
+      spawn: async () => ({ content: 'the child failed', isError: true })
+    });
+    const task = tools.find((tool) => tool.name === 'task');
+    const result = await task!.execute(
+      { description: 'Look', prompt: 'Look around' },
+      makeContext()
+    );
+    expect(result.isError).toBe(true);
+    expect(result.content).toBe('the child failed');
+  });
+
+  it('carries no flag of an error when the child worked', async () => {
+    const tools = createTaskTools({ spawn: async () => ({ content: 'done' }) });
+    const task = tools.find((tool) => tool.name === 'task');
+    const result = await task!.execute(
+      { description: 'Look', prompt: 'Look around' },
+      makeContext()
+    );
+    expect(result.isError).toBeUndefined();
+  });
 });

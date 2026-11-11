@@ -272,7 +272,11 @@ export class Agent {
               this.options.onEvent({ type: 'tool_progress', id: toolUse.id, line })
           });
           // The spend of the child belongs to the action of the parent, the
-          // column of the graph of the spend holds the sum.
+          // column of the graph of the spend holds the sum. It is not added to
+          // the `usage` event of the parent: the host counts the budget of the
+          // goal from the `usage` events only, and the child sends its own
+          // `usage` events to the host, so the child would be counted twice
+          // against the budget of the goal.
           if (result.usage) {
             usage = addUsage(usage, result.usage);
           }

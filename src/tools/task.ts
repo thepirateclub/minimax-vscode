@@ -80,14 +80,24 @@ export function createTaskTools(options: TaskOptions): ToolEntry[] {
         };
       }
       const description = String(input['description'] ?? '').trim();
-      const prompt = String(input['prompt'] ?? '').trim();
-      const role = String(input['role'] ?? 'explore');
+      const rawPrompt = input['prompt'];
+      // The server does not check the schema of the tool, the tool checks
+      // its own input.
+      if (rawPrompt !== undefined && typeof rawPrompt !== 'string') {
+        return {
+          content: 'The prompt of the task has to be a text.',
+          isError: true
+        };
+      }
+      const prompt = typeof rawPrompt === 'string' ? rawPrompt.trim() : '';
       if (prompt.length === 0) {
         return {
           content: 'The task has no prompt, the sub-agent has nothing to do.',
           isError: true
         };
       }
+      // The role comes trimmed, an empty role is the role explore.
+      const role = String(input['role'] ?? '').trim() || 'explore';
       if (!ROLES.includes(role as TaskRole)) {
         return {
           content:
