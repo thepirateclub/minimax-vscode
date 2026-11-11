@@ -32,6 +32,8 @@ export interface SessionOptions {
   budget?: () => boolean;
   // The state of the session, the tools read it.
   sessionState?: SessionState;
+  // The id of the session, the tools know who they work for.
+  sessionId?: string;
   // The state of the repository is read before every turn, the prompt of
   // the model carries the fresh one.
   contextProvider?: () => Promise<string>;
@@ -80,20 +82,24 @@ export class AgentSession {
     this.agent?.abort();
   }
 
-  approve(id: string, allowForSession: boolean): void {
+  approve(id: string, allowForSession: boolean): boolean {
     const resolve = this.pending.get(id);
-    if (resolve) {
-      this.pending.delete(id);
-      resolve({ approved: true, allowForSession });
+    if (!resolve) {
+      return false;
     }
+    this.pending.delete(id);
+    resolve({ approved: true, allowForSession });
+    return true;
   }
 
-  reject(id: string): void {
+  reject(id: string): boolean {
     const resolve = this.pending.get(id);
-    if (resolve) {
-      this.pending.delete(id);
-      resolve({ approved: false, allowForSession: false });
+    if (!resolve) {
+      return false;
     }
+    this.pending.delete(id);
+    resolve({ approved: false, allowForSession: false });
+    return true;
   }
 
   // The turn runs and the history comes back. The place of the request in
@@ -117,6 +123,7 @@ export class AgentSession {
       systemPrompt,
       workspaceRoot: this.options.workspaceRoot,
       depth: this.options.depth,
+      sessionId: this.options.sessionId,
       budget: this.options.budget,
       sessionState: this.options.sessionState,
       logger: this.options.logger,

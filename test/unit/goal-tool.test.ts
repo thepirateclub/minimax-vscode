@@ -12,11 +12,12 @@ const GOAL: GoalState = {
   used: { tokens: 4300, requests: 2, seconds: 65 }
 };
 
-function makeContext(goal?: GoalState): ToolContext {
+function makeContext(goal?: GoalState, depth?: number): ToolContext {
   return {
     workspaceRoot: '/tmp/root',
     signal: new AbortController().signal,
     logger: { info: () => undefined, error: () => undefined },
+    depth,
     sessionState: goal ? { todos: [], goal } : { todos: [] }
   };
 }
@@ -123,6 +124,17 @@ describe('the goal of the session', () => {
         'The limits of the goal belong to the user, the model cannot change them.'
       );
     }
+  });
+
+  it('refuses the call of a sub-agent', async () => {
+    const tools = createGoalTools();
+    const update = tools.find((tool) => tool.name === 'update_goal');
+    const result = await update!.execute(
+      { status: 'complete' },
+      makeContext(GOAL, 1)
+    );
+    expect(result.isError).toBe(true);
+    expect(result.state).toBeUndefined();
   });
 
   it('refuses a note that is not a string', async () => {

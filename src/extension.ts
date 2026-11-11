@@ -5,7 +5,7 @@ import { HttpEmbeddingsClient } from './api/embeddings';
 import { HttpMiniMaxClient } from './api/client';
 import { fetchQuota, type QuotaSnapshot } from './api/quota';
 import type { AnthropicMessage, EffortLevel } from './api/types';
-import type { AgentEvent } from './agent/agent';
+import { Agent, type AgentEvent } from './agent/agent';
 import { buildWorkspaceSnapshot, renderSnapshot } from './agent/context';
 import { readMentionedFiles } from './agent/mentions';
 import {
@@ -41,11 +41,26 @@ import { ToolRegistry } from './tools/registry';
 import { createGitTools } from './tools/git';
 import { createTerminalTools } from './tools/terminal';
 import { createTodoTools } from './tools/todo';
+import {
+  CHILD_MAX_ITERATIONS,
+  createTaskTools,
+  describeInput,
+  type TaskOutcome,
+  type TaskRequest,
+  type TaskRole
+} from './tools/task';
+import type { ToolContext } from './tools/types';
+import {
+  ApprovalGate,
+  type ApprovalDecision,
+  type ApprovalRequest
+} from './ui/approvals';
 import { fileErrorMessage } from './ui/fileError';
 import { AgentPanelProvider } from './ui/panel';
 import { themeKind } from './ui/theme';
 import type {
   AgentState,
+  UiApproval,
   UiMessage,
   UiSelection,
   UiSettings,
@@ -85,6 +100,17 @@ const TITLE_LIMIT = 60;
 // How many actions the spend graph keeps in the header.
 const MAX_USAGE_TURNS = 24;
 
+// The role of a sub-agent tells it what it may do and what its answer looks
+// like. The text goes to the model, it is English.
+const ROLE_PROMPTS: Record<TaskRole, string> = {
+  explore:
+    'You are a sub-agent of the main agent. Your task is to explore: you read the files and you search the project, you never change anything. Answer with a short report: what you found, the paths and the facts. Your answer is the result of the task, write it as plain text.',
+  worker:
+    'You are a sub-agent of the main agent. Your task is to make the change: you edit the files and you run the commands. Answer with a short report: what you changed and what you checked. Your answer is the result of the task, write it as plain text.',
+  verifier:
+    'You are a sub-agent of the main agent. Your task is to check the work: you read the files and the changes and you look for the defects. Answer with the list of the defects you found, or with the words that there are none. Your answer is the result of the task, write it as plain text.'
+};
+
 class MiniMaxController {
   private readonly context: vscode.ExtensionContext;
   private readonly channel: vscode.OutputChannel;
@@ -96,6 +122,9 @@ class MiniMaxController {
   private readonly panel: AgentPanelProvider;
   private readonly statusBar = new StatusBarController();
   private readonly sessions = new Map<string, RuntimeSession>();
+  // The approvals of the sub-agents wait here, the id of the request of the
+  // child starts with "child-".
+  private readonly childApprovals = new Map<string, (decision: ApprovalDecision) => void>();
   // The index of the project, one per workspace folder.
   private readonly searches = new Map<string, ProjectSearch>();
   private activeSessionId: string | undefined;
@@ -125,7 +154,11 @@ class MiniMaxController {
       ...createGitTools(),
       ...createTerminalTools(),
       ...createTodoTools(),
-      ...createGoalTools()
+      ...createGoalTools(),
+      ...createTaskTools({
+        spawn: async (request, ctx, progress) =>
+          await this.spawnTask(request, ctx, progress)
+      })
     ]) {
       this.registry.register(tool);
     }
@@ -375,7 +408,7 @@ class MiniMaxController {
     return this.activeSessionId ? this.sessions.get(this.activeSessionId) : undefined;
   }
 
-  private async buildPrompt(): Promise<string> {
+  private async buildPrompt(registry: ToolRegistry = this.registry): Promise<string> {
     const settings = getSettings();
     const root = this.workspaceRoot();
     const openFiles = vscode.window.visibleTextEditors
@@ -386,9 +419,9 @@ class MiniMaxController {
       openFiles: openFiles.map((path) => ({ path }))
     });
 
-    const tools = this.registry
+    const tools = registry
       .list()
-      .filter((tool) => this.registry.isAllowed(tool, settings.mode))
+      .filter((tool) => registry.isAllowed(tool, settings.mode))
       .map((tool) => tool.name);
 
     return buildSystemPrompt({
@@ -491,6 +524,7 @@ class MiniMaxController {
       contextThreshold: settings.contextThreshold,
       systemPrompt: await this.buildPrompt(),
       contextProvider: async () => await this.sessionContext(runtime),
+      sessionId: runtime.id,
       sessionState: {
         get todos() {
           return runtime.todos;
@@ -511,6 +545,140 @@ class MiniMaxController {
     agent.setHistory(runtime.history);
     runtime.agent = agent;
     return agent;
+  }
+
+  // The registry of a child: the role decides what it may do. A role that
+  // only reads gets the tools without a side effect. The tool of the task is
+  // not there, a child does not start another child.
+  private registryForRole(role: TaskRole): ToolRegistry {
+    const registry = new ToolRegistry();
+    for (const entry of this.registry.list()) {
+      if (entry.name === 'task') {
+        continue;
+      }
+      if (role === 'worker' || !entry.sideEffect) {
+        registry.register(entry);
+      }
+    }
+    return registry;
+  }
+
+  // The gate of a child is the gate of the session: a write of the child
+  // asks the user too.
+  private childApproval(): ApprovalGate {
+    return new ApprovalGate({
+      autoApprove: getSettings().autoApprove,
+      request: async (request) => await this.requestChildApproval(request)
+    });
+  }
+
+  private requestChildApproval(request: ApprovalRequest): Promise<ApprovalDecision> {
+    const id = 'child-' + request.id;
+    const approval: UiApproval = { id, name: request.toolName, input: request.input };
+    return new Promise<ApprovalDecision>((resolve) => {
+      this.childApprovals.set(id, resolve);
+      this.panel.post({ type: 'approval_request', approval });
+    });
+  }
+
+  // The events of the child: the spend goes to the counter of the goal,
+  // the rest goes into the journal of the card of the call. The event of the
+  // end of the child does not go to the host, the spend of the child is
+  // already in the result of the call of the parent.
+  private handleChildEvent(
+    runtime: RuntimeSession,
+    event: AgentEvent,
+    progress: (line: string) => void
+  ): void {
+    if (event.type === 'usage') {
+      this.handleAgentEvent(runtime, event);
+      return;
+    }
+    if (event.type === 'tool_start') {
+      progress(event.name + ' ' + describeInput(event.input));
+      return;
+    }
+    if (event.type === 'tool_end') {
+      progress(event.name + (event.isError ? ' failed' : ' done'));
+      return;
+    }
+    if (event.type === 'assistant_text') {
+      const text = event.text.trim();
+      if (text.length > 0) {
+        progress(text.length > 160 ? text.slice(0, 160) + '…' : text);
+      }
+      return;
+    }
+    if (event.type === 'error') {
+      progress('error: ' + event.message);
+    }
+  }
+
+  // The child runs on its own: its own history, its own system prompt, its
+  // own registry. The answer of the child is the result of the call.
+  private async spawnTask(
+    request: TaskRequest,
+    ctx: ToolContext,
+    progress: (line: string) => void
+  ): Promise<TaskOutcome> {
+    const runtime = ctx.sessionId
+      ? this.sessions.get(ctx.sessionId)
+      : this.activeSession();
+    if (!runtime) {
+      return { content: 'There is no session for the sub-agent.', isError: true };
+    }
+    const key = await getApiKey(this.context.secrets);
+    if (!key) {
+      return { content: 'No API key, the sub-agent cannot run.', isError: true };
+    }
+    const settings = getSettings();
+    const model = MODELS.find((item) => item.id === settings.model);
+    // The tools of the child, the prompt of the child names them and the
+    // child calls only them.
+    const registry = this.registryForRole(request.role);
+    const child = new Agent({
+      client: new HttpMiniMaxClient({
+        baseUrl: resolveBaseUrl(settings.baseUrl, settings.customBaseUrl),
+        apiKey: key
+      }),
+      registry,
+      approval: this.childApproval(),
+      model: settings.model,
+      maxTokens: model?.maxTokens ?? 65_536,
+      maxIterations: CHILD_MAX_ITERATIONS,
+      effort: settings.effort,
+      thinking: this.thinkingMode(settings),
+      mode: settings.mode,
+      systemPrompt:
+        (await this.buildPrompt(registry)) + '\n\n' + ROLE_PROMPTS[request.role],
+      workspaceRoot: this.workspaceRoot(),
+      depth: 1,
+      sessionId: runtime.id,
+      sessionState: {
+        get todos() {
+          return runtime.todos;
+        },
+        get goal() {
+          return runtime.goal;
+        }
+      },
+      budget: () => this.goalBudgetOk(runtime),
+      logger: this.logger,
+      onEvent: (event) => this.handleChildEvent(runtime, event, progress)
+    });
+    const result = await child.run(request.prompt, []);
+    const text = finalText(result.messages);
+    if (text.length === 0) {
+      return {
+        content:
+          'The sub-agent finished without an answer, it stopped with: ' +
+          result.stopReason +
+          '.',
+        isError: true,
+        usage: result.usage
+      };
+    }
+    return { content: text, usage: result.usage };
   }
 
   private handleAgentEvent(runtime: RuntimeSession, event: AgentEvent): void {
@@ -799,12 +967,29 @@ class MiniMaxController {
       return;
     }
     if (message.type === 'approve') {
-      this.activeSession()?.agent?.approve(message.id, message.allowForSession);
+      const runtime = this.activeSession();
+      const handled =
+        runtime?.agent?.approve(message.id, message.allowForSession) ?? false;
+      if (!handled) {
+        const resolve = this.childApprovals.get(message.id);
+        if (resolve) {
+          this.childApprovals.delete(message.id);
+          resolve({ approved: true, allowForSession: message.allowForSession });
+        }
+      }
       this.panel.post({ type: 'approval_resolved', id: message.id, approved: true });
       return;
     }
     if (message.type === 'reject') {
-      this.activeSession()?.agent?.reject(message.id);
+      const runtime = this.activeSession();
+      const handled = runtime?.agent?.reject(message.id) ?? false;
+      if (!handled) {
+        const resolve = this.childApprovals.get(message.id);
+        if (resolve) {
+          this.childApprovals.delete(message.id);
+          resolve({ approved: false, allowForSession: false });
+        }
+      }
       this.panel.post({ type: 'approval_resolved', id: message.id, approved: false });
       return;
     }
@@ -1757,4 +1942,22 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 export function deactivate(): void {
   controller?.persistActive();
   controller = undefined;
+}
+
+// The answer of the child is the text of its last message.
+function finalText(messages: AnthropicMessage[]): string {
+  for (let index = messages.length - 1; index >= 0; index--) {
+    const message = messages[index]!;
+    if (message.role !== 'assistant') {
+      continue;
+    }
+    const parts = message.content.flatMap((block) =>
+      block.type === 'text' ? [block.text] : []
+    );
+    const text = parts.join('\n').trim();
+    if (text.length > 0) {
+      return text;
+    }
+  }
+  return '';
 }

@@ -289,4 +289,10 @@ describe('AgentSession', () => {
     await session.send('probe it');
     expect(depths).toEqual([undefined]);
   });
+
+  it('tells that nobody waits for an unknown approval', () => {
+    const { session } = makeSession();
+    expect(session.approve('nobody-waits', false)).toBe(false);
+    expect(session.reject('nobody-waits')).toBe(false);
+  });
 });

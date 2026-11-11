@@ -78,6 +78,14 @@ export function createGoalTools(): ToolEntry[] {
       required: ['status']
     },
     async execute(input, ctx) {
+      // The status of the goal belongs to the main agent, a sub-agent does
+      // not close the goal.
+      if ((ctx.depth ?? 0) > 0) {
+        return {
+          content: 'The status of the goal belongs to the main agent.',
+          isError: true
+        };
+      }
       if (!ctx.sessionState?.goal) {
         return {
           content: 'There is no goal for this session, there is nothing to update.',
