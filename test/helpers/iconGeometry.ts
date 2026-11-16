@@ -362,24 +362,37 @@ export function markupBBox(markup: string): Box {
   for (const match of markup.matchAll(/\sd="([^"]+)"/g)) {
     boxes.push(pathBBox(match[1] ?? ''));
   }
-  for (const match of markup.matchAll(
-    /<circle[^>]*cx="(-?[\d.]+)"[^>]*cy="(-?[\d.]+)"[^>]*r="(-?[\d.]+)"/g
-  )) {
-    const cx = Number(match[1]);
-    const cy = Number(match[2]);
-    const r = Number(match[3]);
+  // The attributes of a shape can stand in any order, the icons of the
+  // set of lucide write the width and the height before the place.
+  for (const match of markup.matchAll(/<circle[^>]*>/g)) {
+    const tag = match[0];
+    const cx = Number(/\bcx="(-?[\d.]+)"/.exec(tag)?.[1] ?? Number.NaN);
+    const cy = Number(/\bcy="(-?[\d.]+)"/.exec(tag)?.[1] ?? Number.NaN);
+    const r = Number(/\br="(-?[\d.]+)"/.exec(tag)?.[1] ?? Number.NaN);
+    if (!Number.isFinite(cx) || !Number.isFinite(cy) || !Number.isFinite(r)) {
+      continue;
+    }
     boxes.push({ minX: cx - r, minY: cy - r, maxX: cx + r, maxY: cy + r });
   }
-  for (const match of markup.matchAll(
-    /<rect[^>]*x="(-?[\d.]+)"[^>]*y="(-?[\d.]+)"[^>]*width="(-?[\d.]+)"[^>]*height="(-?[\d.]+)"/g
-  )) {
-    const x = Number(match[1]);
-    const y = Number(match[2]);
+  for (const match of markup.matchAll(/<rect[^>]*>/g)) {
+    const tag = match[0];
+    const x = Number(/\bx="(-?[\d.]+)"/.exec(tag)?.[1] ?? Number.NaN);
+    const y = Number(/\by="(-?[\d.]+)"/.exec(tag)?.[1] ?? Number.NaN);
+    const width = Number(/\bwidth="(-?[\d.]+)"/.exec(tag)?.[1] ?? Number.NaN);
+    const height = Number(/\bheight="(-?[\d.]+)"/.exec(tag)?.[1] ?? Number.NaN);
+    if (
+      !Number.isFinite(x) ||
+      !Number.isFinite(y) ||
+      !Number.isFinite(width) ||
+      !Number.isFinite(height)
+    ) {
+      continue;
+    }
     boxes.push({
       minX: x,
       minY: y,
-      maxX: x + Number(match[3]),
-      maxY: y + Number(match[4])
+      maxX: x + width,
+      maxY: y + height
     });
   }
   return mergeBoxes(boxes);
