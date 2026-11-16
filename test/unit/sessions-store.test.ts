@@ -7,6 +7,7 @@ import {
   MAX_STORED_MESSAGES,
   MAX_STORED_PROGRESS_CHARS,
   MAX_STORED_PROGRESS_LINES,
+  MAX_STORED_SESSION_CHARS,
   MAX_STORED_SESSIONS,
   MAX_STORED_TODOS,
   SessionStore,
@@ -106,6 +107,36 @@ describe('capSession', () => {
       uiMessages: [{ id: 'm', role: 'assistant', text: 'x'.repeat(300_000) }]
     });
     expect(stored.uiMessages[0]?.text?.length).toBe(200_000);
+    // The reader has to know that the text is not whole.
+    expect(stored.uiMessages[0]?.text).toContain('the message is cut');
+  });
+
+  it('keeps the head and the tail of a cut message', () => {
+    const stored = capSession({
+      ...session('s', 1),
+      uiMessages: [{ id: 'm', role: 'assistant', text: 'HEAD' + 'x'.repeat(300_000) + 'TAIL' }]
+    });
+    const text = stored.uiMessages[0]?.text ?? '';
+    expect(text.startsWith('HEAD')).toBe(true);
+    expect(text.endsWith('TAIL')).toBe(true);
+  });
+
+  it('cuts a chat that is too long as a whole', () => {
+    // Every message is inside the bound per message, the chat as a whole
+    // is not: the state of the host must not grow without a bound.
+    const messages: UiMessage[] = Array.from({ length: 40 }, (_, index) => ({
+      id: 'm' + index,
+      role: 'assistant',
+      text: 'y'.repeat(100_000)
+    }));
+    const stored = capSession({ ...session('s', 1), uiMessages: messages });
+    const total = stored.uiMessages.reduce(
+      (sum, message) => sum + (message.text?.length ?? 0),
+      0
+    );
+    expect(total).toBeLessThanOrEqual(MAX_STORED_SESSION_CHARS);
+    // The newest messages are the ones that survive.
+    expect(stored.uiMessages.at(-1)?.id).toBe('m39');
   });
 
   it('cuts a long change of a file', () => {

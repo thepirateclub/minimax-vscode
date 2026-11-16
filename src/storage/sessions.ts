@@ -54,14 +54,31 @@ export const MAX_STORED_TURNS = 50;
 export const MAX_STORED_TODOS = 200;
 // The queue of a chat does not grow forever.
 export const MAX_STORED_QUEUE = 30;
+// The whole size of a chat is bounded too. A bound per message is not
+// enough: a hundred messages of the bound each fill the state of the host,
+// and the state of the host is written on every turn.
+export const MAX_STORED_SESSION_CHARS = 2_000_000;
 
+// The marker of the cut of a message. The reader has to know that the
+// text is not whole, otherwise the answer looks like it ended there.
+const MESSAGE_CUT = '... the message is cut ...';
+
+// The text of a message is bounded by the characters. The head and the tail
+// of the message survive, the marker stands in the middle of it.
 function capText(text: string | undefined): string | undefined {
   if (text === undefined) {
     return undefined;
   }
-  return text.length > MAX_STORED_MESSAGE_CHARS
-    ? text.slice(text.length - MAX_STORED_MESSAGE_CHARS)
-    : text;
+  if (text.length <= MAX_STORED_MESSAGE_CHARS) {
+    return text;
+  }
+  const budget = MAX_STORED_MESSAGE_CHARS - MESSAGE_CUT.length;
+  const half = Math.floor(budget / 2);
+  return (
+    text.slice(0, half) +
+    MESSAGE_CUT +
+    text.slice(text.length - (budget - half))
+  );
 }
 
 // A long change would fill the state of the host, the middle of it is cut.
@@ -157,14 +174,53 @@ function capMessage(message: UiMessage): UiMessage {
   };
 }
 
+// The size of a message of the chat: the text of the answer, the text of
+// the thinking and the result of the tool.
+function messageChars(message: UiMessage): number {
+  const tool = message.tool;
+  return (
+    (message.text?.length ?? 0) +
+    (message.thinking?.length ?? 0) +
+    (tool?.content?.length ?? 0) +
+    (tool?.progress?.reduce((sum, line) => sum + line.length, 0) ?? 0)
+  );
+}
+
+// The whole chat is bounded by the characters. The oldest messages go away
+// first, the newest ones are the ones the reader needs.
+function capSessionSize(messages: UiMessage[]): UiMessage[] {
+  let total = 0;
+  for (const message of messages) {
+    total += messageChars(message);
+  }
+  if (total <= MAX_STORED_SESSION_CHARS) {
+    return messages;
+  }
+  const kept: UiMessage[] = [];
+  let size = 0;
+  for (let index = messages.length - 1; index >= 0; index--) {
+    const message = messages[index]!;
+    const chars = messageChars(message);
+    if (size + chars > MAX_STORED_SESSION_CHARS && kept.length > 0) {
+      break;
+    }
+    size += chars;
+    kept.unshift(message);
+  }
+  return kept;
+}
+
 export function capSession(session: StoredSession): StoredSession {
+  const uiMessages = capSessionSize(
+    session.uiMessages.slice(-MAX_STORED_MESSAGES).map(capMessage)
+  );
   return {
     id: session.id,
     title: session.title,
     updatedAt: session.updatedAt,
     workspaceRoot: session.workspaceRoot,
     messages: trimHistory(session.messages, MAX_STORED_HISTORY),
-    uiMessages: session.uiMessages.slice(-MAX_STORED_MESSAGES).map(capMessage),
+    uiMessages,
     usage: session.usage.slice(-MAX_STORED_USAGE_TURNS),
     turns: (session.turns ?? []).slice(-MAX_STORED_TURNS),
     todos: (session.todos ?? []).slice(-MAX_STORED_TODOS),
