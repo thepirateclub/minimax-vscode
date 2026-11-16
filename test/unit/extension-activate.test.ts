@@ -1041,6 +1041,82 @@ describe('extension activation', () => {
     expect(init.state.sessions.map((item) => item.id)).toContain('s-old');
   });
 
+  it('starts a new chat when the project has no chats', async () => {
+    const rootA = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    const rootB = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', rootA);
+    state.secrets.set('minimax.apiKey', 'test-key');
+    state.responses.push(TEXT_SSE);
+    await boot();
+    const chatA = ofType('init')[0]!.state.activeSessionId;
+    expect(chatA).toBeDefined();
+    state.posted.length = 0;
+    state.receive?.({ type: 'send', text: 'question of A', mentions: [], selections: [] });
+    await vi.waitFor(() => {
+      expect(ofType('text_delta').length).toBeGreaterThan(0);
+    });
+    await vi.waitFor(() => {
+      expect(ofType('status').pop()?.state).toBe('idle');
+    });
+
+    // The project B opens: it has no chats of its own.
+    state.config.set('root', rootB);
+    state.posted.length = 0;
+    await boot();
+    const init = ofType('init')[0]!;
+    expect(init.state.workspaceRoot).toBe(rootB);
+    expect(init.state.activeSessionId).toBeDefined();
+    // The chat of the other project is not opened here.
+    expect(init.state.activeSessionId).not.toBe(chatA);
+    expect(init.state.messages).toHaveLength(0);
+    // It stays in the list, the switch of every chat shows it.
+    expect(init.state.sessions.map((item) => item.id)).toContain(chatA);
+    const summary = init.state.sessions.find((item) => item.id === chatA);
+    expect(summary?.workspaceRoot).toBe(rootA);
+  });
+
+  it('opens the chat that was active in the project', async () => {
+    const rootA = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    const rootB = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.secrets.set('minimax.apiKey', 'test-key');
+
+    // The chat of the project A.
+    state.config.set('root', rootA);
+    state.responses.push(TEXT_SSE);
+    await boot();
+    state.receive?.({ type: 'send', text: 'question of A', mentions: [], selections: [] });
+    await vi.waitFor(() => {
+      expect(ofType('text_delta').length).toBeGreaterThan(0);
+    });
+    await vi.waitFor(() => {
+      expect(ofType('status').pop()?.state).toBe('idle');
+    });
+    const chatA = ofType('init')[0]!.state.activeSessionId;
+
+    // The chat of the project B.
+    state.config.set('root', rootB);
+    state.posted.length = 0;
+    state.responses.push(TEXT_SSE);
+    await boot();
+    state.receive?.({ type: 'send', text: 'question of B', mentions: [], selections: [] });
+    await vi.waitFor(() => {
+      expect(ofType('text_delta').length).toBeGreaterThan(0);
+    });
+    await vi.waitFor(() => {
+      expect(ofType('status').pop()?.state).toBe('idle');
+    });
+    const chatB = ofType('init')[0]!.state.activeSessionId;
+    expect(chatB).not.toBe(chatA);
+
+    // The project A opens again: its own chat is open.
+    state.config.set('root', rootA);
+    state.posted.length = 0;
+    await boot();
+    const init = ofType('init')[0]!;
+    expect(init.state.activeSessionId).toBe(chatA);
+    expect(init.state.messages[0]?.text).toBe('question of A');
+  });
+
   it('tells the panel which version is running', async () => {
     const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
     state.config.set('root', root);

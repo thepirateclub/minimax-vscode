@@ -338,4 +338,61 @@ describe('SessionStore', () => {
     store.setActiveId(undefined);
     expect(store.activeId()).toBeUndefined();
   });
+
+  it('tells the project of every chat', async () => {
+    const storage = new FakeStorage();
+    const store = new SessionStore(storage);
+    await store.save({ ...session('s1', 10), workspaceRoot: 'C:/projects/alpha' });
+    await store.save({ ...session('s2', 20), workspaceRoot: 'C:/projects/beta' });
+    const list = store.summaryList();
+    const alpha = list.find((item) => item.id === 's1');
+    const beta = list.find((item) => item.id === 's2');
+    expect(alpha?.workspaceRoot).toBe('C:/projects/alpha');
+    expect(alpha?.workspaceLabel).toBe('alpha');
+    expect(beta?.workspaceLabel).toBe('beta');
+  });
+
+  it('keeps the chats of the projects apart', async () => {
+    const storage = new FakeStorage();
+    const store = new SessionStore(storage);
+    await store.save({ ...session('s1', 10), workspaceRoot: 'C:/projects/alpha' });
+    await store.save({ ...session('s2', 20), workspaceRoot: 'C:/projects/beta' });
+    expect(store.chatsOf('C:/projects/alpha').map((item) => item.id)).toEqual(['s1']);
+    expect(store.chatsOf('C:/projects/beta').map((item) => item.id)).toEqual(['s2']);
+    expect(store.chatsOf('C:/projects/gamma')).toHaveLength(0);
+  });
+
+  it('remembers the open chat of every project', async () => {
+    const storage = new FakeStorage();
+    const store = new SessionStore(storage);
+    await store.save({ ...session('s1', 10), workspaceRoot: 'C:/projects/alpha' });
+    await store.save({ ...session('s2', 20), workspaceRoot: 'C:/projects/beta' });
+    store.setActiveIdFor('C:/projects/alpha', 's1');
+    store.setActiveIdFor('C:/projects/beta', 's2');
+    expect(store.activeIdFor('C:/projects/alpha')).toBe('s1');
+    expect(store.activeIdFor('C:/projects/beta')).toBe('s2');
+    // A project without a chat of its own has no open chat.
+    expect(store.activeIdFor('C:/projects/gamma')).toBeUndefined();
+  });
+
+  it('forgets the open chat of a deleted chat', async () => {
+    const storage = new FakeStorage();
+    const store = new SessionStore(storage);
+    await store.save({ ...session('s1', 10), workspaceRoot: 'C:/projects/alpha' });
+    store.setActiveIdFor('C:/projects/alpha', 's1');
+    store.clearActiveId('s1');
+    expect(store.activeIdFor('C:/projects/alpha')).toBeUndefined();
+    expect(store.activeId()).toBeUndefined();
+  });
+
+  it('takes the chats of an older version into the project that opens them', async () => {
+    const storage = new FakeStorage();
+    const store = new SessionStore(storage);
+    await store.save(session('s1', 10));
+    // The chat does not know its project, the project that opens it takes it.
+    store.claimUnbound('C:/projects/alpha');
+    expect(store.get('s1')?.workspaceRoot).toBe('C:/projects/alpha');
+    expect(store.chatsOf('C:/projects/alpha')).toHaveLength(1);
+    expect(store.chatsOf('C:/projects/beta')).toHaveLength(0);
+  });
 });

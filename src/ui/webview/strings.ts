@@ -173,6 +173,8 @@ export const STRINGS = {
   workspaceFiles: 'Files',
   chatHistory: 'Chat history',
   noChats: 'No saved chats yet',
+  allChats: 'All chats',
+  thisProject: 'This project',
   deleteChat: 'Delete chat',
   showEarlier: 'Show earlier messages',
   jumpToLatest: 'Jump to the latest',

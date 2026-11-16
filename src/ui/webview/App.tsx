@@ -37,6 +37,8 @@ interface VsCodeApi {
 const EMPTY_STATE: UiState = {
   sessions: [],
   activeSessionId: undefined,
+  workspaceRoot: '',
+  workspaceLabel: '',
   messages: [],
   model: 'MiniMax-M3.1-Flash',
   models: [],
@@ -344,6 +346,8 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
         hasApiKey={state.hasApiKey}
         sessions={state.sessions}
         activeSessionId={state.activeSessionId}
+        workspaceRoot={state.workspaceRoot}
+        workspaceLabel={state.workspaceLabel}
         onSelectSession={(id) => vscode.postMessage({ type: 'select_session', id })}
         onDeleteSession={(id) => vscode.postMessage({ type: 'delete_session', id })}
         onNewChat={() => vscode.postMessage({ type: 'new_session' })}

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { UiSessionSummary } from '../../protocol';
-import { IconClose, IconHistory, IconPlus } from '../icons';
+import { IconClose, IconFolder, IconHistory, IconLayers, IconPlus } from '../icons';
+import { visibleSessions } from '../sessionScope';
 import { STRINGS } from '../strings';
 
 function formatTime(timestamp: number): string {
@@ -20,17 +21,26 @@ function formatTime(timestamp: number): string {
 export function SessionMenu({
   sessions,
   activeSessionId,
+  workspaceRoot,
+  workspaceLabel,
   onSelect,
   onDelete,
   onNewChat
 }: {
   sessions: UiSessionSummary[];
   activeSessionId: string | undefined;
+  // The project of the panel: the chats of the other projects are not shown
+  // by default.
+  workspaceRoot: string;
+  workspaceLabel: string;
   onSelect: (id: string) => void;
   onDelete: (id: string) => void;
   onNewChat: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  // The scope of the list: the chats of the project or the chats of every
+  // project.
+  const [all, setAll] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -46,6 +56,10 @@ export function SessionMenu({
     return () => document.removeEventListener('mousedown', close);
   }, [open]);
 
+  // The chats of the other projects stay in the list, they are hidden until
+  // the reader asks for every chat.
+  const visible = visibleSessions(sessions, workspaceRoot, all);
+
   return (
     <div className="session-menu" ref={rootRef}>
       <button
@@ -60,6 +74,17 @@ export function SessionMenu({
       {open ? (
         <div className="session-menu-list">
           <button
+            className={'session-scope' + (all ? ' active' : '')}
+            title={all ? STRINGS.allChats : STRINGS.thisProject}
+            aria-pressed={all}
+            onClick={() => setAll((value) => !value)}
+          >
+            {all ? <IconLayers /> : <IconFolder />}
+            <span className="session-scope-label">
+              {all ? STRINGS.allChats : workspaceLabel || STRINGS.thisProject}
+            </span>
+          </button>
+          <button
             className="session-new"
             onClick={() => {
               setOpen(false);
@@ -69,10 +94,10 @@ export function SessionMenu({
             <IconPlus />
             {STRINGS.newChat}
           </button>
-          {sessions.length === 0 ? (
+          {visible.length === 0 ? (
             <div className="session-empty">{STRINGS.noChats}</div>
           ) : null}
-          {sessions.map((session) => (
+          {visible.map((session) => (
             <div
               key={session.id}
               className={'session-item' + (session.id === activeSessionId ? ' active' : '')}
@@ -85,6 +110,9 @@ export function SessionMenu({
                 }}
               >
                 <span className="session-title">{session.title}</span>
+                {all && session.workspaceLabel ? (
+                  <span className="session-project">{session.workspaceLabel}</span>
+                ) : null}
                 <span className="session-time">{formatTime(session.updatedAt)}</span>
               </button>
               <button

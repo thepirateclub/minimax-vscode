@@ -39,7 +39,7 @@ import { readRepositoryState, summarizeState } from './git/status';
 import { createLogger, type Logger } from './logger';
 import { ProjectSearch } from './search/project';
 import { InMemoryBackupStore } from './storage/backups';
-import { SessionStore, type StoredSession } from './storage/sessions';
+import { projectLabel, SessionStore, type StoredSession } from './storage/sessions';
 import { UsageLedger } from './storage/usage';
 import { createExploreTools, isTextFile } from './tools/explore';
 import { createFileTools, resolveWorkspacePath } from './tools/fs';
@@ -88,6 +88,8 @@ interface RuntimeSession {
   id: string;
   title: string;
   updatedAt: number;
+  // The project of the chat: the root of the workspace it belongs to.
+  workspaceRoot: string;
   history: AnthropicMessage[];
   uiMessages: UiMessage[];
   agent: AgentSession | undefined;
@@ -1852,6 +1854,7 @@ class MiniMaxController {
       id: runtime.id,
       title: runtime.title,
       updatedAt: runtime.updatedAt,
+      workspaceRoot: runtime.workspaceRoot,
       messages: runtime.history,
       uiMessages: runtime.uiMessages,
       usage: runtime.usage,
@@ -1866,8 +1869,9 @@ class MiniMaxController {
         this.logger.error('the chat was not saved to the state of the host');
       } else if (this.activeSessionId === runtime.id) {
         // The id of the active session goes to the state of the host after
-        // the session itself. A lonely id would point to nothing.
-        this.store.setActiveId(runtime.id);
+        // the session itself. A lonely id would point to nothing. The id
+        // belongs to the project of the chat, every project keeps its own.
+        this.store.setActiveIdFor(runtime.workspaceRoot, runtime.id);
       }
       this.panel.post({ type: 'sessions', sessions: this.store.summaryList() });
     });
@@ -1882,6 +1886,7 @@ class MiniMaxController {
       id: runtime.id,
       title: runtime.title,
       updatedAt: Date.now(),
+      workspaceRoot: saved?.workspaceRoot ?? runtime.workspaceRoot,
       messages: saved?.messages ?? [],
       uiMessages: saved?.uiMessages ?? [],
       usage: saved?.usage ?? [],
@@ -1908,6 +1913,9 @@ class MiniMaxController {
       id: stored.id,
       title: stored.title,
       updatedAt: stored.updatedAt,
+      // A chat of an older version does not know its project, the project
+      // that opens it takes it.
+      workspaceRoot: stored.workspaceRoot ?? this.workspaceRoot(),
       history: [...stored.messages],
       uiMessages: [...(stored.uiMessages ?? [])],
       agent: undefined,
@@ -1933,11 +1941,13 @@ class MiniMaxController {
     if (current) {
       this.persist(current);
     }
-    const id = 's-' + Date.now().toString(36);
+    const id = this.nextId('s');
     this.sessions.set(id, {
       id,
       title: 'New chat',
       updatedAt: Date.now(),
+      // A new chat belongs to the project that is open.
+      workspaceRoot: this.workspaceRoot(),
       history: [],
       uiMessages: [],
       agent: undefined,
@@ -1957,20 +1967,32 @@ class MiniMaxController {
     void this.sendInit();
   }
 
-  // The last chat is opened again after a restart, an empty panel would hide
-  // the work of the previous session.
+  // The chat of the project is opened again after a restart, an empty panel
+  // would hide the work of the previous session. Every project keeps its own
+  // chat: the chats of another project stay in the list, they are not shown
+  // by default.
   restoreSession(): void {
-    const activeId = this.store.activeId();
-    const active = activeId ? this.store.get(activeId) : undefined;
-    const stored = active ?? this.store.list()[0];
+    const root = this.workspaceRoot();
+    // The chats of an older version do not know their project, this one
+    // takes them.
+    const list = this.store.claimUnbound(root);
+    const activeId = this.store.activeIdFor(root);
+    const active = activeId ? list.find((session) => session.id === activeId) : undefined;
+    // The chat that was open in the project, otherwise the newest chat of
+    // the project. A chat of another project is not opened here.
+    const stored =
+      active && (active.workspaceRoot === root || active.workspaceRoot === undefined)
+        ? active
+        : list.find((session) => session.workspaceRoot === root);
     if (!stored) {
+      // The project has no chats, a new one starts.
       this.startNewSession();
       return;
     }
     const runtime = this.runtimeFrom(stored);
     this.sessions.set(runtime.id, runtime);
     this.activeSessionId = runtime.id;
-    this.store.setActiveId(runtime.id);
+    this.store.setActiveIdFor(root, runtime.id);
     this.setState('idle');
     void this.sendInit();
   }
@@ -1990,19 +2012,23 @@ class MiniMaxController {
       this.sessions.set(id, runtime);
     }
     this.activeSessionId = id;
-    this.store.setActiveId(id);
+    // The chat that is open belongs to the project of the panel, every
+    // project remembers its own.
+    this.store.setActiveIdFor(this.workspaceRoot(), id);
     this.panel.post({ type: 'session_loaded', messages: runtime.uiMessages });
     void this.sendInit();
   }
 
   private deleteSession(id: string): void {
     this.store.remove(id);
+    // The removed chat is not the open one of any project.
+    this.store.clearActiveId(id);
     this.sessions.delete(id);
     if (this.activeSessionId === id) {
       this.activeSessionId = undefined;
       // The removed chat must not stay active, its id would point to nothing
       // after a restart.
-      this.store.setActiveId(undefined);
+      this.store.setActiveIdFor(this.workspaceRoot(), undefined);
       this.startNewSession();
       return;
     }
@@ -2018,6 +2044,9 @@ class MiniMaxController {
       state: {
         sessions: this.store.summaryList(),
         activeSessionId: this.activeSessionId,
+        // The project of the panel: the list of the chats belongs to it.
+        workspaceRoot: this.workspaceRoot(),
+        workspaceLabel: projectLabel(this.workspaceRoot()),
         messages: runtime ? [...runtime.uiMessages] : [],
         model: settings.model,
         models: MODELS,

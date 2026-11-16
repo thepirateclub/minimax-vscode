@@ -2250,6 +2250,43 @@ html {
   background: var(--row-hover);
 }
 
+/* the scope of the list: the chats of the project or the chats of every
+   project */
+.session-scope {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  text-align: left;
+  cursor: pointer;
+}
+
+.session-scope:hover {
+  background: var(--row-hover);
+  color: var(--fg);
+}
+
+.session-scope.active {
+  color: var(--accent);
+}
+
+.session-scope-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* the project of the chat, it shows in the list of every chat */
+.session-project {
+  color: var(--muted);
+  font-size: var(--fs-xs);
+}
+
 .session-empty {
   padding: 6px 8px;
   color: var(--muted);

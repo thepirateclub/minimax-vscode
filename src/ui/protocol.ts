@@ -61,6 +61,10 @@ export interface UiSessionSummary {
   id: string;
   title: string;
   updatedAt: number;
+  // The project of the chat: the root of the workspace it belongs to.
+  workspaceRoot?: string;
+  // The name of the project, the reader sees it in the list of the chats.
+  workspaceLabel?: string;
 }
 
 export interface UiFile {
@@ -131,6 +135,10 @@ export interface UiUsageTurn {
 export interface UiState {
   sessions: UiSessionSummary[];
   activeSessionId: string | undefined;
+  // The project of the panel: the root of the workspace and its name. The
+  // list of the chats belongs to it.
+  workspaceRoot: string;
+  workspaceLabel: string;
   messages: UiMessage[];
   model: string;
   models: ModelInfo[];

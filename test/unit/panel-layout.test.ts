@@ -75,6 +75,8 @@ function renderHeader(version: string): string {
       hasApiKey: true,
       sessions: [],
       activeSessionId: undefined,
+      workspaceRoot: 'C:/projects/minimax-vscode',
+      workspaceLabel: 'minimax-vscode',
       onSelectSession: noop,
       onDeleteSession: noop,
       onNewChat: noop,

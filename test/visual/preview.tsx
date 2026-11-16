@@ -43,6 +43,9 @@ document.head.appendChild(styleElement);
 const STATE: UiState = {
   sessions: sessions(Date.now()),
   activeSessionId: 's1',
+  // The project of the stand: the list of the chats belongs to it.
+  workspaceRoot: 'C:/projects/minimax-vscode',
+  workspaceLabel: 'minimax-vscode',
   messages: params.get('empty') === '1' ? [] : MESSAGES,
   model: MODELS[0]!.id,
   models: MODELS,
