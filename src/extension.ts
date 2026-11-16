@@ -2077,7 +2077,9 @@ class MiniMaxController {
       turns: saved?.turns ?? [],
       todos: runtime.todos,
       goal: runtime.goal,
-      queue: saved?.queue ?? runtime.queue.map((item) => ({ ...item }))
+      // The queue of памяти хозяина истина, в состоянии хоста она лежит
+      // вместе с остальным чатом.
+      queue: runtime.queue.map((item) => ({ ...item }))
     };
     void this.store.save(stored).then((ok) => {
       if (!ok) {
