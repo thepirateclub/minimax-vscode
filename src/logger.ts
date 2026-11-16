@@ -6,7 +6,10 @@ export interface Logger {
 const SECRET_PATTERNS: RegExp[] = [
   /Bearer\s+[A-Za-z0-9._-]+/g,
   /([?&](?:key|api_key|apikey|token)=)[^&\s]+/gi,
-  /(sk-[A-Za-z0-9]{8,})/g
+  // The key of the M Plan is long and holds dashes and underscores: sk-c...
+  // The look behind keeps the words that only carry the letters inside, for
+  // example task-priority, out of the mask.
+  /(?<![A-Za-z0-9_-])sk-[A-Za-z0-9][A-Za-z0-9._-]{7,}/g
 ];
 
 export function redactSecrets(text: string): string {
