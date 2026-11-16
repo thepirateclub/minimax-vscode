@@ -10,10 +10,12 @@ const CSS = readFileSync(
   'utf8'
 );
 
-function render(messages: UiMessage[]): string {
+function render(messages: UiMessage[], olderMessages = 0): string {
   return renderToStaticMarkup(
     createElement(MessageList, {
       messages,
+      olderMessages,
+      onLoadOlder: () => undefined,
       collapseTools: false,
       collapseCode: false,
       onApprove: () => undefined,
@@ -24,6 +26,29 @@ function render(messages: UiMessage[]): string {
     })
   );
 }
+
+describe('the older part of the chat', () => {
+  it('offers the messages the host keeps', () => {
+    const markup = render([{ id: 'a1', role: 'assistant', text: 'the answer' }], 42);
+    expect(markup).toContain('Show earlier messages');
+    expect(markup).toContain('(42)');
+  });
+
+  it('hides the button when the whole chat is on the panel', () => {
+    const markup = render([{ id: 'a1', role: 'assistant', text: 'the answer' }]);
+    expect(markup).not.toContain('Show earlier messages');
+  });
+
+  it('counts the messages the panel holds and does not draw yet', () => {
+    const messages: UiMessage[] = [];
+    for (let index = 0; index < 130; index++) {
+      messages.push({ id: 'a' + index, role: 'assistant', text: 'the answer' });
+    }
+    const markup = render(messages);
+    // The panel draws the last page of the chat, ten messages wait.
+    expect(markup).toContain('(10)');
+  });
+});
 
 describe('the notices of the panel', () => {
   it('shows a failure as a notice and not as the answer of the model', () => {

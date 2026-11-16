@@ -30,6 +30,7 @@ import { TaskList } from './components/TaskList';
 import { appendNotice } from './notices';
 import { STRINGS } from './strings';
 import { endTool } from './toolEnd';
+import { DeltaBatch } from './deltaBatch';
 
 interface VsCodeApi {
   postMessage(message: WebToExt): void;
@@ -56,12 +57,16 @@ const EMPTY_STATE: UiState = {
   collapseCode: false,
   version: '',
   todos: [],
-  queue: []
+  queue: [],
+  olderMessages: 0
 };
 
 export function App({ vscode }: { vscode: VsCodeApi }) {
   const [state, setState] = useState<UiState>(EMPTY_STATE);
   const [messages, setMessages] = useState<UiMessage[]>([]);
+  // How many messages of the chat wait in the host. The panel asks for
+  // them when the reader wants to see the older part of the chat.
+  const [olderMessages, setOlderMessages] = useState(0);
   const [todos, setTodos] = useState<TodoItem[]>([]);
   const [goal, setGoal] = useState<GoalState | undefined>(undefined);
   // The command /goal without a text opens the wizard of the goal.
@@ -88,12 +93,44 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
   const [queue, setQueue] = useState<UiQueuedMessage[]>([]);
 
   useEffect(() => {
+    // The deltas of the answer wait in a batch and go to the panel in one
+    // piece: the redraw of the whole answer for every token is quadratic.
+    // Every other event flushes the batch first, the order of the events
+    // stays the order they came in.
+    const batch = new DeltaBatch({
+      onFlush: (text, thinking) => {
+        setMessages((prev) => {
+          const next = text.length > 0 ? appendToAssistant(prev, 'text', text) : prev;
+          return thinking.length > 0
+            ? appendToAssistant(next, 'thinking', thinking)
+            : next;
+        });
+      }
+    });
+
     const onMessage = (event: MessageEvent<ExtToWeb>): void => {
       const message = event.data;
+
+      if (message.type === 'text_delta') {
+        batch.pushText(message.text);
+        return;
+      }
+      if (message.type === 'thinking_delta') {
+        batch.pushThinking(message.text);
+        return;
+      }
+      // The piece of a broken answer goes away, the text that waits in the
+      // batch goes away with it.
+      if (message.type === 'assistant_reset') {
+        batch.clear();
+      } else {
+        batch.flush();
+      }
 
       if (message.type === 'init') {
         setState(message.state);
         setMessages(message.state.messages);
+        setOlderMessages(message.state.olderMessages ?? 0);
         setTodos(message.state.todos);
         setGoal(message.state.goal);
         setQueue(message.state.queue ?? []);
@@ -105,14 +142,6 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
       }
       if (message.type === 'assistant_start') {
         setMessages((prev) => [...prev, { id: message.id, role: 'assistant', text: '' }]);
-        return;
-      }
-      if (message.type === 'text_delta') {
-        setMessages((prev) => appendToAssistant(prev, 'text', message.text));
-        return;
-      }
-      if (message.type === 'thinking_delta') {
-        setMessages((prev) => appendToAssistant(prev, 'thinking', message.text));
         return;
       }
       if (message.type === 'tool_start') {
@@ -190,6 +219,14 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
       }
       if (message.type === 'session_loaded') {
         setMessages(message.messages);
+        setOlderMessages(message.olderMessages ?? 0);
+        return;
+      }
+      if (message.type === 'history_older') {
+        // The older part of the chat comes in front of the messages the
+        // panel holds.
+        setMessages((prev) => [...message.messages, ...prev]);
+        setOlderMessages(message.olderMessages);
         return;
       }
       if (message.type === 'sessions') {
@@ -387,6 +424,8 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
         ) : (
           <MessageList
             messages={messages}
+            olderMessages={olderMessages}
+            onLoadOlder={() => vscode.postMessage({ type: 'load_older' })}
             collapseTools={state.collapseTools}
             collapseCode={state.collapseCode}
             onApprove={approve}

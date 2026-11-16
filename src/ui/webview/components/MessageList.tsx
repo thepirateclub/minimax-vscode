@@ -183,6 +183,8 @@ const MessageRow = memo(function MessageRow({
 
 export function MessageList({
   messages,
+  olderMessages,
+  onLoadOlder,
   collapseTools,
   collapseCode,
   onApprove,
@@ -192,6 +194,11 @@ export function MessageList({
   onRewind
 }: {
   messages: UiMessage[];
+  // How many messages of the chat wait in the host. The panel asks for
+  // them when the reader wants to see the older part of the chat.
+  olderMessages: number;
+  // The panel asks the host for the older part of the chat.
+  onLoadOlder: () => void;
   // The cards of the actions fold to their title.
   collapseTools: boolean;
   // The code blocks of the answers fold to their header.
@@ -205,6 +212,9 @@ export function MessageList({
   const listRef = useRef<HTMLDivElement>(null);
   const atBottomRef = useRef(true);
   const lastState = useRef(measure([]));
+  // The height of the list before the older messages came from the host.
+  // The place of the reader stays where it was.
+  const pendingScroll = useRef<number | undefined>(undefined);
   const [visible, setVisible] = useState(PAGE);
   const [atBottom, setAtBottom] = useState(true);
   const [pending, setPending] = useState(0);
@@ -231,6 +241,19 @@ export function MessageList({
     const next = measure(messages);
     const previous = lastState.current;
     lastState.current = next;
+    const before = pendingScroll.current;
+    if (before !== undefined) {
+      // The older messages came from the host: the place of the reader
+      // stays where it was, the list does not jump to the end.
+      pendingScroll.current = undefined;
+      window.requestAnimationFrame(() => {
+        const after = root.scrollHeight;
+        if (after > before) {
+          root.scrollTop += after - before;
+        }
+      });
+      return;
+    }
     if (next.count < previous.count) {
       // Another chat was opened, the list shows its end.
       root.scrollTop = root.scrollHeight;
@@ -265,15 +288,23 @@ export function MessageList({
   const loadEarlier = useCallback((): void => {
     const root = listRef.current;
     const before = root?.scrollHeight ?? 0;
-    setVisible((value) => value + PAGE);
-    // The place of the reader stays where it was.
-    window.requestAnimationFrame(() => {
-      const after = root?.scrollHeight ?? 0;
-      if (root && after > before) {
-        root.scrollTop += after - before;
-      }
-    });
-  }, []);
+    if (messages.length > visible) {
+      // The panel holds these messages, it draws them by itself.
+      setVisible((value) => value + PAGE);
+      // The place of the reader stays where it was.
+      window.requestAnimationFrame(() => {
+        const after = root?.scrollHeight ?? 0;
+        if (root && after > before) {
+          root.scrollTop += after - before;
+        }
+      });
+      return;
+    }
+    // The chat is longer than the panel holds: the older part of it waits
+    // in the host, the panel asks for it.
+    pendingScroll.current = before;
+    onLoadOlder();
+  }, [messages.length, visible, onLoadOlder]);
 
   // The files the agent has read, a snippet of one of them gets the name
   // of the file in its header.
@@ -285,13 +316,16 @@ export function MessageList({
 
   const shown = messages.length > visible ? messages.slice(-visible) : messages;
   const hidden = messages.length - shown.length;
+  // The messages the panel does not draw yet: the ones it holds and the
+  // ones the host keeps.
+  const pendingCount = hidden + olderMessages;
 
   return (
     <div className="messages-wrap">
       <div className="messages" ref={listRef} onScroll={handleScroll}>
-        {hidden > 0 ? (
+        {pendingCount > 0 ? (
           <button className="load-earlier" onClick={loadEarlier}>
-            {STRINGS.showEarlier} ({hidden})
+            {STRINGS.showEarlier} ({pendingCount})
           </button>
         ) : null}
         {shown.map((message, offset) => (

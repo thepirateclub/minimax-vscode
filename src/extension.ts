@@ -64,6 +64,7 @@ import {
   type ApprovalRequest
 } from './ui/approvals';
 import { fileErrorMessage } from './ui/fileError';
+import { historyPage, historyTail } from './ui/historyPage';
 import { AgentPanelProvider } from './ui/panel';
 import { themeKind } from './ui/theme';
 import { VoiceController } from './voice/controller';
@@ -93,6 +94,9 @@ interface RuntimeSession {
   workspaceRoot: string;
   history: AnthropicMessage[];
   uiMessages: UiMessage[];
+  // Where the history of the panel starts in the messages of the session.
+  // The older messages wait in the host until the panel asks for them.
+  panelOffset: number | undefined;
   agent: AgentSession | undefined;
   busy: boolean;
   errorReported: boolean;
@@ -1179,7 +1183,12 @@ class MiniMaxController {
 
   private async handleWebviewMessage(message: WebToExt): Promise<void> {
     if (message.type === 'ready') {
-      await this.sendInit();
+      // The panel has just loaded, it holds nothing of the chat yet.
+      await this.sendInit(true);
+      return;
+    }
+    if (message.type === 'load_older') {
+      this.loadOlder();
       return;
     }
     if (message.type === 'send') {
@@ -1717,7 +1726,7 @@ class MiniMaxController {
     runtime.todos = [];
     this.panel.post({ type: 'todos', todos: runtime.todos });
     // The panel gets a copy, the chat grows right after this line.
-    this.panel.post({ type: 'session_loaded', messages: [...runtime.uiMessages] });
+    this.postHistory(runtime);
     // The request comes back to the input field, the agent waits.
     this.panel.post({ type: 'restore_input', text, mentions, selections });
     this.persist(runtime);
@@ -1766,7 +1775,7 @@ class MiniMaxController {
     runtime.todos = [];
     this.panel.post({ type: 'todos', todos: runtime.todos });
     // The panel gets a copy, the chat grows right after this line.
-    this.panel.post({ type: 'session_loaded', messages: [...runtime.uiMessages] });
+    this.postHistory(runtime);
     await this.handleSend(turn.text, turn.mentions, turn.selections);
   }
 
@@ -2105,6 +2114,7 @@ class MiniMaxController {
       workspaceRoot: stored.workspaceRoot ?? this.workspaceRoot(),
       history: [...stored.messages],
       uiMessages: [...(stored.uiMessages ?? [])],
+      panelOffset: undefined,
       agent: undefined,
       busy: false,
       errorReported: false,
@@ -2145,6 +2155,7 @@ class MiniMaxController {
       workspaceRoot: this.workspaceRoot(),
       history: [],
       uiMessages: [],
+      panelOffset: undefined,
       agent: undefined,
       busy: false,
       errorReported: false,
@@ -2214,7 +2225,7 @@ class MiniMaxController {
     // The chat that is open belongs to the project of the panel, every
     // project remembers its own.
     this.store.setActiveIdFor(this.workspaceRoot(), id);
-    this.panel.post({ type: 'session_loaded', messages: runtime.uiMessages });
+    this.postHistory(runtime);
     void this.sendInit();
   }
 
@@ -2234,10 +2245,64 @@ class MiniMaxController {
     void this.sendInit();
   }
 
-  private async sendInit(): Promise<void> {
+  // The part of the history the panel holds. The host keeps the whole
+  // history, the panel asks for the older part when the reader wants to
+  // see it. A panel that has just loaded holds nothing of the chat, the
+  // tail of the chat goes to it.
+  private panelHistory(
+    runtime: RuntimeSession | undefined,
+    reset: boolean
+  ): { messages: UiMessage[]; olderMessages: number } {
+    if (!runtime) {
+      return { messages: [], olderMessages: 0 };
+    }
+    if (!reset && runtime.panelOffset !== undefined) {
+      const start = Math.max(
+        0,
+        Math.min(runtime.panelOffset, runtime.uiMessages.length)
+      );
+      return { messages: runtime.uiMessages.slice(start), olderMessages: start };
+    }
+    const tail = historyTail(runtime.uiMessages);
+    runtime.panelOffset = tail.offset;
+    return { messages: tail.messages, olderMessages: tail.offset };
+  }
+
+  // The chat of the panel goes to it in one part: the tail of the chat,
+  // the older part waits in the host until the reader asks for it.
+  private postHistory(runtime: RuntimeSession): void {
+    const tail = historyTail(runtime.uiMessages);
+    runtime.panelOffset = tail.offset;
+    this.panel.post({
+      type: 'session_loaded',
+      messages: tail.messages,
+      olderMessages: tail.offset
+    });
+  }
+
+  // The panel asks for the older part of the chat. The host keeps it, the
+  // panel gets one more part.
+  private loadOlder(): void {
+    const runtime = this.activeSession();
+    if (!runtime) {
+      return;
+    }
+    const page = historyPage(runtime.uiMessages, runtime.panelOffset ?? 0);
+    runtime.panelOffset = page.offset;
+    this.panel.post({
+      type: 'history_older',
+      messages: page.messages,
+      olderMessages: page.offset
+    });
+  }
+
+  private async sendInit(reset = false): Promise<void> {
     const settings = getSettings();
     const key = await getApiKey(this.context.secrets);
     const runtime = this.activeSession();
+    // The history goes to the panel in parts: the panel holds the last part
+    // of it, the older part waits for the request of the reader.
+    const history = this.panelHistory(runtime, reset);
     this.panel.post({
       type: 'init',
       state: {
@@ -2246,7 +2311,9 @@ class MiniMaxController {
         // The project of the panel: the list of the chats belongs to it.
         workspaceRoot: this.workspaceRoot(),
         workspaceLabel: projectLabel(this.workspaceRoot()),
-        messages: runtime ? [...runtime.uiMessages] : [],
+        messages: history.messages,
+        // How many messages of the chat wait in the host.
+        olderMessages: history.olderMessages,
         model: settings.model,
         models: MODELS,
         effort: settings.effort,

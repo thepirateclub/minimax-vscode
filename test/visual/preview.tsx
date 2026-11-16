@@ -53,6 +53,7 @@ const STATE: UiState = {
         { id: 'q2', text: 'Then add the tests for it', state: 'waiting' as const }
       ]
     : [],
+  olderMessages: 0,
   messages: params.get('empty') === '1' ? [] : MESSAGES,
   model: MODELS[0]!.id,
   models: MODELS,

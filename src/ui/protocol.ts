@@ -183,6 +183,10 @@ export interface UiState {
   goal?: GoalState;
   // The queue of the messages of the chat.
   queue: UiQueuedMessage[];
+  // How many messages of the chat the panel does not hold yet. The host
+  // keeps them, the panel asks for them when the reader wants to see the
+  // older part of the chat.
+  olderMessages: number;
 }
 
 export type ExtToWeb =
@@ -222,7 +226,10 @@ export type ExtToWeb =
   // The queue of the messages of the chat.
   | { type: 'queue'; items: UiQueuedMessage[] }
   | { type: 'restore_input'; text: string; mentions: string[]; selections: UiSelection[] }
-  | { type: 'session_loaded'; messages: UiMessage[] }
+  | { type: 'session_loaded'; messages: UiMessage[]; olderMessages?: number }
+  // The older messages of the chat come on demand: a big history in one
+  // message is slow to transfer and to draw.
+  | { type: 'history_older'; messages: UiMessage[]; olderMessages: number }
   | { type: 'sessions'; sessions: UiSessionSummary[] }
   | { type: 'models'; models: ModelInfo[]; selected: string }
   | { type: 'files'; requestId: string; files: UiFile[] }
@@ -245,6 +252,8 @@ export type WebToExt =
   | { type: 'send_all_queued' }
   // A message leaves the queue.
   | { type: 'remove_queued'; id: string }
+  // The panel asks for the older messages of the chat.
+  | { type: 'load_older' }
   | { type: 'stop' }
   | { type: 'retry'; id: string }
   | { type: 'rewind'; id: string }

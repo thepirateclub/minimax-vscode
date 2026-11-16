@@ -1347,6 +1347,45 @@ describe('extension activation', () => {
     });
   });
 
+  it('gives the older part of the chat to the panel on demand', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.secrets.set('minimax.apiKey', 'test-key');
+    const messages = Array.from({ length: 200 }, (_, index) => ({
+      id: 'm' + index,
+      role: 'assistant' as const,
+      text: 'line ' + index
+    }));
+    state.globalState.set('minimax.sessions', [
+      {
+        id: 's-long',
+        title: 'Long chat',
+        updatedAt: 5,
+        messages: [],
+        uiMessages: messages,
+        usage: []
+      }
+    ]);
+    state.globalState.set('minimax.activeSession', 's-long');
+    await boot();
+
+    const init = ofType('init')[0]!;
+    // The panel gets the tail of the chat, the older part waits in the
+    // host: a big chat in one message is slow to transfer and to draw.
+    expect(init.state.messages).toHaveLength(120);
+    expect(init.state.olderMessages).toBe(80);
+
+    state.posted.length = 0;
+    state.receive?.({ type: 'load_older' });
+    await vi.waitFor(() => {
+      expect(ofType('history_older').length).toBe(1);
+    });
+    const page = ofType('history_older')[0]!;
+    expect(page.messages).toHaveLength(80);
+    expect(page.messages[0]?.id).toBe('m0');
+    expect(page.olderMessages).toBe(0);
+  });
+
   it('never keeps an active session that the state of the host does not know', async () => {
     const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
     state.config.set('root', root);
