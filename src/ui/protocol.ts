@@ -94,6 +94,25 @@ export interface UiRetryStatus {
   delayMs: number;
 }
 
+// The state of a message in the queue: it waits, it goes out, it is sent
+// or it failed.
+export type QueueState = 'waiting' | 'sending' | 'done' | 'error';
+
+export interface UiQueuedMessage {
+  id: string;
+  text: string;
+  state: QueueState;
+  // The reason of the failure, the reader sees it on the item.
+  error?: string;
+}
+
+// The message of the queue in the host: the mentions and the selections are
+// needed to build the prompt when the message goes out.
+export interface QueuedMessage extends UiQueuedMessage {
+  mentions: string[];
+  selections: UiSelection[];
+}
+
 export interface UiSettingsValues {
   baseUrl: BaseUrlPreset;
   customBaseUrl: string;
@@ -162,6 +181,8 @@ export interface UiState {
   todos: TodoItem[];
   // The goal of the session.
   goal?: GoalState;
+  // The queue of the messages of the chat.
+  queue: UiQueuedMessage[];
 }
 
 export type ExtToWeb =
@@ -198,6 +219,8 @@ export type ExtToWeb =
   | { type: 'retry_status'; status: UiRetryStatus | undefined }
   // The answer broke in the middle, the piece goes away.
   | { type: 'assistant_reset' }
+  // The queue of the messages of the chat.
+  | { type: 'queue'; items: UiQueuedMessage[] }
   | { type: 'restore_input'; text: string; mentions: string[]; selections: UiSelection[] }
   | { type: 'session_loaded'; messages: UiMessage[] }
   | { type: 'sessions'; sessions: UiSessionSummary[] }
@@ -216,6 +239,12 @@ export type ExtToWeb =
 export type WebToExt =
   | { type: 'ready' }
   | { type: 'send'; text: string; mentions: string[]; selections: UiSelection[] }
+  // One message of the queue goes out now.
+  | { type: 'send_queued'; id: string }
+  // Every message of the queue goes out, the failed ones are tried again.
+  | { type: 'send_all_queued' }
+  // A message leaves the queue.
+  | { type: 'remove_queued'; id: string }
   | { type: 'stop' }
   | { type: 'retry'; id: string }
   | { type: 'rewind'; id: string }

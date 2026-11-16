@@ -3,6 +3,7 @@ import type { GoalState, TodoItem } from '../../agent/state';
 import type {
   ExtToWeb,
   UiMessage,
+  UiQueuedMessage,
   UiSelection,
   UiSettings,
   UiState,
@@ -54,7 +55,8 @@ const EMPTY_STATE: UiState = {
   collapseTools: false,
   collapseCode: false,
   version: '',
-  todos: []
+  todos: [],
+  queue: []
 };
 
 export function App({ vscode }: { vscode: VsCodeApi }) {
@@ -82,6 +84,8 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
   // The connection to MiniMax is lost, the request is repeated. The panel
   // shows the attempt.
   const [retryStatus, setRetryStatus] = useState<UiRetryStatus | undefined>(undefined);
+  // The queue of the messages of the chat.
+  const [queue, setQueue] = useState<UiQueuedMessage[]>([]);
 
   useEffect(() => {
     const onMessage = (event: MessageEvent<ExtToWeb>): void => {
@@ -92,6 +96,7 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
         setMessages(message.state.messages);
         setTodos(message.state.todos);
         setGoal(message.state.goal);
+        setQueue(message.state.queue ?? []);
         return;
       }
       if (message.type === 'user_message') {
@@ -155,6 +160,10 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
       }
       if (message.type === 'retry_status') {
         setRetryStatus(message.status);
+        return;
+      }
+      if (message.type === 'queue') {
+        setQueue(message.items);
         return;
       }
       if (message.type === 'assistant_reset') {
@@ -452,6 +461,10 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
           voice={voice}
           dictation={dictation}
           retryStatus={retryStatus}
+          queue={queue}
+          onSendQueued={(id) => vscode.postMessage({ type: 'send_queued', id })}
+          onSendAllQueued={() => vscode.postMessage({ type: 'send_all_queued' })}
+          onRemoveQueued={(id) => vscode.postMessage({ type: 'remove_queued', id })}
           onVoiceStart={() => vscode.postMessage({ type: 'voice_start' })}
           onVoiceStop={() => vscode.postMessage({ type: 'voice_stop' })}
         />

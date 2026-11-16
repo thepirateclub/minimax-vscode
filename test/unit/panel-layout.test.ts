@@ -7,6 +7,7 @@ import { Header } from '../../src/ui/webview/components/Header';
 import { UsageGraph } from '../../src/ui/webview/components/UsageGraph';
 import { MODELS } from '../../src/config/models';
 import { STRINGS } from '../../src/ui/webview/strings';
+import type { UiQueuedMessage } from '../../src/ui/protocol';
 import type { ReactElement } from 'react';
 
 // The layout of the panel is drawn with css, the markup cannot express it,
@@ -31,7 +32,8 @@ const noop = (): void => undefined;
 function renderComposer(
   busy: boolean,
   goalMode = false,
-  retryStatus?: { attempt: number; total: number; delayMs: number }
+  retryStatus?: { attempt: number; total: number; delayMs: number },
+  queue?: UiQueuedMessage[]
 ): string {
   return renderToStaticMarkup(
     createElement(Composer, {
@@ -59,7 +61,8 @@ function renderComposer(
       onSuggest: noop,
       goalMode,
       onGoalMode: noop,
-      retryStatus
+      retryStatus,
+      queue
     }) as ReactElement
   );
 }
@@ -194,6 +197,26 @@ describe('panel layout', () => {
     expect(markup).toContain('5');
     // Without a lost connection the bar is not there.
     expect(renderComposer(true)).not.toContain('composer-status');
+  });
+
+  it('puts the queue over the field of the request', () => {
+    const markup = renderComposer(true, false, undefined, [
+      { id: 'q1', text: 'a message of the queue', state: 'waiting' }
+    ]);
+    const queueAt = markup.indexOf('queue-bar');
+    const inputAt = markup.indexOf('composer-input-wrap');
+    expect(queueAt).toBeGreaterThan(-1);
+    // The queue stands over the field, the reader sees it at once.
+    expect(queueAt).toBeLessThan(inputAt);
+    expect(markup).toContain('a message of the queue');
+  });
+
+  it('keeps the send button while the agent works', () => {
+    const markup = renderComposer(true);
+    // The turn can be stopped and the next request can be written, it
+    // waits in the queue.
+    expect(markup).toContain('composer-send stop');
+    expect(markup.match(/composer-send/g)?.length ?? 0).toBe(2);
   });
 
   it('stretches the graph but keeps the width of the steps', () => {

@@ -1450,6 +1450,116 @@ input:focus {
   white-space: nowrap;
 }
 
+/* The queue of the messages of the chat. A compact strip over the field
+   of the request: every message has its state. */
+.queue-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+}
+
+.queue-items {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 84px;
+  overflow-y: auto;
+}
+
+.queue-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 2px 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--row-hover);
+  font-size: var(--fs-xs);
+}
+
+.queue-item.queue-error {
+  border-color: var(--err);
+}
+
+.queue-item.queue-done {
+  opacity: 0.6;
+}
+
+.queue-state {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  color: var(--muted);
+}
+
+.queue-item.queue-sending .queue-state {
+  color: var(--accent);
+}
+
+.queue-item.queue-error .queue-state {
+  color: var(--err);
+}
+
+.queue-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.queue-send,
+.queue-remove {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  padding: 2px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.queue-send:hover,
+.queue-remove:hover {
+  color: var(--fg);
+  background: var(--hover);
+}
+
+.queue-send:disabled,
+.queue-remove:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.queue-send-all {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--fg);
+  font-size: var(--fs-xs);
+  cursor: pointer;
+}
+
+.queue-send-all:hover {
+  background: var(--hover);
+}
+
 /* composer */
 .composer {
   position: relative;

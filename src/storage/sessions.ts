@@ -2,7 +2,13 @@ import { MAX_HISTORY_MESSAGES, trimHistory } from '../api/history';
 import type { AnthropicMessage } from '../api/types';
 import type { GoalState, TodoItem } from '../agent/state';
 import type { TurnAnchor } from '../agent/turns';
-import type { UiDiffLine, UiMessage, UiSessionSummary, UiUsageTurn } from '../ui/protocol';
+import type {
+  QueuedMessage,
+  UiDiffLine,
+  UiMessage,
+  UiSessionSummary,
+  UiUsageTurn
+} from '../ui/protocol';
 
 export interface StoredSession {
   id: string;
@@ -21,6 +27,9 @@ export interface StoredSession {
   todos?: TodoItem[];
   // The goal of the session, the user sets it.
   goal?: GoalState;
+  // The queue of the messages of the chat, the reader wrote them while the
+  // agent worked.
+  queue?: QueuedMessage[];
 }
 
 // The state of the host. The type is structural, so the store stays testable
@@ -43,6 +52,8 @@ export const MAX_STORED_PROGRESS_CHARS = MAX_STORED_MESSAGE_CHARS;
 export const MAX_STORED_USAGE_TURNS = 24;
 export const MAX_STORED_TURNS = 50;
 export const MAX_STORED_TODOS = 200;
+// The queue of a chat does not grow forever.
+export const MAX_STORED_QUEUE = 30;
 
 function capText(text: string | undefined): string | undefined {
   if (text === undefined) {
@@ -157,7 +168,8 @@ export function capSession(session: StoredSession): StoredSession {
     usage: session.usage.slice(-MAX_STORED_USAGE_TURNS),
     turns: (session.turns ?? []).slice(-MAX_STORED_TURNS),
     todos: (session.todos ?? []).slice(-MAX_STORED_TODOS),
-    goal: session.goal
+    goal: session.goal,
+    queue: (session.queue ?? []).slice(-MAX_STORED_QUEUE)
   };
 }
 

@@ -71,6 +71,7 @@ import { Recorder } from './voice/recorder';
 import type {
   AgentState,
   ExtToWeb,
+  QueuedMessage,
   UiApproval,
   UiMessage,
   UiSelection,
@@ -111,9 +112,21 @@ interface RuntimeSession {
   // child belongs to the chat of this session, it must not leak into
   // another chat.
   approvedTools: Set<string>;
+  // The messages the reader wrote while the agent worked. They go out one
+  // after another when the turn is over.
+  queue: QueuedMessage[];
+  // The queue waits until the reader asks for it: the user stopped the
+  // turn, the messages stay in the queue.
+  queuePaused: boolean;
+  // The user stopped the turn of this moment.
+  turnStopped: boolean;
+  // The reason of the last failure of the turn.
+  lastError: string | undefined;
 }
 
 const TITLE_LIMIT = 60;
+// How many messages wait in the queue of a chat.
+const MAX_QUEUE_ITEMS = 30;
 // How many actions the spend graph keeps in the header.
 const MAX_USAGE_TURNS = 24;
 
@@ -1010,6 +1023,7 @@ class MiniMaxController {
     }
     if (event.type === 'error') {
       runtime.errorReported = true;
+      runtime.lastError = event.message;
       // A turn that ended with an error has no event `done`, its time is
       // added here, otherwise the limit of the time is evaded by failing
       // turns.
@@ -1022,6 +1036,7 @@ class MiniMaxController {
       }
       if (isAbortMessage(event.message)) {
         // The user stopped the turn, it is not a failure of the server.
+        runtime.turnStopped = true;
         this.postFor(runtime, {
           type: 'notice',
           message: 'The request was stopped.',
@@ -1169,6 +1184,18 @@ class MiniMaxController {
     }
     if (message.type === 'send') {
       await this.handleSend(message.text, message.mentions, message.selections);
+      return;
+    }
+    if (message.type === 'send_queued') {
+      this.sendQueued(message.id);
+      return;
+    }
+    if (message.type === 'send_all_queued') {
+      this.sendAllQueued();
+      return;
+    }
+    if (message.type === 'remove_queued') {
+      this.removeQueued(message.id);
       return;
     }
     if (message.type === 'open_file') {
@@ -1384,12 +1411,24 @@ class MiniMaxController {
       return;
     }
     if (runtime.busy) {
-      this.panel.post({
-        type: 'error',
-        message: 'The agent is busy. Stop the current turn before sending a new request.'
-      });
+      // The agent works, the request waits in the queue. The reader writes
+      // several messages in a row, they go out one after another.
+      this.enqueue(runtime, text, mentions, selections);
       return;
     }
+    // The reader wrote a new request, the queue is not on hold anymore.
+    runtime.queuePaused = false;
+    await this.runTurn(runtime, text, mentions, selections);
+  }
+
+  // One turn of the agent: the request goes out, the answer comes back.
+  private async runTurn(
+    runtime: RuntimeSession,
+    text: string,
+    mentions: string[],
+    selections: UiSelection[],
+    queued?: QueuedMessage
+  ): Promise<void> {
     // The budget of the goal is over, the request does not go out. The user
     // raises the limit and the work continues.
     if (!this.goalBudgetOk(runtime)) {
@@ -1406,15 +1445,27 @@ class MiniMaxController {
       // The request does not go out, it comes back to the input field, the
       // user does not lose it.
       this.panel.post({ type: 'restore_input', text, mentions, selections });
+      if (queued) {
+        queued.state = 'error';
+        queued.error = 'The budget of the goal is exhausted.';
+        this.postQueue(runtime);
+      }
       return;
     }
     const agent = await this.ensureAgent(runtime);
     if (!agent) {
+      if (queued) {
+        queued.state = 'error';
+        queued.error = 'No API key, the request did not go out.';
+        this.postQueue(runtime);
+      }
       return;
     }
 
     runtime.busy = true;
     runtime.errorReported = false;
+    runtime.turnStopped = false;
+    runtime.lastError = undefined;
     // The place of the request in the history of the model, the anchor
     // of the turn takes it when the turn is over.
     let requestPlace = -1;
@@ -1460,9 +1511,140 @@ class MiniMaxController {
         mentions,
         selections
       });
+      if (queued) {
+        if (runtime.turnStopped) {
+          // The user stopped the turn, the message waits for the next
+          // command. The queue is on hold until the reader asks for it.
+          queued.state = 'waiting';
+          queued.error = undefined;
+          runtime.queuePaused = true;
+        } else if (runtime.errorReported) {
+          queued.state = 'error';
+          queued.error = runtime.lastError;
+        } else {
+          queued.state = 'done';
+        }
+        this.postQueue(runtime);
+      }
       this.persist(runtime);
       void this.refreshQuota();
+      // The next message of the queue goes out.
+      void this.pumpQueue(runtime);
     }
+  }
+
+  // One message of the queue goes out now, it goes before the others.
+  private sendQueued(id: string): void {
+    const runtime = this.activeSession();
+    if (!runtime) {
+      return;
+    }
+    const index = runtime.queue.findIndex((item) => item.id === id);
+    if (index === -1) {
+      return;
+    }
+    const item = runtime.queue[index]!;
+    if (item.state === 'sending') {
+      return;
+    }
+    item.state = 'waiting';
+    item.error = undefined;
+    runtime.queue.splice(index, 1);
+    runtime.queue.unshift(item);
+    runtime.queuePaused = false;
+    this.postQueue(runtime);
+    void this.pumpQueue(runtime);
+  }
+
+  // Every message of the queue goes out, the failed ones are tried again.
+  private sendAllQueued(): void {
+    const runtime = this.activeSession();
+    if (!runtime) {
+      return;
+    }
+    runtime.queuePaused = false;
+    for (const item of runtime.queue) {
+      if (item.state === 'error') {
+        item.state = 'waiting';
+        item.error = undefined;
+      }
+    }
+    this.postQueue(runtime);
+    void this.pumpQueue(runtime);
+  }
+
+  // A message leaves the queue. A message that goes out cannot be removed.
+  private removeQueued(id: string): void {
+    const runtime = this.activeSession();
+    if (!runtime) {
+      return;
+    }
+    const index = runtime.queue.findIndex((item) => item.id === id);
+    if (index === -1) {
+      return;
+    }
+    if (runtime.queue[index]!.state === 'sending') {
+      return;
+    }
+    runtime.queue.splice(index, 1);
+    this.postQueue(runtime);
+    this.persist(runtime);
+  }
+
+  // The message waits in the queue of the chat.
+  private enqueue(
+    runtime: RuntimeSession,
+    text: string,
+    mentions: string[],
+    selections: UiSelection[]
+  ): void {
+    runtime.queue.push({
+      id: this.nextId('q'),
+      text,
+      mentions,
+      selections,
+      state: 'waiting'
+    });
+    this.trimQueue(runtime);
+    this.postQueue(runtime);
+    this.persist(runtime);
+  }
+
+  // The queue does not grow forever: the sent messages leave it.
+  private trimQueue(runtime: RuntimeSession): void {
+    while (runtime.queue.length > MAX_QUEUE_ITEMS) {
+      const index = runtime.queue.findIndex((item) => item.state === 'done');
+      if (index === -1) {
+        return;
+      }
+      runtime.queue.splice(index, 1);
+    }
+  }
+
+  private postQueue(runtime: RuntimeSession): void {
+    this.postFor(runtime, {
+      type: 'queue',
+      items: runtime.queue.map((item) => ({
+        id: item.id,
+        text: item.text,
+        state: item.state,
+        error: item.error
+      }))
+    });
+  }
+
+  // The next message of the queue goes out, one after another.
+  private async pumpQueue(runtime: RuntimeSession): Promise<void> {
+    if (runtime.busy || runtime.queuePaused) {
+      return;
+    }
+    const next = runtime.queue.find((item) => item.state === 'waiting');
+    if (!next) {
+      return;
+    }
+    next.state = 'sending';
+    this.postQueue(runtime);
+    await this.runTurn(runtime, next.text, next.mentions, next.selections, next);
   }
 
   // The last message of the step tells how long the step took.
@@ -1860,7 +2042,9 @@ class MiniMaxController {
       usage: runtime.usage,
       turns: runtime.turns,
       todos: runtime.todos,
-      goal: runtime.goal
+      goal: runtime.goal,
+      // The queue of the chat, it survives the reload of the panel.
+      queue: runtime.queue.map((item) => ({ ...item }))
     };
     // A full state of the host must not break the turn, the chat stays in
     // memory and the failure goes to the log.
@@ -1892,7 +2076,8 @@ class MiniMaxController {
       usage: saved?.usage ?? [],
       turns: saved?.turns ?? [],
       todos: runtime.todos,
-      goal: runtime.goal
+      goal: runtime.goal,
+      queue: saved?.queue ?? runtime.queue.map((item) => ({ ...item }))
     };
     void this.store.save(stored).then((ok) => {
       if (!ok) {
@@ -1932,7 +2117,15 @@ class MiniMaxController {
         ? { ...stored.goal, used: { ...stored.goal.used } }
         : undefined,
       turnStartedAt: 0,
-      approvedTools: new Set()
+      approvedTools: new Set(),
+      // A message that was going out when the panel closed waits again.
+      queue: (stored.queue ?? []).map((item) => ({
+        ...item,
+        state: item.state === 'sending' ? 'waiting' : item.state
+      })),
+      queuePaused: false,
+      turnStopped: false,
+      lastError: undefined
     };
   }
 
@@ -1958,7 +2151,11 @@ class MiniMaxController {
       todos: [],
       goal: undefined,
       turnStartedAt: 0,
-      approvedTools: new Set()
+      approvedTools: new Set(),
+      queue: [],
+      queuePaused: false,
+      turnStopped: false,
+      lastError: undefined
     });
     this.activeSessionId = id;
     // The id of the new chat goes to the state of the host together with the
@@ -2058,6 +2255,15 @@ class MiniMaxController {
         usage: runtime ? [...runtime.usage] : [],
         todos: runtime ? [...runtime.todos] : [],
         goal: runtime?.goal,
+        // The queue of the chat survives the reload of the panel.
+        queue: runtime
+          ? runtime.queue.map((item) => ({
+              id: item.id,
+              text: item.text,
+              state: item.state,
+              error: item.error
+            }))
+          : [],
         hasApiKey: Boolean(key),
         theme: themeKind(),
         fontSize: settings.fontSize,

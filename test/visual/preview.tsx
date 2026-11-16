@@ -46,6 +46,13 @@ const STATE: UiState = {
   // The project of the stand: the list of the chats belongs to it.
   workspaceRoot: 'C:/projects/minimax-vscode',
   workspaceLabel: 'minimax-vscode',
+  // The queue of the chat, the stand shows it above the field.
+  queue: params.get('queue') === '1'
+    ? [
+        { id: 'q1', text: 'Read the parser and tell me what it does', state: 'done' as const },
+        { id: 'q2', text: 'Then add the tests for it', state: 'waiting' as const }
+      ]
+    : [],
   messages: params.get('empty') === '1' ? [] : MESSAGES,
   model: MODELS[0]!.id,
   models: MODELS,

@@ -2,7 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent, MouseEvent } from 'react';
 import type { EffortLevel } from '../../../api/types';
 import type { AgentMode, ModelInfo } from '../../../config/models';
-import type { UiRetryStatus, UiSelection, UiSuggestion, VoiceState } from '../../protocol';
+import type {
+  UiQueuedMessage,
+  UiRetryStatus,
+  UiSelection,
+  UiSuggestion,
+  VoiceState
+} from '../../protocol';
 import { dictationPiece } from '../dictation';
 import {
   IconAttach,
@@ -19,8 +25,8 @@ import {
 } from '../icons';
 import { splitRestore } from '../restoreInput';
 import { STRINGS } from '../strings';
-import { parseSlashCommand } from '../slashCommand';
 import { IconSelect, type IconSelectOption } from './IconSelect';
+import { QueueBar } from './QueueBar';
 
 export interface InsertRequest {
   paths: string[];
@@ -292,7 +298,11 @@ export function Composer({
   onVoiceStop,
   goalMode = false,
   onGoalMode,
-  retryStatus
+  retryStatus,
+  queue = [],
+  onSendQueued,
+  onSendAllQueued,
+  onRemoveQueued
 }: {
   busy: boolean;
   selections: UiSelection[];
@@ -326,6 +336,11 @@ export function Composer({
   onGoalMode?: (on: boolean) => void;
   // The connection to MiniMax is lost, the request is repeated.
   retryStatus?: UiRetryStatus;
+  // The queue of the messages of the chat.
+  queue?: UiQueuedMessage[];
+  onSendQueued?: (id: string) => void;
+  onSendAllQueued?: () => void;
+  onRemoveQueued?: (id: string) => void;
 }) {
   const currentModel = models.find((item) => item.id === model);
   const modelOptions: IconSelectOption<string>[] = models.map((item) => ({
@@ -473,11 +488,9 @@ export function Composer({
     if (content.text.trim().length === 0) {
       return;
     }
-    // A running turn holds the requests, a command of the panel does not
-    // reach the model and goes through: the goal is set while the agent works.
-    if (busy && !goalMode && !parseSlashCommand(content.text)) {
-      return;
-    }
+    // A running turn does not hold the requests: the message waits in the
+    // queue of the chat and goes out when the turn is over. A command of the
+    // panel does not reach the model and goes through right away.
     onSend(content.text.trim(), content.mentions, selections);
   };
 
@@ -583,6 +596,12 @@ export function Composer({
           ))}
         </div>
       ) : null}
+      <QueueBar
+        items={queue}
+        onSend={(id) => onSendQueued?.(id)}
+        onSendAll={() => onSendAllQueued?.()}
+        onRemove={(id) => onRemoveQueued?.(id)}
+      />
       {retryStatus ? (
         <div className="composer-status" role="status" aria-live="polite">
           <IconRefresh />
@@ -696,6 +715,8 @@ export function Composer({
               <IconMic />
             </button>
             {busy ? (
+              // The agent works: the turn can be stopped and the next
+              // request can be written, it waits in the queue.
               <button
                 className="composer-send stop"
                 title={STRINGS.stop}
@@ -705,17 +726,16 @@ export function Composer({
               >
                 <IconStop />
               </button>
-            ) : (
-              <button
-                className="composer-send"
-                title={STRINGS.send}
-                aria-label={STRINGS.send}
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={submit}
-              >
-                <IconSend />
-              </button>
-            )}
+            ) : null}
+            <button
+              className="composer-send"
+              title={STRINGS.send}
+              aria-label={STRINGS.send}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={submit}
+            >
+              <IconSend />
+            </button>
           </div>
         </div>
       </div>

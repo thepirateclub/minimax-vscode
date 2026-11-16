@@ -42,6 +42,9 @@ const state = vi.hoisted(() => ({
   themeListener: undefined as undefined | (() => void),
   opened: [] as string[],
   shown: [] as string[],
+  // The answer of the server waits until the test lets it come. The
+  // response 'HOLD' holds the turn of the model.
+  holdResponse: undefined as undefined | (() => void),
   quickPick: undefined as undefined | { title: string; items: unknown[] }
 }));
 
@@ -409,6 +412,7 @@ describe('extension activation', () => {
     state.themeListener = undefined;
     state.opened.length = 0;
     state.shown.length = 0;
+    state.holdResponse = undefined;
     vi.stubGlobal(
       'fetch',
       vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
@@ -432,6 +436,16 @@ describe('extension activation', () => {
           });
         }
         const payload = state.responses.shift() ?? TEXT_SSE;
+        if (payload === 'HOLD') {
+          // The turn of the model waits for the test.
+          await new Promise<void>((resolve) => {
+            state.holdResponse = resolve;
+          });
+          return new Response(TEXT_SSE, {
+            status: 200,
+            headers: { 'content-type': 'text/event-stream' }
+          });
+        }
         return new Response(payload, {
           status: 200,
           headers: { 'content-type': 'text/event-stream' }
@@ -1115,6 +1129,111 @@ describe('extension activation', () => {
     const init = ofType('init')[0]!;
     expect(init.state.activeSessionId).toBe(chatA);
     expect(init.state.messages[0]?.text).toBe('question of A');
+  });
+
+  it('keeps the message in the queue while the agent works', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.secrets.set('minimax.apiKey', 'test-key');
+    state.responses.push('HOLD', TEXT_SSE);
+    await boot();
+
+    state.receive?.({ type: 'send', text: 'first question', mentions: [], selections: [] });
+    await vi.waitFor(() => {
+      expect(ofType('user_message').length).toBe(1);
+    });
+
+    // The agent works, the next message waits in the queue.
+    state.receive?.({ type: 'send', text: 'second question', mentions: [], selections: [] });
+    await vi.waitFor(() => {
+      expect(ofType('queue').length).toBeGreaterThan(0);
+    });
+    const queue = ofType('queue').pop()!;
+    expect(queue.items).toHaveLength(1);
+    expect(queue.items[0]?.text).toBe('second question');
+    expect(queue.items[0]?.state).toBe('waiting');
+    // The request of the queue did not go out yet.
+    expect(ofType('user_message')).toHaveLength(1);
+
+    // The turn is over, the message of the queue goes out.
+    await vi.waitFor(() => {
+      expect(state.holdResponse).toBeDefined();
+    });
+    state.holdResponse?.();
+    await vi.waitFor(() => {
+      expect(ofType('user_message').length).toBe(2);
+    });
+    expect(ofType('user_message')[1]?.text).toBe('second question');
+    await vi.waitFor(() => {
+      const last = ofType('queue').pop()!;
+      expect(last.items[0]?.state).toBe('done');
+    });
+  });
+
+  it('removes a message from the queue', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.secrets.set('minimax.apiKey', 'test-key');
+    state.responses.push('HOLD');
+    await boot();
+
+    state.receive?.({ type: 'send', text: 'first question', mentions: [], selections: [] });
+    await vi.waitFor(() => {
+      expect(ofType('user_message').length).toBe(1);
+    });
+    state.receive?.({ type: 'send', text: 'second question', mentions: [], selections: [] });
+    await vi.waitFor(() => {
+      expect(ofType('queue').length).toBeGreaterThan(0);
+    });
+    const item = ofType('queue').pop()!.items[0]!;
+
+    state.receive?.({ type: 'remove_queued', id: item.id });
+    await vi.waitFor(() => {
+      expect(ofType('queue').pop()!.items).toHaveLength(0);
+    });
+
+    // The message of the queue does not go out.
+    await vi.waitFor(() => {
+      expect(state.holdResponse).toBeDefined();
+    });
+    state.holdResponse?.();
+    await vi.waitFor(() => {
+      expect(ofType('status').pop()?.state).toBe('idle');
+    });
+    expect(ofType('user_message')).toHaveLength(1);
+  });
+
+  it('sends every message of the queue', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.secrets.set('minimax.apiKey', 'test-key');
+    state.responses.push('HOLD', TEXT_SSE, TEXT_SSE);
+    await boot();
+
+    state.receive?.({ type: 'send', text: 'first question', mentions: [], selections: [] });
+    await vi.waitFor(() => {
+      expect(ofType('user_message').length).toBe(1);
+    });
+    state.receive?.({ type: 'send', text: 'second question', mentions: [], selections: [] });
+    state.receive?.({ type: 'send', text: 'third question', mentions: [], selections: [] });
+    await vi.waitFor(() => {
+      expect(ofType('queue').pop()!.items).toHaveLength(2);
+    });
+
+    state.receive?.({ type: 'send_all_queued' });
+    await vi.waitFor(() => {
+      expect(state.holdResponse).toBeDefined();
+    });
+    state.holdResponse?.();
+    // Both messages of the queue go out, one after another.
+    await vi.waitFor(() => {
+      expect(ofType('user_message').length).toBe(3);
+    });
+    expect(ofType('user_message').map((message) => message.text)).toEqual([
+      'first question',
+      'second question',
+      'third question'
+    ]);
   });
 
   it('tells the panel which version is running', async () => {
