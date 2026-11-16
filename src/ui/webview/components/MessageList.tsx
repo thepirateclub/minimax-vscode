@@ -14,7 +14,7 @@ import { ApprovalCard } from './ApprovalCard';
 import { ThinkingBlock } from './ThinkingBlock';
 import { ToolCard } from './ToolCard';
 import { ToolSteps } from './ToolSteps';
-import { groupToolSteps } from '../toolSteps';
+import { groupToolSteps, type FeedItem } from '../toolSteps';
 
 // The panel keeps the dom small, the older messages are loaded on demand.
 const PAGE = 120;
@@ -82,6 +82,7 @@ const MessageRow = memo(function MessageRow({
   collapseTools,
   collapseCode,
   canRetry,
+  repeatedThinking,
   onApprove,
   onReject,
   onOpenFile,
@@ -96,6 +97,8 @@ const MessageRow = memo(function MessageRow({
   collapseCode: boolean;
   // The turn of the request failed, the request can be repeated.
   canRetry: boolean;
+  // The reasoning follows another reasoning, the row stands apart from it.
+  repeatedThinking: boolean;
   onApprove: (id: string, allowForSession: boolean) => void;
   onReject: (id: string) => void;
   onOpenFile: (path: string, line?: number) => void;
@@ -145,7 +148,12 @@ const MessageRow = memo(function MessageRow({
       ) : null}
       {message.role === 'assistant' ? (
         <div className="assistant-body">
-          {message.thinking ? <ThinkingBlock text={message.thinking} /> : null}
+          {message.thinking ? (
+            <ThinkingBlock
+              text={message.thinking}
+              repeated={repeatedThinking}
+            />
+          ) : null}
           {message.text ? (
             <div
               className="markdown"
@@ -182,6 +190,19 @@ const MessageRow = memo(function MessageRow({
     </div>
   );
 });
+
+// The reasoning follows another reasoning without anything between them:
+// the row stands apart from the row before it.
+function isRepeatedThinking(previous: FeedItem | undefined): boolean {
+  if (!previous || previous.kind !== 'message') {
+    return false;
+  }
+  const message = previous.message;
+  if (message.role !== 'assistant' || !message.thinking) {
+    return false;
+  }
+  return (message.text?.length ?? 0) === 0;
+}
 
 export function MessageList({
   messages,
@@ -330,6 +351,9 @@ export function MessageList({
   // The messages the panel does not draw yet: the ones it holds and the
   // ones the host keeps.
   const pendingCount = hidden + olderMessages;
+  // The feed of the chat, the steps of the actions and the messages of the
+  // model in the order they came.
+  const feed = groupToolSteps(shown);
 
   return (
     <div className="messages-wrap">
@@ -339,7 +363,7 @@ export function MessageList({
             {STRINGS.showEarlier} ({pendingCount})
           </button>
         ) : null}
-        {groupToolSteps(shown).map((item) =>
+        {feed.map((item, index) =>
           item.kind === 'steps' ? (
             // The setting hides the steps of the tools, the reader then sees
             // the text of the model only.
@@ -359,6 +383,7 @@ export function MessageList({
               collapseTools={collapseTools}
               collapseCode={collapseCode}
               canRetry={failed.has(item.message.id)}
+              repeatedThinking={isRepeatedThinking(feed[index - 1])}
               onApprove={onApprove}
               onReject={onReject}
               onOpenFile={onOpenFile}

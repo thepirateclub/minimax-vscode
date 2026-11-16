@@ -10,7 +10,7 @@ import { MODELS } from '../../src/config/models';
 // panel and never falls behind the build.
 import manifest from '../../package.json';
 import type { ExtToWeb, UiSettings, UiState } from '../../src/ui/protocol';
-import { MESSAGES, USAGE, sessions } from './fixture';
+import { MESSAGES, SECTIONS, SECTIONS_STEPS, USAGE, sessions } from './fixture';
 import dark from './themes/dark.json';
 import light from './themes/light.json';
 
@@ -54,13 +54,25 @@ const STATE: UiState = {
       ]
     : [],
   olderMessages: 0,
-  messages: params.get('empty') === '1' ? [] : MESSAGES,
+  // ?sections=1 shows the chat with the folding sections: the heads of the
+  // sections have to stand on one grid. ?steps=1 shows the steps of the work:
+  // the group of the actions ends at the thought of the model.
+  messages:
+    params.get('empty') === '1'
+      ? []
+      : params.get('sections') === '1'
+        ? SECTIONS
+        : params.get('steps') === '1'
+          ? SECTIONS_STEPS
+          : MESSAGES,
   model: MODELS[0]!.id,
   models: MODELS,
   effort: 'max',
   mode: 'code',
   thinking: false,
-  state: busy ? 'streaming' : 'idle',
+  // The chat of the steps of the work holds a running action, the panel
+  // works and the status over the field stands.
+  state: busy || params.get('steps') === '1' ? 'streaming' : 'idle',
   tokens: 184_320,
   usage: USAGE,
   hasApiKey: params.get('nokey') !== '1',

@@ -20,16 +20,16 @@ export function ToolSteps({
   return (
     <div className={'tool-steps' + (failed ? ' tool-steps-failed' : '')}>
       <button
-        className="tool-steps-head"
+        className="section-head tool-steps-head"
         aria-expanded={open}
         onClick={() => setOpen(!open)}
         title={STRINGS.toolStepsOpen}
       >
         <Chevron open={open} />
-        <span className="tool-steps-icon">
+        <span className="section-icon tool-steps-icon">
           <IconList />
         </span>
-        <span className="tool-steps-title">{STRINGS.toolSteps}</span>
+        <span className="section-title tool-steps-title">{STRINGS.toolSteps}</span>
         <span className="tool-steps-count">{step.tools.length}</span>
       </button>
       {open ? (

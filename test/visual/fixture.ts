@@ -161,6 +161,80 @@ export const MESSAGES: UiMessage[] = [
   }
 ];
 
+
+// The chat of the folding sections: an answer, a step of the actions and three
+// turns of the reasoning one after another. The stand shows it under
+// ?sections=1, it is the case where the heads of the sections drifted apart.
+export const SECTIONS: UiMessage[] = [
+  { id: 's-u1', role: 'user', text: 'Перенеси хранилище на SQLite и проверь, как устроен сервер.' },
+  {
+    id: 's-a1',
+    role: 'assistant',
+    text: 'Принято: v1 остаётся рабочей веткой, main не трогаю. Теперь перевожу хранилище на SQLite.'
+  },
+  ...Array.from({ length: 11 }, (_, i) => ({
+    id: 's-t' + i,
+    role: 'tool' as const,
+    tool: {
+      id: 's-t' + i,
+      name: 'read_file',
+      input: { path: 'src/storage/sessions.ts' },
+      content: 'export function read(): Session[] { return []; }',
+      durationMs: 4
+    }
+  })),
+  { id: 's-th1', role: 'assistant', thinking: 'First turn of the reasoning.' },
+  { id: 's-th2', role: 'assistant', thinking: 'Second turn of the reasoning.' },
+  { id: 's-th3', role: 'assistant', thinking: 'Third turn of the reasoning.' }
+];
+
+// The chat of the steps of the work: actions, a thought, actions again.
+// The stand shows it under ?steps=1, the group of the actions has to end at
+// the thought of the model.
+export const SECTIONS_STEPS: UiMessage[] = [
+  { id: 'w-u1', role: 'user', text: 'Перенеси хранилище на SQLite и проверь, как устроен сервер.' },
+  {
+    id: 'w-a1',
+    role: 'assistant',
+    text: 'Принято: v1 остаётся рабочей веткой, main не трогаю. Сначала посмотрю, как устроен сервер.'
+  },
+  ...Array.from({ length: 3 }, (_, i) => ({
+    id: 'w-t' + i,
+    role: 'tool' as const,
+    tool: {
+      id: 'w-t' + i,
+      name: 'read_file',
+      input: { path: 'src/storage/sessions.ts' },
+      content: 'export function read(): Session[] { return []; }',
+      durationMs: 4
+    }
+  })),
+  { id: 'w-th1', role: 'assistant', thinking: 'The server keeps the chats in the state of the editor.' },
+  ...Array.from({ length: 2 }, (_, i) => ({
+    id: 'w-u' + i,
+    role: 'tool' as const,
+    tool: {
+      id: 'w-u' + i,
+      name: 'search_code',
+      input: { query: 'sessions' },
+      content: 'src/storage/sessions.ts:12',
+      durationMs: 18
+    }
+  })),
+  {
+    id: 'w-run',
+    role: 'tool',
+    tool: {
+      id: 'w-run',
+      name: 'git_diff',
+      input: { staged: false },
+      content: 'diff --git a/src/storage/sessions.ts b/src/storage/sessions.ts',
+      running: true
+    }
+  },
+  { id: 'w-th2', role: 'assistant', thinking: 'The change touches the storage of the chats.' }
+];
+
 export function sessions(now: number): UiSessionSummary[] {
   return [
     { id: 's1', title: 'Rounding of the token counter', updatedAt: now },

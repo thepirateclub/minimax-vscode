@@ -9,6 +9,7 @@ import { MODELS } from '../../src/config/models';
 import { STRINGS } from '../../src/ui/webview/strings';
 import type { UiQueuedMessage } from '../../src/ui/protocol';
 import type { ReactElement } from 'react';
+import type { ActiveAction } from '../../src/ui/webview/activityStatus';
 
 // The layout of the panel is drawn with css, the markup cannot express it,
 // so the tests read the rules of the stylesheet.
@@ -33,7 +34,8 @@ function renderComposer(
   busy: boolean,
   goalMode = false,
   retryStatus?: { attempt: number; total: number; delayMs: number },
-  queue?: UiQueuedMessage[]
+  queue?: UiQueuedMessage[],
+  action?: ActiveAction
 ): string {
   return renderToStaticMarkup(
     createElement(Composer, {
@@ -62,7 +64,8 @@ function renderComposer(
       goalMode,
       onGoalMode: noop,
       retryStatus,
-      queue
+      queue,
+      action
     }) as ReactElement
   );
 }
@@ -233,6 +236,47 @@ describe('panel layout', () => {
     const height = /min-height:\s*(\d+)px/.exec(style);
     expect(height).not.toBeNull();
     expect(Number(height?.[1] ?? 0)).toBeGreaterThanOrEqual(64);
+  });
+
+  it('puts the heads of the folding sections on one grid', () => {
+    // The chevron, the icon, the title and the counter of every section of
+    // the chat stand on one grid, the rows of the panel drifted apart
+    // before: the icon of the reasoning stood 12 pixels left of the icon of
+    // the actions and the counter hung in the margin.
+    const head = rule('.section-head');
+    expect(head).toMatch(/display:\s*grid/);
+    expect(head).toMatch(/grid-template-columns:\s*14px 14px minmax\(0, 1fr\) auto/);
+    expect(head).toMatch(/column-gap:\s*6px/);
+    // The words of the head and the counter stand on one baseline.
+    expect(rule('.section-title')).toMatch(/align-self:\s*baseline/);
+    expect(rule('.tool-steps-count')).toMatch(/align-self:\s*baseline/);
+    // The chevron and the icon stand in the middle of the row.
+    expect(rule('.section-head .chevron')).toMatch(/align-self:\s*center/);
+    // The group of the actions does not hang in the margin of the panel.
+    expect(rule('.tool-steps')).toMatch(/margin:\s*2px 0 0/);
+  });
+
+  it('keeps the two thoughts in a row apart', () => {
+    // Two thoughts in a row are two steps of the reasoning, a thin line
+    // between them keeps them from melting into one block.
+    expect(rule('.thinking-repeated')).toMatch(/border-top:\s*1px solid var\(--border\)/);
+  });
+
+  it('shows the action of the agent over the field of the request', () => {
+    const markup = renderComposer(true, false, undefined, undefined, {
+      name: 'git_diff',
+      detail: 'shows the changes',
+      target: ''
+    });
+    expect(markup).toContain('composer-activity');
+    expect(markup).toContain('git_diff');
+    expect(markup).toContain('shows the changes');
+    // The row stands over the field, the reader sees it at once.
+    expect(markup.indexOf('composer-activity')).toBeLessThan(
+      markup.indexOf('composer-input-wrap')
+    );
+    // Without an action the row is not there at all.
+    expect(renderComposer(true)).not.toContain('composer-activity');
   });
 
   it('draws one column per action of the session', () => {
