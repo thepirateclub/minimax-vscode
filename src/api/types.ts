@@ -83,6 +83,9 @@ export type StreamEvent =
   | { type: 'text_delta'; text: string }
   | { type: 'tool_use_start'; id: string; name: string }
   | { type: 'tool_use_delta'; id: string; partialJson: string }
+  // The server failed in the middle of the answer. The request is repeated,
+  // the piece that came goes away.
+  | { type: 'stream_error'; message: string }
   | {
       type: 'message_stop';
       stopReason: StopReason;

@@ -87,6 +87,7 @@ const SETTINGS: UiSettings = {
   mode: 'code',
   thinking: false,
   maxIterations: 25,
+  maxRetries: 5,
   fontSize: 13,
   historyMaxMessages: 200,
   contextThreshold: 50,

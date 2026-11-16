@@ -20,6 +20,11 @@ export type AgentEvent =
   | { type: 'assistant_start' }
   | { type: 'assistant_text'; text: string }
   | { type: 'assistant_thinking'; text: string }
+  // The request runs again from the start: the piece of the broken answer
+  // goes away, the new one takes its place.
+  | { type: 'assistant_reset' }
+  // The connection to MiniMax is lost, the request is repeated.
+  | { type: 'retrying'; attempt: number; total: number; delayMs: number }
   | { type: 'tool_start'; id: string; name: string; input: Record<string, unknown> }
   | {
       type: 'tool_end';
@@ -53,6 +58,12 @@ export interface AgentOptions {
   model: string;
   maxTokens: number;
   maxIterations: number;
+  // How many times a request is repeated after the loss of the connection.
+  // Zero turns the repeats off.
+  maxRetries?: number;
+  // The first pause between the attempts. The pause grows from it. The
+  // tests use a small base, a real turn waits a second.
+  retryBaseDelayMs?: number;
   effort?: EffortLevel;
   thinking?: 'adaptive';
   mode: AgentMode;
@@ -71,10 +82,15 @@ export interface AgentOptions {
 }
 
 const MAX_IDENTICAL_CALLS = 3;
-const RETRY_DELAYS_MS = [1000, 4000];
+// How many times a request is repeated when the connection is lost.
+export const DEFAULT_MAX_RETRIES = 5;
+const RETRY_BASE_DELAY_MS = 1000;
+const RETRY_MAX_DELAY_MS = 30_000;
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+// The delay grows with every attempt: a second, two, four, eight. The
+// server needs time, a fast second attempt hits the same overload.
+export function retryDelay(attempt: number, baseMs = RETRY_BASE_DELAY_MS): number {
+  return Math.min(baseMs * 2 ** Math.max(0, attempt), RETRY_MAX_DELAY_MS);
 }
 
 function signatureOf(name: string, input: Record<string, unknown>): string {
@@ -362,6 +378,8 @@ export class Agent {
     stopReason: StopReason;
     usage: Usage;
   }> {
+    const maxRetries = Math.max(0, this.options.maxRetries ?? DEFAULT_MAX_RETRIES);
+    const baseDelay = this.options.retryBaseDelayMs ?? RETRY_BASE_DELAY_MS;
     let attempt = 0;
     for (;;) {
       let emitted = false;
@@ -415,24 +433,49 @@ export class Agent {
         const retryable = error instanceof MiniMaxApiError && error.retryable;
         // A request that the user stopped is not a failure of the server,
         // a retry would wait and fail again.
-        if (
-          this.controller.signal.aborted ||
-          !retryable ||
-          emitted ||
-          attempt >= RETRY_DELAYS_MS.length
-        ) {
+        if (this.controller.signal.aborted || !retryable || attempt >= maxRetries) {
           const message = error instanceof Error ? error.message : String(error);
           this.options.onEvent({ type: 'error', message });
           throw error;
         }
-        const delay = RETRY_DELAYS_MS[attempt]!;
+        const delay = retryDelay(attempt, baseDelay);
         attempt += 1;
+        if (emitted) {
+          // The answer broke in the middle: the piece that came is not the
+          // answer, the whole request runs again.
+          this.options.onEvent({ type: 'assistant_reset' });
+        }
+        this.options.onEvent({
+          type: 'retrying',
+          attempt,
+          total: maxRetries,
+          delayMs: delay
+        });
         this.options.logger.info(
           'retrying MiniMax request in ' + delay + 'ms: ' + error.message
         );
-        await sleep(delay);
+        await this.waitBeforeRetry(delay);
       }
     }
+  }
+
+  // The pause between the attempts ends at once when the user stops the
+  // turn, the panel must not wait for the delay.
+  private async waitBeforeRetry(ms: number): Promise<void> {
+    if (this.controller.signal.aborted) {
+      return;
+    }
+    await new Promise<void>((resolve) => {
+      const timer = setTimeout(() => {
+        this.controller.signal.removeEventListener('abort', onAbort);
+        resolve();
+      }, ms);
+      const onAbort = (): void => {
+        clearTimeout(timer);
+        resolve();
+      };
+      this.controller.signal.addEventListener('abort', onAbort, { once: true });
+    });
   }
 
   private handleEvent(event: StreamEvent): void {

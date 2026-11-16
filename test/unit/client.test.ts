@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { HttpMiniMaxClient } from '../../src/api/client';
+import { MiniMaxApiError } from '../../src/api/errors';
 import type { ChatRequest, StreamEvent } from '../../src/api/types';
 
 const REQUEST: ChatRequest = {
@@ -116,5 +117,39 @@ describe('the client of MiniMax', () => {
     // The error of the stream reaches the caller, the cancel of the reader
     // does not replace it.
     await expect(read()).rejects.toThrow('the connection broke');
+  });
+
+  it('reports a stream that ended before the answer ended', async () => {
+    const body = bodyOf([BLOCK_START, TEXT_FIRST]);
+    const client = clientOf(body);
+    const read = async (): Promise<void> => {
+      for await (const event of client.stream(REQUEST)) {
+        void event;
+      }
+    };
+    // The stream ended without the event of the server. An empty answer
+    // would be a lie, the request goes out again.
+    const failure = await read().catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(MiniMaxApiError);
+    expect((failure as MiniMaxApiError).retryable).toBe(true);
+    expect((failure as Error).message).toContain(
+      'The connection to MiniMax was closed before the answer ended.'
+    );
+  });
+
+  it('reports the error of the server in the middle of the answer', async () => {
+    const errorEvent =
+      'event: error\n' + 'data: {"type":"error","error":{"message":"overloaded"}}\n\n';
+    const body = bodyOf([BLOCK_START, TEXT_FIRST, errorEvent]);
+    const client = clientOf(body);
+    const read = async (): Promise<void> => {
+      for await (const event of client.stream(REQUEST)) {
+        void event;
+      }
+    };
+    const failure = await read().catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(MiniMaxApiError);
+    expect((failure as MiniMaxApiError).retryable).toBe(true);
+    expect((failure as Error).message).toContain('overloaded');
   });
 });

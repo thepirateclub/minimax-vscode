@@ -566,6 +566,7 @@ class MiniMaxController {
       model: settings.model,
       maxTokens: model?.maxTokens ?? 65_536,
       maxIterations: settings.maxIterations,
+      maxRetries: settings.maxRetries,
       effort: settings.effort,
       mode: settings.mode,
       thinking: this.thinkingMode(settings),
@@ -839,6 +840,30 @@ class MiniMaxController {
       this.setState('thinking');
       return;
     }
+    if (event.type === 'assistant_reset') {
+      // The answer broke in the middle: the piece that came is not the
+      // answer. The request runs again and the new text takes its place.
+      for (let index = runtime.uiMessages.length - 1; index >= 0; index--) {
+        const message = runtime.uiMessages[index]!;
+        if (message.role === 'assistant' && !message.approval) {
+          message.text = '';
+          message.thinking = '';
+          break;
+        }
+      }
+      this.postFor(runtime, { type: 'assistant_reset' });
+      return;
+    }
+    if (event.type === 'retrying') {
+      // The connection to MiniMax is lost, the request is repeated. The
+      // panel shows the attempt and the reader knows the agent works.
+      this.postFor(runtime, {
+        type: 'retry_status',
+        status: { attempt: event.attempt, total: event.total, delayMs: event.delayMs }
+      });
+      this.setState('thinking');
+      return;
+    }
     if (event.type === 'tool_progress') {
       // The journal of the action: the lines that the tool writes while it
       // runs. They stay in the card of the action. The same id of a tool
@@ -977,6 +1002,8 @@ class MiniMaxController {
       this.setState('idle');
       // The turn is over, the time of the turn is not running anymore.
       runtime.turnStartedAt = 0;
+      // The repeats are over, the panel drops the status of the attempt.
+      this.postFor(runtime, { type: 'retry_status', status: undefined });
       return;
     }
     if (event.type === 'error') {
@@ -1008,6 +1035,8 @@ class MiniMaxController {
       this.setState('error');
       // The turn is over, the time of the turn is not running anymore.
       runtime.turnStartedAt = 0;
+      // The repeats are over, the panel drops the status of the attempt.
+      this.postFor(runtime, { type: 'retry_status', status: undefined });
     }
   }
 
@@ -1745,6 +1774,7 @@ class MiniMaxController {
       enableWebSearch: settings.enableWebSearch,
       collapseTools: settings.collapseTools,
       collapseCode: settings.collapseCode,
+      maxRetries: settings.maxRetries,
       speechLanguage: settings.speechLanguage,
       microphone: settings.microphone,
       hasApiKey: Boolean(key),
@@ -1776,6 +1806,7 @@ class MiniMaxController {
       ['mode', values.mode],
       ['thinking', values.thinking],
       ['maxIterations', values.maxIterations],
+      ['maxRetries', values.maxRetries],
       ['fontSize', values.fontSize],
       ['historyMaxMessages', values.historyMaxMessages],
       ['contextThreshold', values.contextThreshold],

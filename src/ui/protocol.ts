@@ -83,6 +83,13 @@ export interface UiSuggestion {
   source: 'open' | 'workspace';
 }
 
+// The status of a repeated request: the connection to MiniMax is lost.
+export interface UiRetryStatus {
+  attempt: number;
+  total: number;
+  delayMs: number;
+}
+
 export interface UiSettingsValues {
   baseUrl: BaseUrlPreset;
   customBaseUrl: string;
@@ -91,6 +98,8 @@ export interface UiSettingsValues {
   mode: AgentMode;
   thinking: boolean;
   maxIterations: number;
+  // How many times a request is repeated after the loss of the connection.
+  maxRetries: number;
   fontSize: number;
   historyMaxMessages: number;
   contextThreshold: number;
@@ -177,6 +186,10 @@ export type ExtToWeb =
   | { type: 'error'; message: string }
   | { type: 'notice'; message: string; kind: NoticeKind }
   | { type: 'step_time'; id: string; elapsedMs: number }
+  // The connection to MiniMax is lost, the request is repeated.
+  | { type: 'retry_status'; status: UiRetryStatus | undefined }
+  // The answer broke in the middle, the piece goes away.
+  | { type: 'assistant_reset' }
   | { type: 'restore_input'; text: string; mentions: string[]; selections: UiSelection[] }
   | { type: 'session_loaded'; messages: UiMessage[] }
   | { type: 'sessions'; sessions: UiSessionSummary[] }

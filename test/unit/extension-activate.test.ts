@@ -749,6 +749,7 @@ describe('extension activation', () => {
         mode: 'plan',
         thinking: true,
         maxIterations: 12,
+        maxRetries: 3,
         fontSize: 15,
         historyMaxMessages: 40,
         contextThreshold: 60,

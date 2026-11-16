@@ -9,6 +9,8 @@ export interface MiniMaxSettings {
   mode: AgentMode;
   thinking: boolean;
   maxIterations: number;
+  // How many times a request is repeated after the loss of the connection.
+  maxRetries: number;
   // The size of the font of the panel in pixels.
   fontSize: number;
   // How many messages the chat keeps before the old turns are cut.
@@ -66,6 +68,7 @@ export function getSettings(): MiniMaxSettings {
     mode: cfg.get<AgentMode>('mode', 'code'),
     thinking: cfg.get<boolean>('thinking', false),
     maxIterations: cfg.get<number>('maxIterations', 40),
+    maxRetries: userValue<number>(cfg, 'maxRetries', 5),
     fontSize: cfg.get<number>('fontSize', 13),
     historyMaxMessages: cfg.get<number>('historyMaxMessages', 120),
     contextThreshold: cfg.get<number>('contextThreshold', 50),

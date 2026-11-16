@@ -16,6 +16,10 @@ export interface SessionOptions {
   model: string;
   maxTokens: number;
   maxIterations: number;
+  // How many times a request is repeated after the loss of the connection.
+  maxRetries?: number;
+  // The first pause between the attempts, the pause grows from it.
+  retryBaseDelayMs?: number;
   effort: EffortLevel;
   thinking?: 'adaptive';
   // The context window of the model, the history is cut to fit into it.
@@ -128,6 +132,8 @@ export class AgentSession {
       model: this.options.model,
       maxTokens: this.options.maxTokens,
       maxIterations: this.options.maxIterations,
+      maxRetries: this.options.maxRetries,
+      retryBaseDelayMs: this.options.retryBaseDelayMs,
       effort: this.options.effort,
       thinking: this.options.thinking,
       mode: this.options.mode,

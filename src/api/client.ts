@@ -86,9 +86,30 @@ export class HttpMiniMaxClient implements MiniMaxClient {
         }
         const chunk = utf8.decode(value, { stream: true });
         for (const event of decoder.push(chunk)) {
+          if (event.type === 'stream_error') {
+            // The server failed in the middle of the answer: the request is
+            // repeated by the agent.
+            throw new MiniMaxApiError(event.message, response.status, undefined, true);
+          }
           yield event;
         }
       }
+    } catch (error) {
+      if (error instanceof MiniMaxApiError) {
+        throw error;
+      }
+      // The user stopped the turn, the cancellation is not a failure.
+      if (options?.signal?.aborted || request.signal?.aborted) {
+        throw error;
+      }
+      // The connection broke in the middle of the answer.
+      throw new MiniMaxApiError(
+        'The connection to MiniMax was lost: ' +
+          (error instanceof Error ? error.message : String(error)),
+        0,
+        undefined,
+        true
+      );
     } finally {
       // The stream was abandoned: the budget of the goal ran out or the
       // user stopped the turn. The request has to be closed on the wire,
@@ -100,6 +121,16 @@ export class HttpMiniMaxClient implements MiniMaxClient {
         // The stream is over or broken, there is nothing to cancel.
       }
       reader.releaseLock();
+    }
+    if (!decoder.finished) {
+      // The stream ended without the event of the server: the answer was cut.
+      // An empty answer is a lie, the request goes out again.
+      throw new MiniMaxApiError(
+        'The connection to MiniMax was closed before the answer ended.',
+        0,
+        undefined,
+        true
+      );
     }
     for (const event of decoder.flush()) {
       yield event;
