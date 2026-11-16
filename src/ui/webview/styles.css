@@ -1432,6 +1432,24 @@ input:focus {
   font-style: italic;
 }
 
+/* The status of the request that is repeated after the loss of the
+   connection. It stands above the field, the reader sees it at once. */
+.composer-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 2px 6px;
+  font-size: var(--fs-sm);
+  color: var(--warn);
+}
+
+.composer-status-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* composer */
 .composer {
   position: relative;

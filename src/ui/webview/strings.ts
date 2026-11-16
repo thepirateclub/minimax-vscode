@@ -136,6 +136,12 @@ export const STRINGS = {
   maxTokens: 'Max tokens',
   maxTokensHint: 'The limit of the answer comes from the model catalog.',
   maxIterations: 'Max iterations',
+  maxRetries: 'Connection retries',
+  maxRetriesHint:
+    'How many times a request is repeated when the connection to MiniMax is lost. Zero turns the repeats off.',
+  retryConnecting: 'Connecting...',
+  retryAttempt: 'attempt',
+  retryOf: 'of',
   fontSize: 'Font size',
   fontSizeHint: 'The size of the font of the panel in pixels.',
   historyMaxMessages: 'Compacting',

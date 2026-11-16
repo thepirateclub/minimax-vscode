@@ -28,7 +28,11 @@ function rule(selector: string): string {
 
 const noop = (): void => undefined;
 
-function renderComposer(busy: boolean, goalMode = false): string {
+function renderComposer(
+  busy: boolean,
+  goalMode = false,
+  retryStatus?: { attempt: number; total: number; delayMs: number }
+): string {
   return renderToStaticMarkup(
     createElement(Composer, {
       busy,
@@ -54,7 +58,8 @@ function renderComposer(busy: boolean, goalMode = false): string {
       onRemoveSelection: noop,
       onSuggest: noop,
       goalMode,
-      onGoalMode: noop
+      onGoalMode: noop,
+      retryStatus
     }) as ReactElement
   );
 }
@@ -176,6 +181,17 @@ describe('panel layout', () => {
     // The frame of the field and the pressed button say the mode.
     expect(rule('.composer-input-wrap.goal-mode')).toMatch(/border-color:\s*var\(--accent\)/);
     expect(rule('.composer-goal.active')).toMatch(/color:\s*var\(--accent\)/);
+  });
+
+  it('shows the attempt while the connection is lost', () => {
+    const markup = renderComposer(true, false, { attempt: 2, total: 5, delayMs: 2000 });
+    expect(markup).toContain('composer-status');
+    expect(markup).toContain(STRINGS.retryConnecting);
+    // The reader knows how many attempts are left.
+    expect(markup).toContain('2');
+    expect(markup).toContain('5');
+    // Without a lost connection the bar is not there.
+    expect(renderComposer(true)).not.toContain('composer-status');
   });
 
   it('stretches the graph but keeps the width of the steps', () => {

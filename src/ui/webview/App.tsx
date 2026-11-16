@@ -7,6 +7,7 @@ import type {
   UiSettings,
   UiState,
   UiSuggestion,
+  UiRetryStatus,
   WebToExt,
   VoiceState
 } from '../protocol';
@@ -76,6 +77,9 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
   const [voice, setVoice] = useState<VoiceState>('idle');
   const [dictation, setDictation] = useState<DictationRequest | undefined>(undefined);
   const dictationToken = useRef(0);
+  // The connection to MiniMax is lost, the request is repeated. The panel
+  // shows the attempt.
+  const [retryStatus, setRetryStatus] = useState<UiRetryStatus | undefined>(undefined);
 
   useEffect(() => {
     const onMessage = (event: MessageEvent<ExtToWeb>): void => {
@@ -145,6 +149,16 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
           state: message.state,
           tokens: message.tokens ?? prev.tokens
         }));
+        return;
+      }
+      if (message.type === 'retry_status') {
+        setRetryStatus(message.status);
+        return;
+      }
+      if (message.type === 'assistant_reset') {
+        // The answer broke in the middle, the piece goes away: the request
+        // runs again and the new text takes its place.
+        setMessages((prev) => resetAssistant(prev));
         return;
       }
       if (message.type === 'theme') {
@@ -433,6 +447,7 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
           onSuggest={suggest}
           voice={voice}
           dictation={dictation}
+          retryStatus={retryStatus}
           onVoiceStart={() => vscode.postMessage({ type: 'voice_start' })}
           onVoiceStop={() => vscode.postMessage({ type: 'voice_stop' })}
         />
@@ -451,6 +466,20 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
       </div>
     </div>
   );
+}
+
+// The piece of the broken answer goes away, the last answer of the model
+// is empty until the request comes again.
+function resetAssistant(messages: UiMessage[]): UiMessage[] {
+  const next = [...messages];
+  for (let i = next.length - 1; i >= 0; i--) {
+    const item = next[i]!;
+    if (item.role === 'assistant' && !item.approval) {
+      next[i] = { ...item, text: '', thinking: '' };
+      return next;
+    }
+  }
+  return next;
 }
 
 function appendToAssistant(

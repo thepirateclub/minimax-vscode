@@ -13,6 +13,7 @@ function toValues(settings: UiSettings): UiSettingsValues {
     mode: settings.mode,
     thinking: settings.thinking,
     maxIterations: settings.maxIterations,
+    maxRetries: settings.maxRetries,
     fontSize: settings.fontSize,
     historyMaxMessages: settings.historyMaxMessages,
     contextThreshold: settings.contextThreshold,
@@ -232,6 +233,18 @@ export function SettingsView({
             value={values.maxIterations}
             onChange={(event) => patch({ maxIterations: Number(event.target.value) })}
           />
+        </label>
+        <label className="field">
+          <span>{STRINGS.maxRetries}</span>
+          <input
+            type="number"
+            min={0}
+            max={20}
+            step={1}
+            value={values.maxRetries}
+            onChange={(event) => patch({ maxRetries: Number(event.target.value) })}
+          />
+          <span className="hint">{STRINGS.maxRetriesHint}</span>
         </label>
         <label className="field">
           <span>{STRINGS.historyMaxMessages}</span>

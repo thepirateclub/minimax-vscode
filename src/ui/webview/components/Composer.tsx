@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent, MouseEvent } from 'react';
 import type { EffortLevel } from '../../../api/types';
 import type { AgentMode, ModelInfo } from '../../../config/models';
-import type { UiSelection, UiSuggestion, VoiceState } from '../../protocol';
+import type { UiRetryStatus, UiSelection, UiSuggestion, VoiceState } from '../../protocol';
 import { dictationPiece } from '../dictation';
 import {
   IconAttach,
@@ -12,6 +12,7 @@ import {
   IconModel,
   IconPlan,
   IconGoal,
+  IconRefresh,
   IconSend,
   IconStop,
   IconThinking
@@ -290,7 +291,8 @@ export function Composer({
   onVoiceStart,
   onVoiceStop,
   goalMode = false,
-  onGoalMode
+  onGoalMode,
+  retryStatus
 }: {
   busy: boolean;
   selections: UiSelection[];
@@ -322,6 +324,8 @@ export function Composer({
   // The field takes the goal of the session instead of a request.
   goalMode?: boolean;
   onGoalMode?: (on: boolean) => void;
+  // The connection to MiniMax is lost, the request is repeated.
+  retryStatus?: UiRetryStatus;
 }) {
   const currentModel = models.find((item) => item.id === model);
   const modelOptions: IconSelectOption<string>[] = models.map((item) => ({
@@ -577,6 +581,15 @@ export function Composer({
               </button>
             </span>
           ))}
+        </div>
+      ) : null}
+      {retryStatus ? (
+        <div className="composer-status" role="status" aria-live="polite">
+          <IconRefresh />
+          <span className="composer-status-text">
+            {STRINGS.retryConnecting} {STRINGS.retryAttempt} {retryStatus.attempt}{' '}
+            {STRINGS.retryOf} {retryStatus.total}
+          </span>
         </div>
       ) : null}
       <div className={'composer-input-wrap' + (goalMode ? ' goal-mode' : '')}>
