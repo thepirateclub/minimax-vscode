@@ -25,6 +25,47 @@ function commandFailure(result: GitRunResult): ToolExecutionResult {
   return failure(detail.length > 0 ? detail : 'git failed with exit code ' + result.code);
 }
 
+// Git reads everything that starts with a dash as an option of the command.
+// The ref of the model is a value, so the separator goes before it: git calls
+// it --end-of-options, everything after it is a value and not an option.
+// The plain -- cannot be used here, it would turn the ref of the diff into a
+// path and the diff would come back empty.
+const END_OF_OPTIONS = '--end-of-options';
+
+// A ref with a dash is read as an option of the command, for example
+// --output=<file> of the diff writes a file. The ref of the model is a
+// commit, a tag or a branch, it never starts with a dash.
+function checkRef(ref: string, tool: string): string | undefined {
+  if (ref.length === 0) {
+    return undefined;
+  }
+  if (ref.startsWith('-')) {
+    return tool + ' failed: the ref must not start with a dash';
+  }
+  if (/[\s\u0000-\u001f]/.test(ref)) {
+    return tool + ' failed: the ref must not hold spaces';
+  }
+  return undefined;
+}
+
+// Git older than 2.24 does not know the separator. The check of the ref is
+// the wall for it, the ref of the model cannot be an option anyway.
+async function runGitWithSeparator(
+  root: string,
+  args: string[],
+  options: { signal?: AbortSignal }
+): Promise<GitRunResult> {
+  const result = await runGit(root, args, options);
+  if (result.code !== 0 && /unknown option .*end-of-options/i.test(result.stderr)) {
+    return await runGit(
+      root,
+      args.filter((item) => item !== END_OF_OPTIONS),
+      options
+    );
+  }
+  return result;
+}
+
 async function openRepository(workspaceRoot: string): Promise<Repository | undefined> {
   const root = await repoRoot(workspaceRoot);
   if (!root) {
@@ -154,9 +195,15 @@ export function createGitTools(): ToolEntry[] {
       if (input['staged'] === true) {
         args.push('--cached');
       }
-      const ref = input['ref'];
-      if (typeof ref === 'string' && ref.length > 0) {
-        args.push(ref);
+      const ref = typeof input['ref'] === 'string' ? input['ref'].trim() : '';
+      if (ref.length > 0) {
+        const problem = checkRef(ref, 'git_diff');
+        if (problem) {
+          return failure(problem);
+        }
+        // The separator goes before the ref, the ref of the model cannot be
+        // read as an option of the diff.
+        args.push(END_OF_OPTIONS, ref);
       }
       let paths: string[] = [];
       try {
@@ -167,7 +214,9 @@ export function createGitTools(): ToolEntry[] {
       if (paths.length > 0) {
         args.push('--', ...paths);
       }
-      const result = await runGit(repository.root, args, { signal: ctx.signal });
+      const result = await runGitWithSeparator(repository.root, args, {
+        signal: ctx.signal
+      });
       if (result.code !== 0) {
         return commandFailure(result);
       }
@@ -259,7 +308,20 @@ export function createGitTools(): ToolEntry[] {
       if (ref.length === 0) {
         return failure('git_show failed: ref must not be empty');
       }
-      const args = ['show', '--no-color', '--date=short', '--pretty=format:%h %ad %an %s', ref];
+      const problem = checkRef(ref, 'git_show');
+      if (problem) {
+        return failure(problem);
+      }
+      // The separator goes before the ref, the ref of the model cannot be
+      // read as an option of the show.
+      const args = [
+        'show',
+        '--no-color',
+        '--date=short',
+        '--pretty=format:%h %ad %an %s',
+        END_OF_OPTIONS,
+        ref
+      ];
       let paths: string[] = [];
       try {
         paths = pathList(input).map((item) => toRepoPath(repository, item));
@@ -269,7 +331,9 @@ export function createGitTools(): ToolEntry[] {
       if (paths.length > 0) {
         args.push('--', ...paths);
       }
-      const result = await runGit(repository.root, args, { signal: ctx.signal });
+      const result = await runGitWithSeparator(repository.root, args, {
+        signal: ctx.signal
+      });
       if (result.code !== 0) {
         return commandFailure(result);
       }
@@ -482,13 +546,25 @@ export function createGitTools(): ToolEntry[] {
       if (name.length === 0) {
         return failure('git_branch_create failed: name must not be empty');
       }
-      const base = String(input['base'] ?? '').trim();
-      const checkout = input['checkout'] !== false;
-      const args = checkout ? ['checkout', '-b', name] : ['branch', name];
-      if (base.length > 0) {
-        args.push(base);
+      const nameProblem = checkRef(name, 'git_branch_create');
+      if (nameProblem) {
+        return failure(nameProblem);
       }
-      const result = await runGit(repository.root, args, { signal: ctx.signal });
+      const base = String(input['base'] ?? '').trim();
+      const baseProblem = checkRef(base, 'git_branch_create');
+      if (baseProblem) {
+        return failure(baseProblem);
+      }
+      const checkout = input['checkout'] !== false;
+      // The separator of git goes before the base, the base of the model
+      // cannot be read as an option of the command.
+      const args = checkout ? ['checkout', '-b', name] : ['branch', '--', name];
+      if (base.length > 0) {
+        args.push(END_OF_OPTIONS, base);
+      }
+      const result = await runGitWithSeparator(repository.root, args, {
+        signal: ctx.signal
+      });
       if (result.code !== 0) {
         return commandFailure(result);
       }
@@ -520,7 +596,15 @@ export function createGitTools(): ToolEntry[] {
       if (ref.length === 0) {
         return failure('git_checkout failed: ref must not be empty');
       }
-      const result = await runGit(repository.root, ['checkout', ref], { signal: ctx.signal });
+      const problem = checkRef(ref, 'git_checkout');
+      if (problem) {
+        return failure(problem);
+      }
+      const result = await runGitWithSeparator(
+        repository.root,
+        ['checkout', END_OF_OPTIONS, ref],
+        { signal: ctx.signal }
+      );
       if (result.code !== 0) {
         return commandFailure(result);
       }
