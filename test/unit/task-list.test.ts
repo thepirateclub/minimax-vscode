@@ -50,37 +50,52 @@ describe('the widget of the list of tasks', () => {
     expect(render([])).toBe('');
   });
 
-  it('gives every state and the high priority its class', () => {
+  it('gives every state and the priority its class', () => {
     const markup = render([
-      { content: 'Read the parser', status: 'pending', priority: 'high' },
-      { content: 'Add tests', status: 'in_progress', priority: 'medium' },
-      { content: 'Ship it', status: 'completed', priority: 'low' }
+      { content: 'Read the parser', status: 'pending', priority: 'very_high' },
+      { content: 'Add tests', status: 'in_progress', priority: 'high' },
+      { content: 'Ship it', status: 'completed', priority: 'medium' },
+      { content: 'Rest', status: 'pending', priority: 'low' }
     ]);
     expect(markup).toContain('task-pending');
     expect(markup).toContain('task-in_progress');
     expect(markup).toContain('task-completed');
-    expect(markup).toContain('task-high');
-    // The default priorities carry no class, a class without a rule is a dead end.
-    expect(markup).not.toContain('task-medium');
-    expect(markup).not.toContain('task-low');
+    // Every priority has its own class, a class without a rule is a dead end.
+    expect(markup).toContain('task-priority-very_high');
+    expect(markup).toContain('task-priority-high');
+    expect(markup).toContain('task-priority-medium');
+    expect(markup).toContain('task-priority-low');
   });
 
-  it('marks only the high priority, the rest is the default', () => {
+  it('shows the priority as an arrow, the word stays in the hint', () => {
     const markup = render([
       { content: 'Read the parser', status: 'pending', priority: 'high' },
       { content: 'Add tests', status: 'pending', priority: 'medium' },
-      { content: 'Ship it', status: 'pending', priority: 'low' }
+      { content: 'Ship it', status: 'pending', priority: 'low' },
+      { content: 'Ship it now', status: 'pending', priority: 'very_high' }
     ]);
-    // A word on every row is noise, the reader looks for the urgent one.
-    expect(markup).toContain('High');
-    expect(markup).not.toContain('Medium');
-    expect(markup).not.toContain('>Low<');
+    // The arrow of jira is an icon, a word on every row is noise.
+    expect(markup).toContain('<svg');
+    expect(markup).toContain('title="' + STRINGS.taskPriorityHigh + '"');
+    expect(markup).toContain('title="' + STRINGS.taskPriorityMedium + '"');
+    expect(markup).toContain('title="' + STRINGS.taskPriorityLow + '"');
+    expect(markup).toContain('title="' + STRINGS.taskPriorityVeryHigh + '"');
+    // The word of the priority is not printed on the row.
+    expect(markup).not.toContain('>' + STRINGS.taskPriorityHigh + '<');
   });
 
   it('does not paint the priority with the accent', () => {
-    // The accent means interaction and the active state only.
-    const body = /\.task-high \.task-priority \{([^}]*)\}/.exec(CSS)?.[1] ?? '';
-    expect(body).not.toContain('--accent');
+    // The accent means interaction and the active state only, the arrows
+    // take the colors of the theme.
+    for (const name of [
+      'task-priority-low',
+      'task-priority-medium',
+      'task-priority-high',
+      'task-priority-very_high'
+    ]) {
+      const body = new RegExp('\\.' + name + ' \\{([^}]*)\\}').exec(CSS)?.[1] ?? '';
+      expect(body, name).not.toContain('--accent');
+    }
   });
 
   it('has a rule for every class of the widget', () => {

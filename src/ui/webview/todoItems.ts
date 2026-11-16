@@ -1,7 +1,7 @@
 import type { TodoItem, TodoPriority, TodoStatus } from '../../agent/state';
 
 const STATUSES: TodoStatus[] = ['pending', 'in_progress', 'completed'];
-const PRIORITIES: TodoPriority[] = ['high', 'medium', 'low'];
+const PRIORITIES: TodoPriority[] = ['very_high', 'high', 'medium', 'low'];
 
 // The card of todo_write reads the list from the arguments of the call: the
 // model may send anything, a broken item is skipped, not drawn as garbage.

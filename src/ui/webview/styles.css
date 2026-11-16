@@ -97,6 +97,10 @@ body {
   --ok: var(--vscode-testing-iconPassed, #3fb950);
   --err: var(--vscode-testing-iconFailed, #f14c4c);
   --warn: var(--vscode-inputValidation-warningBorder, #cca700);
+  /* the arrows of the priority of a task, the colors of the theme */
+  --prio-low: var(--vscode-charts-blue, #4daafc);
+  --prio-medium: var(--vscode-charts-yellow, #cca700);
+  --prio-high: var(--vscode-charts-red, #f14c4c);
   --hover: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.16));
   --row-hover: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.12));
   --selected: var(--vscode-list-activeSelectionBackground, rgba(128, 128, 128, 0.24));
@@ -507,14 +511,30 @@ input:focus {
   flex: 1 1 auto;
 }
 
+/* The priority of a task is an arrow of jira. The color of the arrow
+   comes from the theme of the host. */
 .task-priority {
   flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
   color: var(--muted);
   font-size: var(--fs-xs);
 }
 
-.task-high .task-priority {
-  color: var(--warn);
+.task-priority-low {
+  color: var(--prio-low);
+}
+
+.task-priority-medium {
+  color: var(--prio-medium);
+}
+
+.task-priority-high {
+  color: var(--prio-high);
+}
+
+.task-priority-very_high {
+  color: var(--prio-high);
 }
 
 /* the note of the model on the card of update_goal */
@@ -2786,4 +2806,167 @@ html {
 
 .tok-remove {
   color: var(--tok-remove);
+}
+
+
+/* the icon of the panel of the reasoning */
+.thinking-icon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--muted);
+}
+
+/* the actions of one step of the agent, the step is folded by default */
+.tool-steps {
+  margin: 2px 12px 0;
+}
+
+.tool-steps-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 2px 0;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.tool-steps-head:hover {
+  color: var(--fg);
+}
+
+.tool-steps-icon {
+  display: inline-flex;
+  align-items: center;
+}
+
+.tool-steps-title {
+  flex: 1 1 auto;
+}
+
+.tool-steps-count {
+  color: var(--muted);
+  font-size: var(--fs-xs);
+}
+
+.tool-steps-body {
+  padding: 2px 0 4px;
+}
+
+.tool-steps-failed .tool-steps-head {
+  color: var(--err);
+}
+
+/* the files that the last action changed */
+.summary-bar {
+  flex: 0 0 auto;
+  margin: 4px 12px 0;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--fg);
+  font-size: var(--fs-sm);
+}
+
+.summary-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.summary-icon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--muted);
+}
+
+.summary-title {
+  flex: 1 1 auto;
+}
+
+.summary-count {
+  color: var(--muted);
+  font-size: var(--fs-xs);
+}
+
+.summary-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.summary-clear:hover {
+  color: var(--fg);
+}
+
+.summary-files {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  max-height: 160px;
+  overflow: auto;
+}
+
+.summary-file {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 2px 0;
+  border: none;
+  background: none;
+  color: var(--fg);
+  font-size: var(--fs-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.summary-file:hover {
+  background: var(--row-hover);
+}
+
+.summary-badge {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-sm);
+  color: var(--bg);
+  background: var(--muted);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  line-height: 14px;
+  text-align: center;
+}
+
+.summary-badge-added {
+  background: var(--ok);
+}
+
+.summary-badge-modified {
+  background: var(--muted);
+}
+
+.summary-badge-deleted {
+  background: var(--err);
+}
+
+.summary-badge-renamed {
+  background: var(--warn);
+}
+
+.summary-name {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

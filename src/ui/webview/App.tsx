@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { GoalState, TodoItem } from '../../agent/state';
 import type {
   ExtToWeb,
+  UiChangedFile,
   UiMessage,
   UiQueuedMessage,
   UiSelection,
@@ -25,6 +26,7 @@ import { DEFAULT_GOAL_FORM } from './goalWizard';
 import { goalFormValues, parseGoalForm } from './components/GoalBar';
 import { Header, type PanelTab } from './components/Header';
 import { MessageList } from './components/MessageList';
+import { SummaryBar } from './components/SummaryBar';
 import { SettingsView } from './components/SettingsView';
 import { TaskList } from './components/TaskList';
 import { appendNotice } from './notices';
@@ -55,6 +57,8 @@ const EMPTY_STATE: UiState = {
   fontSize: 13,
   collapseTools: false,
   collapseCode: false,
+  showToolSteps: false,
+  summary: [],
   version: '',
   todos: [],
   queue: [],
@@ -68,6 +72,9 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
   // them when the reader wants to see the older part of the chat.
   const [olderMessages, setOlderMessages] = useState(0);
   const [todos, setTodos] = useState<TodoItem[]>([]);
+  // The files that the last action changed, the panel shows them under the
+  // feed.
+  const [summary, setSummary] = useState<UiChangedFile[]>([]);
   const [goal, setGoal] = useState<GoalState | undefined>(undefined);
   // The command /goal without a text opens the wizard of the goal.
   // The input field takes the goal instead of a request.
@@ -133,6 +140,7 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
         setOlderMessages(message.state.olderMessages ?? 0);
         setTodos(message.state.todos);
         setGoal(message.state.goal);
+        setSummary(message.state.summary ?? []);
         setQueue(message.state.queue ?? []);
         return;
       }
@@ -215,6 +223,10 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
       }
       if (message.type === 'goal') {
         setGoal(message.goal);
+        return;
+      }
+      if (message.type === 'summary') {
+        setSummary(message.files);
         return;
       }
       if (message.type === 'session_loaded') {
@@ -428,6 +440,7 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
             onLoadOlder={() => vscode.postMessage({ type: 'load_older' })}
             collapseTools={state.collapseTools}
             collapseCode={state.collapseCode}
+            showToolSteps={state.showToolSteps}
             onApprove={approve}
             onReject={reject}
             onOpenFile={openFile}
@@ -435,6 +448,11 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
             onRewind={(id) => vscode.postMessage({ type: 'rewind', id })}
           />
         )}
+        <SummaryBar
+          files={summary}
+          onOpenFile={(path) => vscode.postMessage({ type: 'open_file', path })}
+          onClear={() => setSummary([])}
+        />
         <Composer
           busy={busy}
           selections={selections}

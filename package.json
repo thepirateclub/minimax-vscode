@@ -184,6 +184,11 @@
           "default": false,
           "description": "Collapses the code blocks of the answers. The header with the file name stays, the code opens on a click."
         },
+        "minimax.showToolSteps": {
+          "type": "boolean",
+          "default": true,
+          "description": "Shows the steps of the tools in the chat. The actions of one step stand under a header, the step is folded by default."
+        },
         "minimax.speechLanguage": {
           "type": "string",
           "default": "",

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Chevron } from '../icons';
+import { Chevron, IconThinking } from '../icons';
 import { STRINGS } from '../strings';
 
 export function ThinkingBlock({ text }: { text: string }) {
@@ -12,6 +12,9 @@ export function ThinkingBlock({ text }: { text: string }) {
         onClick={() => setOpen((value) => !value)}
       >
         <Chevron open={open} />
+        <span className="thinking-icon">
+          <IconThinking />
+        </span>
         {STRINGS.thinking}
       </button>
       {open ? <pre className="thinking-body">{text}</pre> : null}

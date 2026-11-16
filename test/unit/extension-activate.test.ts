@@ -799,6 +799,7 @@ describe('extension activation', () => {
         enableWebSearch: false,
         collapseTools: true,
         collapseCode: true,
+        showToolSteps: true,
         speechLanguage: 'ru',
         microphone: 'Mic 1'
       }
@@ -818,6 +819,7 @@ describe('extension activation', () => {
     expect(state.config.get('rulesEnabled')).toBe(false);
     expect(state.config.get('collapseTools')).toBe(true);
     expect(state.config.get('collapseCode')).toBe(true);
+    expect(state.config.get('showToolSteps')).toBe(true);
     expect(state.config.get('speechLanguage')).toBe('ru');
     expect(state.config.get('microphone')).toBe('Mic 1');
   });

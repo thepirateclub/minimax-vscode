@@ -13,6 +13,8 @@ import { STRINGS } from '../strings';
 import { ApprovalCard } from './ApprovalCard';
 import { ThinkingBlock } from './ThinkingBlock';
 import { ToolCard } from './ToolCard';
+import { ToolSteps } from './ToolSteps';
+import { groupToolSteps } from '../toolSteps';
 
 // The panel keeps the dom small, the older messages are loaded on demand.
 const PAGE = 120;
@@ -187,6 +189,7 @@ export function MessageList({
   onLoadOlder,
   collapseTools,
   collapseCode,
+  showToolSteps,
   onApprove,
   onReject,
   onOpenFile,
@@ -203,6 +206,8 @@ export function MessageList({
   collapseTools: boolean;
   // The code blocks of the answers fold to their header.
   collapseCode: boolean;
+  // The steps of the tools are shown in the feed.
+  showToolSteps: boolean;
   onApprove: (id: string, allowForSession: boolean) => void;
   onReject: (id: string) => void;
   onOpenFile: (path: string, line?: number) => void;
@@ -313,6 +318,12 @@ export function MessageList({
   const failed = failedRequests(messages);
   // The command that ran before every message of the chat.
   const commands = commandHints(messages);
+  // The command of a message by its id: the steps of the tools break the
+  // order of the feed, the index of the message is not its place anymore.
+  const commandsById = new Map<string, CommandHint | undefined>();
+  messages.forEach((message, index) => {
+    commandsById.set(message.id, commands[index]);
+  });
 
   const shown = messages.length > visible ? messages.slice(-visible) : messages;
   const hidden = messages.length - shown.length;
@@ -328,22 +339,34 @@ export function MessageList({
             {STRINGS.showEarlier} ({pendingCount})
           </button>
         ) : null}
-        {shown.map((message, offset) => (
-          <MessageRow
-            key={message.id}
-            message={message}
-            sources={sources}
-            command={commands[messages.length - shown.length + offset]}
-            collapseTools={collapseTools}
-            collapseCode={collapseCode}
-            canRetry={failed.has(message.id)}
-            onApprove={onApprove}
-            onReject={onReject}
-            onOpenFile={onOpenFile}
-            onRetry={onRetry}
-            onRewind={onRewind}
-          />
-        ))}
+        {groupToolSteps(shown).map((item) =>
+          item.kind === 'steps' ? (
+            // The setting hides the steps of the tools, the reader then sees
+            // the text of the model only.
+            showToolSteps ? (
+              <ToolSteps
+                key={item.step.id}
+                step={item.step}
+                collapsed={collapseTools}
+              />
+            ) : null
+          ) : (
+            <MessageRow
+              key={item.message.id}
+              message={item.message}
+              sources={sources}
+              command={commandsById.get(item.message.id)}
+              collapseTools={collapseTools}
+              collapseCode={collapseCode}
+              canRetry={failed.has(item.message.id)}
+              onApprove={onApprove}
+              onReject={onReject}
+              onOpenFile={onOpenFile}
+              onRetry={onRetry}
+              onRewind={onRewind}
+            />
+          )
+        )}
       </div>
       {!atBottom ? (
         <button className="jump-latest" onClick={scrollToBottom}>

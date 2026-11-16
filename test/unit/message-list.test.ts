@@ -18,6 +18,7 @@ function render(messages: UiMessage[], olderMessages = 0): string {
       onLoadOlder: () => undefined,
       collapseTools: false,
       collapseCode: false,
+      showToolSteps: true,
       onApprove: () => undefined,
       onReject: () => undefined,
       onOpenFile: () => undefined,

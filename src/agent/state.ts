@@ -3,7 +3,8 @@
 
 export type TodoStatus = 'pending' | 'in_progress' | 'completed';
 
-export type TodoPriority = 'high' | 'medium' | 'low';
+// The priority of a task. The very high one is the double arrow of jira.
+export type TodoPriority = 'very_high' | 'high' | 'medium' | 'low';
 
 export interface TodoItem {
   content: string;

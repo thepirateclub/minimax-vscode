@@ -23,6 +23,7 @@ function toValues(settings: UiSettings): UiSettingsValues {
     enableWebSearch: settings.enableWebSearch,
     collapseTools: settings.collapseTools,
     collapseCode: settings.collapseCode,
+    showToolSteps: settings.showToolSteps,
     speechLanguage: settings.speechLanguage,
     microphone: settings.microphone
   };
@@ -304,6 +305,15 @@ export function SettingsView({
           <span>{STRINGS.collapseCode}</span>
         </label>
         <p className="hint">{STRINGS.collapseCodeHint}</p>
+        <label className="checkbox">
+          <input
+            type="checkbox"
+            checked={values.showToolSteps}
+            onChange={(event) => patch({ showToolSteps: event.target.checked })}
+          />
+          <span>{STRINGS.showToolSteps}</span>
+        </label>
+        <p className="hint">{STRINGS.showToolStepsHint}</p>
       </section>
 
       <section className="settings-section">

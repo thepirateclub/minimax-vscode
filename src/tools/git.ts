@@ -14,7 +14,11 @@ interface Repository {
   root: string;
   // The root of the workspace, the paths of the model are relative to it.
   workspace: string;
+  // The directory of the command, it is the -C of git.
+  base: string;
 }
+
+type Opened = { ok: true; repository: Repository } | { ok: false; error: string };
 
 function failure(message: string): ToolExecutionResult {
   return { content: message, isError: true };
@@ -66,24 +70,59 @@ async function runGitWithSeparator(
   return result;
 }
 
-async function openRepository(workspaceRoot: string): Promise<Repository | undefined> {
-  const root = await repoRoot(workspaceRoot);
-  if (!root) {
-    return undefined;
+// The directory of the command. It is the -C of git: the command runs there
+// and the paths of the model are read relative to it. The directory stays
+// inside the workspace, the model does not walk out of it.
+function resolveBase(workspaceRoot: string, candidate: unknown): string {
+  if (candidate === undefined || candidate === null) {
+    return workspaceRoot;
   }
-  return { root, workspace: workspaceRoot };
+  const raw = String(candidate).trim();
+  if (raw.length === 0) {
+    return workspaceRoot;
+  }
+  const absolute = isAbsolute(raw) ? raw : resolve(workspaceRoot, raw);
+  const rel = relative(resolve(workspaceRoot), absolute);
+  if (rel.startsWith('..') || isAbsolute(rel)) {
+    throw new Error('the directory is outside the workspace: ' + raw);
+  }
+  return absolute;
 }
 
-// The path of the model is relative to the workspace, git wants it relative
-// to the repository.
-function toRepoPath(repository: Repository, candidate: string): string {
-  const absolute = isAbsolute(candidate) ? candidate : resolve(repository.workspace, candidate);
-  const rel = relative(repository.root, absolute);
+async function openRepository(
+  workspaceRoot: string,
+  input: Record<string, unknown>
+): Promise<Opened> {
+  let base: string;
+  try {
+    base = resolveBase(workspaceRoot, input['directory']);
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : String(error)
+    };
+  }
+  const root = await repoRoot(base);
+  if (!root) {
+    return { ok: false, error: 'Not a git repository: ' + workspaceRoot };
+  }
+  return { ok: true, repository: { root, workspace: workspaceRoot, base } };
+}
+
+// The path of the model is relative to the workspace, git reads it relative
+// to the directory of the command.
+function toGitPath(repository: Repository, candidate: string): string {
+  const absolute = isAbsolute(candidate)
+    ? candidate
+    : resolve(repository.workspace, candidate);
+  const rel = relative(repository.base, absolute);
+  if (rel.startsWith('..') || isAbsolute(rel)) {
+    throw new Error(
+      'the path is outside the directory of the command: ' + candidate
+    );
+  }
   if (rel.length === 0) {
     return '.';
-  }
-  if (rel.startsWith('..') || isAbsolute(rel)) {
-    throw new Error('the path is outside the repository: ' + candidate);
   }
   return rel.split(/[\\/]/).join('/');
 }
@@ -114,7 +153,9 @@ function pathList(input: Record<string, unknown>): string[] {
   if (!Array.isArray(many)) {
     return [];
   }
-  return many.filter((item): item is string => typeof item === 'string' && item.length > 0);
+  return many.filter(
+    (item): item is string => typeof item === 'string' && item.length > 0
+  );
 }
 
 function limitText(text: string): string {
@@ -123,6 +164,23 @@ function limitText(text: string): string {
   }
   return text.slice(0, MAX_DIFF_CHARS) + '\n[the diff is cut, it is too long]';
 }
+
+// The directory of the command is the same argument in every tool, the
+// description of it is written once.
+const DIRECTORY_PROPERTY = {
+  type: 'string',
+  description:
+    'The directory of the workspace to run the command in, the same as the -C of git. The path is relative to the workspace root.'
+};
+
+// The formats of the lines of the journal. The model picks the short one
+// when it only needs the subjects of the commits.
+const LOG_FORMATS: Record<string, string> = {
+  oneline: '%h %s',
+  short: '%h %an %s',
+  medium: '%h %an %ad %s',
+  full: '%H %an <%ae> %ad %s'
+};
 
 export function createGitTools(): ToolEntry[] {
   const gitStatus: ToolEntry = {
@@ -133,15 +191,18 @@ export function createGitTools(): ToolEntry[] {
     sideEffect: false,
     inputSchema: {
       type: 'object',
-      properties: {}
-    },
-    async execute(_input, ctx) {
-      const repository = await openRepository(ctx.workspaceRoot);
-      if (!repository) {
-        return failure('Not a git repository: ' + ctx.workspaceRoot);
+      properties: {
+        directory: DIRECTORY_PROPERTY
       }
+    },
+    async execute(input, ctx) {
+      const opened = await openRepository(ctx.workspaceRoot, input);
+      if (!opened.ok) {
+        return failure(opened.error);
+      }
+      const repository = opened.repository;
       const result = await runGit(
-        repository.root,
+        repository.base,
         ['status', '--porcelain=v1', '-b', '--untracked-files=all'],
         { signal: ctx.signal }
       );
@@ -173,29 +234,42 @@ export function createGitTools(): ToolEntry[] {
   const gitDiff: ToolEntry = {
     name: 'git_diff',
     description:
-      'Show the changes of the repository as a diff. By default the changes of the working tree, staged=true shows the index, ref compares the tree with a commit or a branch.',
+      'Show the changes of the repository as a diff. By default the changes of the working tree, staged=true shows the index, ref compares the tree with a commit or a branch, ref and ref2 compare two commits. stat gives the summary of the change, name_only gives the names of the changed files.',
     approval: 'never',
     sideEffect: false,
     inputSchema: {
       type: 'object',
       properties: {
         staged: { type: 'boolean', description: 'Show the staged changes instead of the working tree.' },
+        cached: { type: 'boolean', description: 'The same as staged.' },
         ref: { type: 'string', description: 'Compare the tree with this commit or branch.' },
+        ref2: { type: 'string', description: 'Compare this commit or branch with ref.' },
+        stat: { type: 'boolean', description: 'Show the summary of the change instead of the lines.' },
+        name_only: { type: 'boolean', description: 'Show only the names of the changed files.' },
         paths: { type: 'array', items: { type: 'string' }, description: 'Files to show, relative to the workspace root.' },
-        context_lines: { type: 'integer', minimum: 0, maximum: 20, description: 'Lines of context around a change, default 3.' }
+        context_lines: { type: 'integer', minimum: 0, maximum: 20, description: 'Lines of context around a change, default 3.' },
+        directory: DIRECTORY_PROPERTY
       }
     },
     async execute(input, ctx) {
-      const repository = await openRepository(ctx.workspaceRoot);
-      if (!repository) {
-        return failure('Not a git repository: ' + ctx.workspaceRoot);
+      const opened = await openRepository(ctx.workspaceRoot, input);
+      if (!opened.ok) {
+        return failure(opened.error);
       }
+      const repository = opened.repository;
       const context = Math.min(20, Math.max(0, Number(input['context_lines'] ?? DEFAULT_CONTEXT_LINES)));
       const args = ['diff', '--no-color', '-U' + String(context)];
-      if (input['staged'] === true) {
+      if (input['staged'] === true || input['cached'] === true) {
         args.push('--cached');
       }
+      if (input['stat'] === true) {
+        args.push('--stat');
+      }
+      if (input['name_only'] === true) {
+        args.push('--name-only');
+      }
       const ref = typeof input['ref'] === 'string' ? input['ref'].trim() : '';
+      const ref2 = typeof input['ref2'] === 'string' ? input['ref2'].trim() : '';
       if (ref.length > 0) {
         const problem = checkRef(ref, 'git_diff');
         if (problem) {
@@ -205,16 +279,26 @@ export function createGitTools(): ToolEntry[] {
         // read as an option of the diff.
         args.push(END_OF_OPTIONS, ref);
       }
+      if (ref2.length > 0) {
+        const problem = checkRef(ref2, 'git_diff');
+        if (problem) {
+          return failure(problem);
+        }
+        if (ref.length === 0) {
+          return failure('git_diff failed: ref2 needs ref');
+        }
+        args.push(ref2);
+      }
       let paths: string[] = [];
       try {
-        paths = pathList(input).map((item) => toRepoPath(repository, item));
+        paths = pathList(input).map((item) => toGitPath(repository, item));
       } catch (error) {
         return failure(error instanceof Error ? error.message : String(error));
       }
       if (paths.length > 0) {
         args.push('--', ...paths);
       }
-      const result = await runGitWithSeparator(repository.root, args, {
+      const result = await runGitWithSeparator(repository.base, args, {
         signal: ctx.signal
       });
       if (result.code !== 0) {
@@ -230,7 +314,7 @@ export function createGitTools(): ToolEntry[] {
   const gitLog: ToolEntry = {
     name: 'git_log',
     description:
-      'Show the commits of the repository, the newest first. Filter them by a path or by a text of the message.',
+      'Show the commits of the repository, the newest first. Filter them by a path or by a text of the message. The format picks the shape of a line: oneline is the short hash and the subject, short adds the author, medium adds the date, full shows the whole hash and the mail of the author.',
     approval: 'never',
     sideEffect: false,
     inputSchema: {
@@ -238,44 +322,72 @@ export function createGitTools(): ToolEntry[] {
       properties: {
         limit: { type: 'integer', minimum: 1, maximum: MAX_LOG_LINES, description: 'How many commits to show, default 20.' },
         paths: { type: 'array', items: { type: 'string' }, description: 'Only the commits that touch these files.' },
-        grep: { type: 'string', description: 'Only the commits whose message holds this text.' }
+        grep: { type: 'string', description: 'Only the commits whose message holds this text.' },
+        format: {
+          type: 'string',
+          enum: ['oneline', 'short', 'medium', 'full'],
+          description: 'The shape of a line of the journal.'
+        },
+        oneline: {
+          type: 'boolean',
+          description: 'The same as format=oneline: the short hash and the subject.'
+        },
+        directory: DIRECTORY_PROPERTY
       }
     },
     async execute(input, ctx) {
-      const repository = await openRepository(ctx.workspaceRoot);
-      if (!repository) {
-        return failure('Not a git repository: ' + ctx.workspaceRoot);
+      const opened = await openRepository(ctx.workspaceRoot, input);
+      if (!opened.ok) {
+        return failure(opened.error);
       }
+      const repository = opened.repository;
       const limit = Math.min(
         MAX_LOG_LINES,
         Math.max(1, Number(input['limit'] ?? DEFAULT_LOG_LINES))
       );
-      const args = [
-        'log',
-        '-n',
-        String(limit),
-        '--date=short',
-        '--pretty=format:%h%x09%an%x09%ad%x09%s'
-      ];
+      const requested = String(input['format'] ?? '').trim().toLowerCase();
+      const format = input['oneline'] === true ? 'oneline' : requested;
+      const args = ['log', '-n', String(limit)];
+      let pretty: string | undefined;
+      if (format.length > 0) {
+        pretty = LOG_FORMATS[format];
+        if (!pretty) {
+          return failure(
+            'git_log failed: the format must be oneline, short, medium or full'
+          );
+        }
+      }
+      if (pretty) {
+        if (pretty.includes('%ad')) {
+          args.push('--date=short');
+        }
+        args.push('--pretty=format:' + pretty);
+      } else {
+        args.push('--date=short', '--pretty=format:%h%x09%an%x09%ad%x09%s');
+      }
       const grep = input['grep'];
       if (typeof grep === 'string' && grep.length > 0) {
         args.push('--grep', grep);
       }
       let paths: string[] = [];
       try {
-        paths = pathList(input).map((item) => toRepoPath(repository, item));
+        paths = pathList(input).map((item) => toGitPath(repository, item));
       } catch (error) {
         return failure(error instanceof Error ? error.message : String(error));
       }
       if (paths.length > 0) {
         args.push('--', ...paths);
       }
-      const result = await runGit(repository.root, args, { signal: ctx.signal });
+      const result = await runGit(repository.base, args, { signal: ctx.signal });
       if (result.code !== 0) {
         return commandFailure(result);
       }
       if (result.stdout.trim().length === 0) {
         return { content: 'no commits' };
+      }
+      if (pretty) {
+        // The format is the choice of the model, the lines go as they are.
+        return { content: result.stdout.trim() };
       }
       return {
         content: parseLog(result.stdout)
@@ -288,22 +400,25 @@ export function createGitTools(): ToolEntry[] {
   const gitShow: ToolEntry = {
     name: 'git_show',
     description:
-      'Show one commit with its changes. The ref is a commit hash, a tag or a branch.',
+      'Show one commit with its changes. The ref is a commit hash, a tag or a branch. stat gives the summary of the change instead of the lines.',
     approval: 'never',
     sideEffect: false,
     inputSchema: {
       type: 'object',
       properties: {
         ref: { type: 'string', description: 'The commit, the tag or the branch to show.' },
-        paths: { type: 'array', items: { type: 'string' }, description: 'Only these files of the commit.' }
+        stat: { type: 'boolean', description: 'Show the summary of the change instead of the lines.' },
+        paths: { type: 'array', items: { type: 'string' }, description: 'Only these files of the commit.' },
+        directory: DIRECTORY_PROPERTY
       },
       required: ['ref']
     },
     async execute(input, ctx) {
-      const repository = await openRepository(ctx.workspaceRoot);
-      if (!repository) {
-        return failure('Not a git repository: ' + ctx.workspaceRoot);
+      const opened = await openRepository(ctx.workspaceRoot, input);
+      if (!opened.ok) {
+        return failure(opened.error);
       }
+      const repository = opened.repository;
       const ref = String(input['ref'] ?? '').trim();
       if (ref.length === 0) {
         return failure('git_show failed: ref must not be empty');
@@ -314,24 +429,23 @@ export function createGitTools(): ToolEntry[] {
       }
       // The separator goes before the ref, the ref of the model cannot be
       // read as an option of the show.
-      const args = [
-        'show',
-        '--no-color',
-        '--date=short',
-        '--pretty=format:%h %ad %an %s',
-        END_OF_OPTIONS,
-        ref
-      ];
+      const args = ['show', '--no-color', '--date=short'];
+      if (input['stat'] === true) {
+        args.push('--stat');
+      } else {
+        args.push('--pretty=format:%h %ad %an %s');
+      }
+      args.push(END_OF_OPTIONS, ref);
       let paths: string[] = [];
       try {
-        paths = pathList(input).map((item) => toRepoPath(repository, item));
+        paths = pathList(input).map((item) => toGitPath(repository, item));
       } catch (error) {
         return failure(error instanceof Error ? error.message : String(error));
       }
       if (paths.length > 0) {
         args.push('--', ...paths);
       }
-      const result = await runGitWithSeparator(repository.root, args, {
+      const result = await runGitWithSeparator(repository.base, args, {
         signal: ctx.signal
       });
       if (result.code !== 0) {
@@ -350,14 +464,16 @@ export function createGitTools(): ToolEntry[] {
     inputSchema: {
       type: 'object',
       properties: {
-        all: { type: 'boolean', description: 'Show the remote branches too.' }
+        all: { type: 'boolean', description: 'Show the remote branches too.' },
+        directory: DIRECTORY_PROPERTY
       }
     },
     async execute(input, ctx) {
-      const repository = await openRepository(ctx.workspaceRoot);
-      if (!repository) {
-        return failure('Not a git repository: ' + ctx.workspaceRoot);
+      const opened = await openRepository(ctx.workspaceRoot, input);
+      if (!opened.ok) {
+        return failure(opened.error);
       }
+      const repository = opened.repository;
       const args = [
         'branch',
         '--format=%(refname:short)%09%(HEAD)%09%(upstream:short)%09%(upstream:track)'
@@ -365,7 +481,7 @@ export function createGitTools(): ToolEntry[] {
       if (input['all'] === true) {
         args.push('--all');
       }
-      const result = await runGit(repository.root, args, { signal: ctx.signal });
+      const result = await runGit(repository.base, args, { signal: ctx.signal });
       if (result.code !== 0) {
         return commandFailure(result);
       }
@@ -396,18 +512,20 @@ export function createGitTools(): ToolEntry[] {
       properties: {
         path: { type: 'string', description: 'The file to blame, relative to the workspace root.' },
         start_line: { type: 'integer', minimum: 1, description: 'The first line of the range.' },
-        end_line: { type: 'integer', minimum: 1, description: 'The last line of the range.' }
+        end_line: { type: 'integer', minimum: 1, description: 'The last line of the range.' },
+        directory: DIRECTORY_PROPERTY
       },
       required: ['path']
     },
     async execute(input, ctx) {
-      const repository = await openRepository(ctx.workspaceRoot);
-      if (!repository) {
-        return failure('Not a git repository: ' + ctx.workspaceRoot);
+      const opened = await openRepository(ctx.workspaceRoot, input);
+      if (!opened.ok) {
+        return failure(opened.error);
       }
+      const repository = opened.repository;
       let target: string;
       try {
-        target = toRepoPath(repository, String(input['path'] ?? ''));
+        target = toGitPath(repository, String(input['path'] ?? ''));
       } catch (error) {
         return failure(error instanceof Error ? error.message : String(error));
       }
@@ -418,7 +536,7 @@ export function createGitTools(): ToolEntry[] {
         args.push('-L', String(Math.floor(start)) + ',' + String(Math.floor(end)));
       }
       args.push('--', target);
-      const result = await runGit(repository.root, args, { signal: ctx.signal });
+      const result = await runGit(repository.base, args, { signal: ctx.signal });
       if (result.code !== 0) {
         return commandFailure(result);
       }
@@ -441,18 +559,20 @@ export function createGitTools(): ToolEntry[] {
       type: 'object',
       properties: {
         paths: { type: 'array', items: { type: 'string' }, description: 'The files to stage.' },
-        unstage: { type: 'boolean', description: 'Take the files out of the index instead.' }
+        unstage: { type: 'boolean', description: 'Take the files out of the index instead.' },
+        directory: DIRECTORY_PROPERTY
       },
       required: ['paths']
     },
     async execute(input, ctx) {
-      const repository = await openRepository(ctx.workspaceRoot);
-      if (!repository) {
-        return failure('Not a git repository: ' + ctx.workspaceRoot);
+      const opened = await openRepository(ctx.workspaceRoot, input);
+      if (!opened.ok) {
+        return failure(opened.error);
       }
+      const repository = opened.repository;
       let paths: string[] = [];
       try {
-        paths = pathList(input).map((item) => toRepoPath(repository, item));
+        paths = pathList(input).map((item) => toGitPath(repository, item));
       } catch (error) {
         return failure(error instanceof Error ? error.message : String(error));
       }
@@ -463,7 +583,7 @@ export function createGitTools(): ToolEntry[] {
       const args = unstage
         ? ['reset', '-q', 'HEAD', '--', ...paths]
         : ['add', '--', ...paths];
-      const result = await runGit(repository.root, args, { signal: ctx.signal });
+      const result = await runGit(repository.base, args, { signal: ctx.signal });
       if (result.code !== 0) {
         return commandFailure(result);
       }
@@ -481,19 +601,21 @@ export function createGitTools(): ToolEntry[] {
       type: 'object',
       properties: {
         message: { type: 'string', description: 'The message of the commit.' },
-        amend: { type: 'boolean', description: 'Rewrite the last commit instead of making a new one.' }
+        amend: { type: 'boolean', description: 'Rewrite the last commit instead of making a new one.' },
+        directory: DIRECTORY_PROPERTY
       },
       required: ['message']
     },
     async execute(input, ctx) {
-      const repository = await openRepository(ctx.workspaceRoot);
-      if (!repository) {
-        return failure('Not a git repository: ' + ctx.workspaceRoot);
+      const opened = await openRepository(ctx.workspaceRoot, input);
+      if (!opened.ok) {
+        return failure(opened.error);
       }
+      const repository = opened.repository;
       const message = String(input['message'] ?? '');
       const amend = input['amend'] === true;
       if (!amend) {
-        const staged = await runGit(repository.root, ['diff', '--cached', '--name-only'], {
+        const staged = await runGit(repository.base, ['diff', '--cached', '--name-only'], {
           signal: ctx.signal
         });
         if (staged.code === 0 && staged.stdout.trim().length === 0) {
@@ -513,11 +635,11 @@ export function createGitTools(): ToolEntry[] {
       } else {
         args.push('-m', message);
       }
-      const result = await runGit(repository.root, args, { signal: ctx.signal });
+      const result = await runGit(repository.base, args, { signal: ctx.signal });
       if (result.code !== 0) {
         return commandFailure(result);
       }
-      const head = await runGit(repository.root, ['log', '-1', '--pretty=format:%h %s']);
+      const head = await runGit(repository.base, ['log', '-1', '--pretty=format:%h %s']);
       return { content: 'committed ' + head.stdout.trim() };
     }
   };
@@ -533,15 +655,17 @@ export function createGitTools(): ToolEntry[] {
       properties: {
         name: { type: 'string', description: 'The name of the new branch.' },
         base: { type: 'string', description: 'The commit or the branch the new branch starts from.' },
-        checkout: { type: 'boolean', description: 'Switch to the new branch, true by default.' }
+        checkout: { type: 'boolean', description: 'Switch to the new branch, true by default.' },
+        directory: DIRECTORY_PROPERTY
       },
       required: ['name']
     },
     async execute(input, ctx) {
-      const repository = await openRepository(ctx.workspaceRoot);
-      if (!repository) {
-        return failure('Not a git repository: ' + ctx.workspaceRoot);
+      const opened = await openRepository(ctx.workspaceRoot, input);
+      if (!opened.ok) {
+        return failure(opened.error);
       }
+      const repository = opened.repository;
       const name = String(input['name'] ?? '').trim();
       if (name.length === 0) {
         return failure('git_branch_create failed: name must not be empty');
@@ -562,7 +686,7 @@ export function createGitTools(): ToolEntry[] {
       if (base.length > 0) {
         args.push(END_OF_OPTIONS, base);
       }
-      const result = await runGitWithSeparator(repository.root, args, {
+      const result = await runGitWithSeparator(repository.base, args, {
         signal: ctx.signal
       });
       if (result.code !== 0) {
@@ -583,15 +707,17 @@ export function createGitTools(): ToolEntry[] {
     inputSchema: {
       type: 'object',
       properties: {
-        ref: { type: 'string', description: 'The branch or the commit to switch to.' }
+        ref: { type: 'string', description: 'The branch or the commit to switch to.' },
+        directory: DIRECTORY_PROPERTY
       },
       required: ['ref']
     },
     async execute(input, ctx) {
-      const repository = await openRepository(ctx.workspaceRoot);
-      if (!repository) {
-        return failure('Not a git repository: ' + ctx.workspaceRoot);
+      const opened = await openRepository(ctx.workspaceRoot, input);
+      if (!opened.ok) {
+        return failure(opened.error);
       }
+      const repository = opened.repository;
       const ref = String(input['ref'] ?? '').trim();
       if (ref.length === 0) {
         return failure('git_checkout failed: ref must not be empty');
@@ -601,15 +727,167 @@ export function createGitTools(): ToolEntry[] {
         return failure(problem);
       }
       const result = await runGitWithSeparator(
-        repository.root,
+        repository.base,
         ['checkout', END_OF_OPTIONS, ref],
         { signal: ctx.signal }
       );
       if (result.code !== 0) {
         return commandFailure(result);
       }
-      const head = await runGit(repository.root, ['rev-parse', '--abbrev-ref', 'HEAD']);
+      const head = await runGit(repository.base, ['rev-parse', '--abbrev-ref', 'HEAD']);
       return { content: 'switched to ' + head.stdout.trim() };
+    }
+  };
+
+  const gitMerge: ToolEntry = {
+    name: 'git_merge',
+    description:
+      'Merge a branch or a commit into the current branch. The merge changes the files of the working tree, so the user confirms it. A conflict stops the merge and the tool names the files in conflict.',
+    approval: 'always',
+    sideEffect: true,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        branch: {
+          type: 'string',
+          description: 'The branch or the commit to merge into the current branch.'
+        },
+        no_ff: {
+          type: 'boolean',
+          description: 'Always make a merge commit, even when a fast forward is possible.'
+        },
+        no_commit: {
+          type: 'boolean',
+          description: 'Stop before the commit, the merge stays in the working tree.'
+        },
+        message: { type: 'string', description: 'The message of the merge commit.' },
+        directory: DIRECTORY_PROPERTY
+      },
+      required: ['branch']
+    },
+    async execute(input, ctx) {
+      const opened = await openRepository(ctx.workspaceRoot, input);
+      if (!opened.ok) {
+        return failure(opened.error);
+      }
+      const repository = opened.repository;
+      const branch = String(input['branch'] ?? '').trim();
+      if (branch.length === 0) {
+        return failure('git_merge failed: branch must not be empty');
+      }
+      const problem = checkRef(branch, 'git_merge');
+      if (problem) {
+        return failure(problem);
+      }
+      const args = ['merge'];
+      if (input['no_ff'] === true) {
+        args.push('--no-ff');
+      }
+      if (input['no_commit'] === true) {
+        args.push('--no-commit');
+      }
+      const message = String(input['message'] ?? '').trim();
+      if (message.length > 0) {
+        args.push('-m', message);
+      }
+      // The separator goes before the branch, the branch of the model cannot
+      // be read as an option of the merge.
+      args.push(END_OF_OPTIONS, branch);
+      const result = await runGitWithSeparator(repository.base, args, {
+        signal: ctx.signal
+      });
+      if (result.code !== 0) {
+        const detail = commandFailure(result);
+        // The merge that stops on a conflict names the files, the model has
+        // to know which ones it has to fix.
+        const conflicts = await runGit(repository.base, ['diff', '--name-only', '--diff-filter=U'], {
+          signal: ctx.signal
+        });
+        if (conflicts.code === 0 && conflicts.stdout.trim().length > 0) {
+          return {
+            content:
+              detail.content +
+              '\n[the files in conflict]\n' +
+              conflicts.stdout.trim(),
+            isError: true
+          };
+        }
+        return detail;
+      }
+      return { content: 'merged ' + branch };
+    }
+  };
+
+  const gitTag: ToolEntry = {
+    name: 'git_tag',
+    description:
+      'Create a tag on a commit, a mark of a release. A tag with a message is an annotated tag, a tag without a message is a light one. The tag names a version of the project, for example 1.2.0.',
+    approval: 'always',
+    sideEffect: true,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'The name of the tag, for example 1.2.0.' },
+        message: { type: 'string', description: 'The message of the tag, it makes the tag annotated.' },
+        ref: {
+          type: 'string',
+          description: 'The commit or the branch to tag, the current HEAD by default.'
+        },
+        force: {
+          type: 'boolean',
+          description: 'Move the tag to the commit when it exists already.'
+        },
+        directory: DIRECTORY_PROPERTY
+      },
+      required: ['name']
+    },
+    async execute(input, ctx) {
+      const opened = await openRepository(ctx.workspaceRoot, input);
+      if (!opened.ok) {
+        return failure(opened.error);
+      }
+      const repository = opened.repository;
+      const name = String(input['name'] ?? '').trim();
+      if (name.length === 0) {
+        return failure('git_tag failed: name must not be empty');
+      }
+      const nameProblem = checkRef(name, 'git_tag');
+      if (nameProblem) {
+        return failure(nameProblem);
+      }
+      const ref = String(input['ref'] ?? '').trim();
+      const refProblem = checkRef(ref, 'git_tag');
+      if (refProblem) {
+        return failure(refProblem);
+      }
+      const message = String(input['message'] ?? '').trim();
+      const args = ['tag'];
+      if (message.length > 0) {
+        args.push('-a', name, '-m', message);
+      } else {
+        args.push(name);
+      }
+      if (input['force'] === true) {
+        args.push('--force');
+      }
+      if (ref.length > 0) {
+        // The separator goes before the ref, the ref of the model cannot be
+        // read as an option of the tag.
+        args.push(END_OF_OPTIONS, ref);
+      }
+      const result = await runGitWithSeparator(repository.base, args, {
+        signal: ctx.signal
+      });
+      if (result.code !== 0) {
+        return commandFailure(result);
+      }
+      return {
+        content:
+          'created the tag ' +
+          name +
+          (ref.length > 0 ? ' on ' + ref : '') +
+          (message.length > 0 ? '' : ' (a light tag)')
+      };
     }
   };
 
@@ -621,15 +899,18 @@ export function createGitTools(): ToolEntry[] {
     sideEffect: false,
     inputSchema: {
       type: 'object',
-      properties: {}
-    },
-    async execute(_input, ctx) {
-      const repository = await openRepository(ctx.workspaceRoot);
-      if (!repository) {
-        return failure('Not a git repository: ' + ctx.workspaceRoot);
+      properties: {
+        directory: DIRECTORY_PROPERTY
       }
+    },
+    async execute(input, ctx) {
+      const opened = await openRepository(ctx.workspaceRoot, input);
+      if (!opened.ok) {
+        return failure(opened.error);
+      }
+      const repository = opened.repository;
       const result = await runGit(
-        repository.root,
+        repository.base,
         ['worktree', 'list', '--porcelain'],
         { signal: ctx.signal }
       );
@@ -670,15 +951,17 @@ export function createGitTools(): ToolEntry[] {
         base: {
           type: 'string',
           description: 'The commit or the branch the new branch starts from.'
-        }
+        },
+        directory: DIRECTORY_PROPERTY
       },
       required: ['path']
     },
     async execute(input, ctx) {
-      const repository = await openRepository(ctx.workspaceRoot);
-      if (!repository) {
-        return failure('Not a git repository: ' + ctx.workspaceRoot);
+      const opened = await openRepository(ctx.workspaceRoot, input);
+      if (!opened.ok) {
+        return failure(opened.error);
       }
+      const repository = opened.repository;
       const raw = String(input['path'] ?? '').trim();
       if (raw.length === 0) {
         return failure('git_worktree_add failed: path must not be empty');
@@ -693,7 +976,7 @@ export function createGitTools(): ToolEntry[] {
       const base = String(input['base'] ?? '').trim();
       const args = ['worktree', 'add'];
       if (branch.length > 0) {
-        const known = await runGit(repository.root, [
+        const known = await runGit(repository.base, [
           'show-ref',
           '--verify',
           '--quiet',
@@ -714,7 +997,7 @@ export function createGitTools(): ToolEntry[] {
           args.push(base);
         }
       }
-      const result = await runGit(repository.root, args, { signal: ctx.signal });
+      const result = await runGit(repository.base, args, { signal: ctx.signal });
       if (result.code !== 0) {
         return commandFailure(result);
       }
@@ -743,15 +1026,17 @@ export function createGitTools(): ToolEntry[] {
         force: {
           type: 'boolean',
           description: 'Remove it even when it holds changes.'
-        }
+        },
+        directory: DIRECTORY_PROPERTY
       },
       required: ['path']
     },
     async execute(input, ctx) {
-      const repository = await openRepository(ctx.workspaceRoot);
-      if (!repository) {
-        return failure('Not a git repository: ' + ctx.workspaceRoot);
+      const opened = await openRepository(ctx.workspaceRoot, input);
+      if (!opened.ok) {
+        return failure(opened.error);
       }
+      const repository = opened.repository;
       const raw = String(input['path'] ?? '').trim();
       if (raw.length === 0) {
         return failure('git_worktree_remove failed: path must not be empty');
@@ -767,10 +1052,10 @@ export function createGitTools(): ToolEntry[] {
         args.push('--force');
       }
       args.push(target);
-      const result = await runGit(repository.root, args, { signal: ctx.signal });
+      const result = await runGit(repository.base, args, { signal: ctx.signal });
       if (result.code !== 0) {
         // The folder is gone, the record of the worktree is stale.
-        const pruned = await runGit(repository.root, ['worktree', 'prune'], {
+        const pruned = await runGit(repository.base, ['worktree', 'prune'], {
           signal: ctx.signal
         });
         if (pruned.code === 0) {
@@ -798,6 +1083,8 @@ export function createGitTools(): ToolEntry[] {
     gitCommit,
     gitBranchCreate,
     gitCheckout,
+    gitMerge,
+    gitTag,
     gitWorktreeList,
     gitWorktreeAdd,
     gitWorktreeRemove

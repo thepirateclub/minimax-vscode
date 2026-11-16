@@ -28,6 +28,8 @@ const GIT_TOOLS: Record<string, string> = {
   show: 'git_show',
   branch: 'git_branch',
   blame: 'git_blame',
+  merge: 'git_merge',
+  tag: 'git_tag',
   add: 'git_stage',
   commit: 'git_commit',
   checkout: 'git_checkout',

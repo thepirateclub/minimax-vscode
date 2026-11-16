@@ -34,6 +34,7 @@ import {
   setApiKey
 } from './config/secrets';
 import { getSettings, onSettingsChanged, type MiniMaxSettings } from './config/settings';
+import { readChangedFiles } from './git/changes';
 import { collectStagedChanges, gitRepositories, setCommitMessage } from './git/scm';
 import { readRepositoryState, summarizeState } from './git/status';
 import { createLogger, type Logger } from './logger';
@@ -49,6 +50,10 @@ import { ToolRegistry } from './tools/registry';
 import { createGitTools } from './tools/git';
 import { createTerminalTools } from './tools/terminal';
 import { createTodoTools } from './tools/todo';
+import { createTaskFileTools } from './tools/tasks';
+import { createReplTools, resetReplProcesses } from './tools/repl';
+import { createContainerTools } from './tools/containers';
+import { createCmdTools } from './tools/cmd';
 import {
   CHILD_MAX_ITERATIONS,
   createTaskTools,
@@ -219,7 +224,11 @@ class MiniMaxController {
       ...createExploreTools({ search: (root) => this.searchFor(root) }),
       ...createGitTools(),
       ...createTerminalTools(),
+      ...createCmdTools(),
       ...createTodoTools(),
+      ...createTaskFileTools(),
+      ...createReplTools(),
+      ...createContainerTools(),
       ...createGoalTools(),
       ...createTaskTools({
         spawn: async (request, ctx, progress) =>
@@ -944,6 +953,13 @@ class MiniMaxController {
         runtime.todos = event.state.todos;
         this.postFor(runtime, { type: 'todos', todos: runtime.todos });
         this.persist(runtime);
+        // The tasks are done, the reader wants to see what changed.
+        if (
+          runtime.todos.length > 0 &&
+          runtime.todos.every((item) => item.status === 'completed')
+        ) {
+          void this.postSummary(runtime);
+        }
       }
       if (event.state?.kind === 'goal') {
         const goal = runtime.goal;
@@ -1014,6 +1030,8 @@ class MiniMaxController {
         // to get the goal with the time that was added.
         this.postFor(runtime, { type: 'goal', goal: { ...goal } });
       }
+      // The action is over, the reader sees the files it changed.
+      void this.postSummary(runtime);
       const notice = stopNotice(event.stopReason, getSettings().maxIterations, goal);
       if (notice) {
         this.postFor(runtime, { type: 'notice', message: notice.message, kind: notice.kind });
@@ -1181,6 +1199,16 @@ class MiniMaxController {
     }
   }
 
+  // The files of the working tree after the action. The panel shows them
+  // under the feed, the reader opens a file with a click.
+  private async postSummary(runtime: RuntimeSession): Promise<void> {
+    const files = await readChangedFiles(this.workspaceRoot());
+    if (files.length === 0) {
+      return;
+    }
+    this.postFor(runtime, { type: 'summary', files });
+  }
+
   private async handleWebviewMessage(message: WebToExt): Promise<void> {
     if (message.type === 'ready') {
       // The panel has just loaded, it holds nothing of the chat yet.
@@ -1333,6 +1361,8 @@ class MiniMaxController {
       runtime.todos = [];
       this.panel.post({ type: 'todos', todos: [] });
       this.persist(runtime);
+      // The tasks are cancelled, the reader sees what the work changed.
+      void this.postSummary(runtime);
       return;
     }
     if (message.type === 'clear_goal') {
@@ -1967,6 +1997,7 @@ class MiniMaxController {
       enableWebSearch: settings.enableWebSearch,
       collapseTools: settings.collapseTools,
       collapseCode: settings.collapseCode,
+      showToolSteps: settings.showToolSteps,
       maxRetries: settings.maxRetries,
       speechLanguage: settings.speechLanguage,
       microphone: settings.microphone,
@@ -2009,6 +2040,7 @@ class MiniMaxController {
       ['enableWebSearch', values.enableWebSearch],
       ['collapseTools', values.collapseTools],
       ['collapseCode', values.collapseCode],
+      ['showToolSteps', values.showToolSteps],
       ['speechLanguage', values.speechLanguage],
       ['microphone', values.microphone]
     ];
@@ -2142,6 +2174,9 @@ class MiniMaxController {
   }
 
   startNewSession(): void {
+    // The processes of the repl belong to the chat, a new chat starts
+    // with clean ones.
+    resetReplProcesses();
     const current = this.activeSession();
     if (current) {
       this.persist(current);
@@ -2338,6 +2373,10 @@ class MiniMaxController {
         fontSize: settings.fontSize,
         collapseTools: settings.collapseTools,
         collapseCode: settings.collapseCode,
+        showToolSteps: settings.showToolSteps,
+        // The summary of the files lives in the panel only, the host
+        // sends it again after the next action.
+        summary: [],
         // The version comes from the manifest, the webview does not know it.
         version: this.context.extension?.packageJSON?.version ?? ''
       }

@@ -202,6 +202,20 @@ function describeTool(tool: UiToolCall, folded: boolean): ToolView {
       summary: firstLine(content)
     };
   }
+  if (tool.name === 'git_merge') {
+    return {
+      icon: <IconGit />,
+      title: STRINGS.toolGitMerge + ' ' + text(input['branch']),
+      summary: firstLine(content)
+    };
+  }
+  if (tool.name === 'git_tag') {
+    return {
+      icon: <IconGit />,
+      title: STRINGS.toolGitTag + ' ' + text(input['name']),
+      summary: firstLine(content)
+    };
+  }
   if (tool.name === 'git_branch') {
     return {
       icon: <IconGit />,
@@ -267,6 +281,75 @@ function describeTool(tool: UiToolCall, folded: boolean): ToolView {
       icon: <IconGit />,
       title: STRINGS.toolGitWorktreeRemove + ' ' + (paths[0] ?? ''),
       summary: firstLine(content)
+    };
+  }
+  if (tool.name === 'tasks_read') {
+    return {
+      icon: <IconList />,
+      title: STRINGS.toolTasksRead,
+      summary: countLines(content) + ' ' + STRINGS.toolLines
+    };
+  }
+  if (tool.name === 'tasks_update') {
+    const action = text(input['action']);
+    return {
+      icon: <IconList />,
+      title:
+        STRINGS.toolTasksUpdate +
+        (action.length > 0 ? ' (' + action + ')' : ''),
+      summary: firstLine(content)
+    };
+  }
+  if (tool.name === 'repl_node' || tool.name === 'repl_python') {
+    return {
+      icon: <IconTerminal />,
+      title:
+        tool.name === 'repl_node' ? STRINGS.toolReplNode : STRINGS.toolReplPython,
+      summary: firstLine(content)
+    };
+  }
+  if (tool.name === 'container_list') {
+    return {
+      icon: <IconList />,
+      title: STRINGS.toolContainers,
+      summary: countLines(content) + ' ' + STRINGS.toolEntries
+    };
+  }
+  if (tool.name === 'container_logs') {
+    return {
+      icon: <IconTerminal />,
+      title: STRINGS.toolContainerLogs + ' ' + text(input['name']),
+      summary: firstLine(content)
+    };
+  }
+  if (tool.name === 'container_run') {
+    return {
+      icon: <IconTerminal />,
+      title: STRINGS.toolContainerRun + ' ' + text(input['image']),
+      summary: firstLine(content)
+    };
+  }
+  if (tool.name === 'container_stop') {
+    return {
+      icon: <IconTerminal />,
+      title: STRINGS.toolContainerStop + ' ' + text(input['name']),
+      summary: firstLine(content)
+    };
+  }
+  if (tool.name === 'container_exec') {
+    return {
+      icon: <IconTerminal />,
+      title: STRINGS.toolContainerExec + ' ' + text(input['name']),
+      summary: firstLine(content)
+    };
+  }
+  if (tool.name === 'run_cmd') {
+    const command = text(input['command']);
+    const failed = /exit code (\d+)/.exec(content ?? '');
+    return {
+      icon: <IconTerminal />,
+      title: folded ? STRINGS.toolCmd + ' ' + command : STRINGS.toolCmd,
+      summary: failed ? STRINGS.toolExitCode + ' ' + failed[1] : ''
     };
   }
   if (tool.name === 'task') {
@@ -405,7 +488,7 @@ export function ToolCard({
             <DiffView path={changes.path} lines={changes.lines} showPath={false} />
           ) : tool.name === 'read_file' && tool.content ? (
             <FileReadView content={tool.content} path={filePaths(tool.input)[0] ?? ''} />
-          ) : tool.name === 'run_terminal' ? (
+          ) : tool.name === 'run_terminal' || tool.name === 'run_cmd' ? (
             <TerminalView
               command={String(tool.input['command'] ?? '')}
               content={tool.content ?? ''}

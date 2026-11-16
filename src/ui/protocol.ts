@@ -29,6 +29,12 @@ export interface UiToolCall {
   diff?: { path: string; lines: UiDiffLine[] };
 }
 
+// A file of the working tree that the agent has changed.
+export interface UiChangedFile {
+  path: string;
+  status: 'added' | 'modified' | 'deleted' | 'renamed';
+}
+
 export interface UiApproval {
   id: string;
   name: string;
@@ -134,6 +140,8 @@ export interface UiSettingsValues {
   collapseTools: boolean;
   // The code blocks of the answers fold to their header.
   collapseCode: boolean;
+  // The steps of the tools are shown in the feed.
+  showToolSteps: boolean;
   speechLanguage: string;
   microphone: string;
 }
@@ -175,6 +183,10 @@ export interface UiState {
   collapseTools: boolean;
   // The code blocks of the answers fold to their header.
   collapseCode: boolean;
+  // The steps of the tools are shown in the feed.
+  showToolSteps: boolean;
+  // The files of the last action, the panel shows them under the feed.
+  summary: UiChangedFile[];
   // The version of the running extension, the panel shows it in the header.
   version: string;
   // The list of tasks of the session.
@@ -216,6 +228,8 @@ export type ExtToWeb =
   | { type: 'todos'; todos: TodoItem[] }
   // The goal of the session, the host owns it.
   | { type: 'goal'; goal?: GoalState }
+  // The files that the last action changed.
+  | { type: 'summary'; files: UiChangedFile[] }
   | { type: 'error'; message: string }
   | { type: 'notice'; message: string; kind: NoticeKind }
   | { type: 'step_time'; id: string; elapsedMs: number }

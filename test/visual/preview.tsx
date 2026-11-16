@@ -68,6 +68,16 @@ const STATE: UiState = {
   fontSize: 13,
   collapseTools: params.get('collapse') === '1',
   collapseCode: params.get('collapse') === '1',
+  showToolSteps: params.get('steps') !== '0',
+  // The files of the last action, the panel shows them under the feed.
+  summary:
+    params.get('summary') === '1'
+      ? [
+          { path: 'src/ui/webview/components/SummaryBar.tsx', status: 'added' as const },
+          { path: 'src/ui/webview/styles.css', status: 'modified' as const },
+          { path: 'src/old/file.ts', status: 'deleted' as const }
+        ]
+      : [],
   version: manifest.version,
   // The widgets over the feed: ?goal=1 shows the goal and the tasks.
   todos:
@@ -100,6 +110,7 @@ const SETTINGS: UiSettings = {
   maxIterations: 25,
   maxRetries: 5,
   fontSize: 13,
+  showToolSteps: true,
   historyMaxMessages: 200,
   contextThreshold: 50,
   semanticSearch: false,

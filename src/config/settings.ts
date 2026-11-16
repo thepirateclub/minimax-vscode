@@ -23,6 +23,8 @@ export interface MiniMaxSettings {
   collapseTools: boolean;
   // The code blocks of the answers fold to their header.
   collapseCode: boolean;
+  // The steps of the tools are shown in the feed.
+  showToolSteps: boolean;
   autoApprove: string[];
   enableWebSearch: boolean;
   rulesEnabled: boolean;
@@ -75,6 +77,7 @@ export function getSettings(): MiniMaxSettings {
     semanticSearch: cfg.get<boolean>('semanticSearch', false),
     collapseTools: cfg.get<boolean>('collapseTools', false),
     collapseCode: cfg.get<boolean>('collapseCode', false),
+    showToolSteps: cfg.get<boolean>('showToolSteps', true),
     autoApprove: userValue<string[]>(cfg, 'autoApprove', []),
     enableWebSearch: cfg.get<boolean>('enableWebSearch', false),
     rulesEnabled: cfg.get<boolean>('rulesEnabled', true),
