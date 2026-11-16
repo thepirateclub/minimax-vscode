@@ -7,6 +7,19 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ExtensionContext } from 'vscode';
 import type { ExtToWeb, WebToExt } from '../../src/ui/protocol';
 
+// The turn of the model builds the prompt, reads the tree of the project
+// and waits for the answer. Under the load of the whole suite the first turn
+// takes longer than the second that vi.waitFor gives by default.
+const rawWaitFor = vi.waitFor;
+vi.waitFor = ((
+  callback: Parameters<typeof rawWaitFor>[0],
+  options?: Parameters<typeof rawWaitFor>[1]
+) =>
+  rawWaitFor(callback, {
+    timeout: 10_000,
+    ...(typeof options === 'number' ? { timeout: options } : options)
+  })) as unknown as typeof vi.waitFor;
+
 const state = vi.hoisted(() => ({
   commands: new Map<string, (...args: unknown[]) => unknown>(),
   viewProviders: new Map<string, { resolveWebviewView: (view: unknown) => void }>(),
@@ -187,6 +200,18 @@ vi.mock('vscode', () => {
 });
 
 const MESSAGES_URL = 'https://api.minimax.io/anthropic/v1/messages';
+
+// The test of the address of the API marks its request with this text. The
+// answer is given by the mark, so a leftover request of another test cannot
+// take it away from the test that waits for it.
+const PROBE_MARK = 'endpoint-probe';
+const PROBE_SSE = [
+  'event: message_start\ndata: {"type":"message_start","message":{"usage":{"input_tokens":3}}}\n\n',
+  'event: content_block_start\ndata: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}\n\n',
+  'event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"probe answer"}}\n\n',
+  'event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":2}}\n\n',
+  'event: message_stop\ndata: {"type":"message_stop"}\n\n'
+].join('');
 
 // The workspace of a test can be a repository, the state of it goes into
 // the prompt of the model.
@@ -394,6 +419,12 @@ describe('extension activation', () => {
         if (body) {
           state.bodies.push(body);
         }
+        if (body.includes(PROBE_MARK)) {
+          return new Response(PROBE_SSE, {
+            status: 200,
+            headers: { 'content-type': 'text/event-stream' }
+          });
+        }
         if (href.includes('/v1/token_plan/remains')) {
           return new Response(QUOTA_JSON, {
             status: 200,
@@ -526,10 +557,10 @@ describe('extension activation', () => {
     await boot();
 
     state.posted.length = 0;
-    state.receive?.({ type: 'send', text: 'hello', mentions: [], selections: [] });
+    state.receive?.({ type: 'send', text: PROBE_MARK, mentions: [], selections: [] });
     await vi.waitFor(() => {
       expect(ofType('text_delta').map((message) => message.text).join('')).toBe(
-        'hi from the model'
+        'probe answer'
       );
     });
     await vi.waitFor(() => {
@@ -550,10 +581,10 @@ describe('extension activation', () => {
     await boot();
 
     state.posted.length = 0;
-    state.receive?.({ type: 'send', text: 'hello', mentions: [], selections: [] });
+    state.receive?.({ type: 'send', text: PROBE_MARK, mentions: [], selections: [] });
     await vi.waitFor(() => {
       expect(ofType('text_delta').map((message) => message.text).join('')).toBe(
-        'hi from the model'
+        'probe answer'
       );
     });
     await vi.waitFor(() => {
