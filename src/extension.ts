@@ -21,7 +21,13 @@ import type { GoalState, TodoItem } from './agent/state';
 import { budgetOver } from './agent/goalBudget';
 import { isAbortMessage, stopNotice } from './agent/stopReason';
 import { cutHistory, findRequestIndex, turnOfMessage, type TurnAnchor } from './agent/turns';
-import { AGENT_MODES, MODELS, resolveBaseUrl } from './config/models';
+import {
+  AGENT_MODES,
+  checkBaseUrl,
+  isOfficialBaseUrlHost,
+  MODELS,
+  resolveBaseUrl
+} from './config/models';
 import {
   clearApiKey as clearStoredApiKey,
   getApiKey,
@@ -267,6 +273,7 @@ class MiniMaxController {
     context.subscriptions.push(
       onSettingsChanged(() => {
         this.applySettings();
+        this.warnAboutTheBaseUrl();
         void this.sendInit();
       })
     );
@@ -1748,9 +1755,22 @@ class MiniMaxController {
 
   private async saveSettings(values: UiSettingsValues): Promise<void> {
     const config = vscode.workspace.getConfiguration('minimax');
+    // The address of the API holds the key of the user, a wrong address is
+    // refused and the rest of the settings is saved.
+    let customBaseUrl = values.customBaseUrl;
+    if (typeof customBaseUrl === 'string' && customBaseUrl.trim().length > 0) {
+      const check = checkBaseUrl(customBaseUrl);
+      if (!check.ok) {
+        this.panel.post({
+          type: 'error',
+          message: 'The custom base URL is not accepted: ' + check.reason + '.'
+        });
+        customBaseUrl = '';
+      }
+    }
     const updates: Array<[string, unknown]> = [
       ['baseUrl', values.baseUrl],
-      ['customBaseUrl', values.customBaseUrl],
+      ['customBaseUrl', customBaseUrl],
       ['model', values.model],
       ['effort', values.effort],
       ['mode', values.mode],
@@ -2096,12 +2116,53 @@ class MiniMaxController {
       if (!url || url.trim().length === 0) {
         return;
       }
-      await config.update('customBaseUrl', url.trim(), vscode.ConfigurationTarget.Global);
+      const trimmed = url.trim();
+      const check = checkBaseUrl(trimmed);
+      if (!check.ok) {
+        void vscode.window.showErrorMessage(
+          'MiniMax: the endpoint is not accepted, ' + check.reason + '.'
+        );
+        return;
+      }
+      // The key of the user goes to this host, the address of MiniMax is the
+      // usual one and another host is asked about.
+      if (!isOfficialBaseUrlHost(check.host ?? '')) {
+        const answer = await vscode.window.showWarningMessage(
+          'MiniMax: the API key will go to ' +
+            check.host +
+            '. It is not the address of MiniMax.',
+          { modal: true },
+          'Use it'
+        );
+        if (answer !== 'Use it') {
+          return;
+        }
+      }
+      await config.update('customBaseUrl', trimmed, vscode.ConfigurationTarget.Global);
       await config.update('baseUrl', 'auto', vscode.ConfigurationTarget.Global);
     } else {
       await config.update('baseUrl', choice.value, vscode.ConfigurationTarget.Global);
     }
     await this.sendInit();
+  }
+
+  // The address of the API can be wrong in the settings of the user, the
+  // official endpoint is used then and the user is told about it.
+  private warnAboutTheBaseUrl(): void {
+    const custom = getSettings().customBaseUrl.trim();
+    if (custom.length === 0) {
+      return;
+    }
+    const check = checkBaseUrl(custom);
+    if (check.ok) {
+      return;
+    }
+    this.logger.error('the custom base URL is not accepted: ' + check.reason);
+    void vscode.window.showWarningMessage(
+      'MiniMax: the custom base URL is not accepted, ' +
+        check.reason +
+        '. The official endpoint is used.'
+    );
   }
 
   private async selectModel(): Promise<void> {

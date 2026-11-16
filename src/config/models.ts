@@ -52,10 +52,50 @@ export const MODELS: ModelInfo[] = [
 export const GLOBAL_BASE_URL = 'https://api.minimax.io/anthropic';
 export const CHINA_BASE_URL = 'https://api.minimaxi.com/anthropic';
 
+// The key of the user goes to this address with the header Authorization, so
+// the address is checked before it is used.
+export const OFFICIAL_BASE_URL_HOSTS = ['api.minimax.io', 'api.minimaxi.com'];
+
+export interface BaseUrlCheck {
+  ok: boolean;
+  // Why the address was refused.
+  reason?: string;
+  // The host of the address, it holds the key.
+  host?: string;
+}
+
+// Only https is accepted: the key must not go to the network in the clear.
+export function checkBaseUrl(value: string): BaseUrlCheck {
+  const trimmed = value.trim();
+  if (trimmed.length === 0) {
+    return { ok: false, reason: 'the address is empty' };
+  }
+  let url: URL;
+  try {
+    url = new URL(trimmed);
+  } catch {
+    return { ok: false, reason: 'the address is not a valid URL' };
+  }
+  if (url.protocol !== 'https:') {
+    return { ok: false, reason: 'only https is allowed' };
+  }
+  if (url.hostname.length === 0) {
+    return { ok: false, reason: 'the address has no host' };
+  }
+  return { ok: true, host: url.hostname };
+}
+
+// The address of MiniMax itself, the key may go to another host only with the
+// consent of the user.
+export function isOfficialBaseUrlHost(host: string): boolean {
+  return OFFICIAL_BASE_URL_HOSTS.includes(host.toLowerCase());
+}
+
 export function resolveBaseUrl(preset: BaseUrlPreset, custom?: string): string {
-  if (custom && custom.trim().length > 0) {
+  if (custom && custom.trim().length > 0 && checkBaseUrl(custom).ok) {
     return custom.trim().replace(/\/+$/, '');
   }
+  // The address was not trusted, the official endpoint of the region is used.
   if (preset === 'china') {
     return CHINA_BASE_URL;
   }

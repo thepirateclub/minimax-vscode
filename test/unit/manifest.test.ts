@@ -19,6 +19,7 @@ interface ManifestProperty {
   default?: unknown;
   description?: string;
   enum?: string[];
+  scope?: string;
 }
 
 interface Manifest {
@@ -66,6 +67,17 @@ describe('the manifest of the extension', () => {
     expect(properties['minimax.speechLanguage']?.enum).toEqual(expect.arrayContaining(['', 'ru', 'en']));
     expect(properties['minimax.microphone']).toMatchObject({ type: 'string', default: '' });
     expect(properties['minimax.ffmpegPath']).toMatchObject({ type: 'string', default: 'ffmpeg' });
+  });
+
+  it('keeps the address of the API out of the reach of the workspace', () => {
+    const properties = manifest.contributes.configuration.properties;
+    // A repository that the user opens must not move the API to another host
+    // with the key of the user, must not switch the confirmations off and
+    // must not point the voice input to its own program.
+    expect(properties['minimax.customBaseUrl']?.scope).toBe('application');
+    expect(properties['minimax.baseUrl']?.scope).toBe('application');
+    expect(properties['minimax.autoApprove']?.scope).toBe('application');
+    expect(properties['minimax.ffmpegPath']?.scope).toBe('application');
   });
 
   it('offers the switches that fold the panels of the chat', () => {

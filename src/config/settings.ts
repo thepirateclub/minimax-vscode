@@ -32,11 +32,35 @@ export interface MiniMaxSettings {
   ffmpegPath: string;
 }
 
+// The settings that decide where the key of the user goes and what the
+// agent may do without a question. A repository that the user opens must not
+// be able to change them. The manifest declares the scope of these settings,
+// this check is the second wall for it.
+function userValue<T>(
+  cfg: vscode.WorkspaceConfiguration,
+  key: string,
+  fallback: T
+): T {
+  const inspected = typeof cfg.inspect === 'function' ? cfg.inspect<T>(key) : undefined;
+  if (!inspected) {
+    return cfg.get<T>(key, fallback);
+  }
+  // The value of the workspace and of the folder is not taken, the user sets
+  // these settings himself.
+  if (inspected.globalValue !== undefined) {
+    return inspected.globalValue;
+  }
+  if (inspected.defaultValue !== undefined) {
+    return inspected.defaultValue;
+  }
+  return fallback;
+}
+
 export function getSettings(): MiniMaxSettings {
   const cfg = vscode.workspace.getConfiguration('minimax');
   return {
-    baseUrl: cfg.get<BaseUrlPreset>('baseUrl', 'auto'),
-    customBaseUrl: cfg.get<string>('customBaseUrl', ''),
+    baseUrl: userValue<BaseUrlPreset>(cfg, 'baseUrl', 'auto'),
+    customBaseUrl: userValue<string>(cfg, 'customBaseUrl', ''),
     model: cfg.get<string>('model', 'MiniMax-M3.1-Flash'),
     effort: cfg.get<EffortLevel>('effort', 'max'),
     mode: cfg.get<AgentMode>('mode', 'code'),
@@ -48,13 +72,13 @@ export function getSettings(): MiniMaxSettings {
     semanticSearch: cfg.get<boolean>('semanticSearch', false),
     collapseTools: cfg.get<boolean>('collapseTools', false),
     collapseCode: cfg.get<boolean>('collapseCode', false),
-    autoApprove: cfg.get<string[]>('autoApprove', []),
+    autoApprove: userValue<string[]>(cfg, 'autoApprove', []),
     enableWebSearch: cfg.get<boolean>('enableWebSearch', false),
     rulesEnabled: cfg.get<boolean>('rulesEnabled', true),
     speechLanguage: cfg.get<string>('speechLanguage', ''),
     microphone: cfg.get<string>('microphone', ''),
     speechVocabulary: cfg.get<string[]>('speechVocabulary', []),
-    ffmpegPath: cfg.get<string>('ffmpegPath', 'ffmpeg')
+    ffmpegPath: userValue<string>(cfg, 'ffmpegPath', 'ffmpeg')
   };
 }
 

@@ -2,7 +2,7 @@
   "name": "minimax-agent",
   "displayName": "MiniMax Agent",
   "description": "Coding agent for VS Code powered by MiniMax models",
-  "version": "0.13.0",
+  "version": "0.13.1",
   "publisher": "local",
   "license": "MIT",
   "engines": {
@@ -129,12 +129,14 @@
             "global",
             "china"
           ],
+          "scope": "application",
           "description": "API region. auto uses the global endpoint."
         },
         "minimax.customBaseUrl": {
           "type": "string",
           "default": "",
-          "description": "Custom base URL. Overrides the region preset when set."
+          "scope": "application",
+          "description": "Custom base URL. Overrides the region preset when set. Only https is accepted, the API key goes to this address."
         },
         "minimax.model": {
           "type": "string",
@@ -203,6 +205,7 @@
         "minimax.ffmpegPath": {
           "type": "string",
           "default": "ffmpeg",
+          "scope": "application",
           "description": "The ffmpeg that records the voice input. The webview of VS Code has no access to the microphone."
         },
         "minimax.fontSize": {
@@ -243,6 +246,7 @@
             "type": "string"
           },
           "default": [],
+          "scope": "application",
           "description": "Tool names approved without confirmation for the whole session."
         },
         "minimax.enableWebSearch": {

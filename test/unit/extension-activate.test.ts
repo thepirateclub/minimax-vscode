@@ -11,6 +11,7 @@ const state = vi.hoisted(() => ({
   commands: new Map<string, (...args: unknown[]) => unknown>(),
   viewProviders: new Map<string, { resolveWebviewView: (view: unknown) => void }>(),
   config: new Map<string, unknown>(),
+  workspaceConfig: new Map<string, unknown>(),
   secrets: new Map<string, string>(),
   globalState: new Map<string, unknown>(),
   posted: [] as ExtToWeb[],
@@ -35,6 +36,15 @@ vi.mock('vscode', () => {
   const configuration = {
     get: (key: string, fallback?: unknown) =>
       state.config.has(key) ? state.config.get(key) : fallback,
+    // The editor tells where the value of a setting comes from: the user, the
+    // workspace or the folder. The extension reads the value of the user for
+    // the settings that hold the address of the API.
+    inspect: (key: string) => ({
+      key,
+      defaultValue: undefined,
+      globalValue: state.config.get(key),
+      workspaceValue: state.workspaceConfig.get(key)
+    }),
     update: async (key: string, value: unknown) => {
       state.config.set(key, value);
     }
@@ -357,6 +367,7 @@ describe('extension activation', () => {
     state.commands.clear();
     state.viewProviders.clear();
     state.config.clear();
+    state.workspaceConfig.clear();
     state.secrets.clear();
     state.globalState.clear();
     state.posted.length = 0;
@@ -502,6 +513,53 @@ describe('extension activation', () => {
     const index = state.fetched.indexOf(MESSAGES_URL);
     expect(state.headers[index]?.['Authorization']).toBe('Bearer test-key');
     expect(state.headers[index]?.['anthropic-version']).toBe('2023-06-01');
+  });
+
+  it('does not take the address of the API from the workspace', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    // A repository that the user opens tries to move the API to its own host
+    // with the key of the user.
+    state.workspaceConfig.set('customBaseUrl', 'https://attacker.example/anthropic');
+    state.secrets.set('minimax.apiKey', 'test-key');
+    state.responses.push(TEXT_SSE);
+    await boot();
+
+    state.posted.length = 0;
+    state.receive?.({ type: 'send', text: 'hello', mentions: [], selections: [] });
+    await vi.waitFor(() => {
+      expect(ofType('text_delta').map((message) => message.text).join('')).toBe(
+        'hi from the model'
+      );
+    });
+    await vi.waitFor(() => {
+      expect(ofType('status').pop()?.state).toBe('idle');
+    });
+    expect(state.fetched).toContain(MESSAGES_URL);
+    expect(state.fetched.some((url) => url.includes('attacker.example'))).toBe(false);
+    const index = state.fetched.indexOf(MESSAGES_URL);
+    expect(state.headers[index]?.['Authorization']).toBe('Bearer test-key');
+  });
+
+  it('takes the address of the API from the user', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.config.set('customBaseUrl', 'https://proxy.example/anthropic');
+    state.secrets.set('minimax.apiKey', 'test-key');
+    state.responses.push(TEXT_SSE);
+    await boot();
+
+    state.posted.length = 0;
+    state.receive?.({ type: 'send', text: 'hello', mentions: [], selections: [] });
+    await vi.waitFor(() => {
+      expect(ofType('text_delta').map((message) => message.text).join('')).toBe(
+        'hi from the model'
+      );
+    });
+    await vi.waitFor(() => {
+      expect(ofType('status').pop()?.state).toBe('idle');
+    });
+    expect(state.fetched).toContain('https://proxy.example/anthropic/v1/messages');
   });
 
   it('asks for an approval before a write and applies it after the answer', async () => {
