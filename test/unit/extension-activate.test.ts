@@ -20,6 +20,14 @@ vi.waitFor = ((
     ...(typeof options === 'number' ? { timeout: options } : options)
   })) as unknown as typeof vi.waitFor;
 
+// The log of the network of one controller: the addresses, the headers
+// and the bodies of the requests.
+interface FetchLog {
+  fetched: string[];
+  headers: Array<Record<string, string>>;
+  bodies: string[];
+}
+
 const state = vi.hoisted(() => ({
   commands: new Map<string, (...args: unknown[]) => unknown>(),
   viewProviders: new Map<string, { resolveWebviewView: (view: unknown) => void }>(),
@@ -344,6 +352,10 @@ function makeContext(): ExtensionContext {
 }
 
 function makeView(): unknown {
+  // The panel of this controller writes into the list of this test. The
+  // panel of the controller of the previous test keeps the list it was
+  // built with, its late messages do not fall into this test.
+  const posted = state.posted;
   return {
     webview: {
       options: {},
@@ -354,7 +366,7 @@ function makeView(): unknown {
         // The webview gets a copy of the message, the host keeps the object
         // and can change it later. A test that looks at the panel has to see
         // the message as it was posted.
-        state.posted.push(structuredClone(message));
+        posted.push(structuredClone(message));
         return Promise.resolve(true);
       },
       onDidReceiveMessage: (handler: (message: WebToExt) => void) => {
@@ -364,6 +376,51 @@ function makeView(): unknown {
     },
     onDidDispose: () => ({ dispose: () => undefined })
   };
+}
+
+// The stub of the network. Every boot of the extension gets its own: the
+// controller of the previous test keeps the stub it was built with, a late
+// request of it cannot take the answer of the next test.
+function stubFetch(queue: string[], log: FetchLog): void {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      const href = String(url);
+      log.fetched.push(href);
+      log.headers.push((init?.headers ?? {}) as Record<string, string>);
+      const body = typeof init?.body === 'string' ? init.body : '';
+      if (body) {
+        log.bodies.push(body);
+      }
+      if (body.includes(PROBE_MARK)) {
+        return new Response(PROBE_SSE, {
+          status: 200,
+          headers: { 'content-type': 'text/event-stream' }
+        });
+      }
+      if (href.includes('/v1/token_plan/remains')) {
+        return new Response(QUOTA_JSON, {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      const payload = queue.shift() ?? TEXT_SSE;
+      if (payload === 'HOLD') {
+        // The turn of the model waits for the test.
+        await new Promise<void>((resolve) => {
+          state.holdResponse = resolve;
+        });
+        return new Response(TEXT_SSE, {
+          status: 200,
+          headers: { 'content-type': 'text/event-stream' }
+        });
+      }
+      return new Response(payload, {
+        status: 200,
+        headers: { 'content-type': 'text/event-stream' }
+      });
+    })
+  );
 }
 
 async function boot(): Promise<void> {
@@ -398,11 +455,14 @@ describe('extension activation', () => {
     state.workspaceConfig.clear();
     state.secrets.clear();
     state.globalState.clear();
-    state.posted.length = 0;
-    state.fetched.length = 0;
-    state.headers.length = 0;
-    state.bodies.length = 0;
-    state.responses.length = 0;
+    state.posted = [];
+    // Every test has its own answers and its own log of the network. The
+    // controller of the previous test keeps the stub it was built with, a
+    // late request of it cannot take the answer of this test.
+    state.fetched = [];
+    state.headers = [];
+    state.bodies = [];
+    state.responses = [];
     state.editor = undefined;
     state.documents.length = 0;
     state.files.length = 0;
@@ -413,45 +473,11 @@ describe('extension activation', () => {
     state.opened.length = 0;
     state.shown.length = 0;
     state.holdResponse = undefined;
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
-        const href = String(url);
-        state.fetched.push(href);
-        state.headers.push((init?.headers ?? {}) as Record<string, string>);
-        const body = typeof init?.body === 'string' ? init.body : '';
-        if (body) {
-          state.bodies.push(body);
-        }
-        if (body.includes(PROBE_MARK)) {
-          return new Response(PROBE_SSE, {
-            status: 200,
-            headers: { 'content-type': 'text/event-stream' }
-          });
-        }
-        if (href.includes('/v1/token_plan/remains')) {
-          return new Response(QUOTA_JSON, {
-            status: 200,
-            headers: { 'content-type': 'application/json' }
-          });
-        }
-        const payload = state.responses.shift() ?? TEXT_SSE;
-        if (payload === 'HOLD') {
-          // The turn of the model waits for the test.
-          await new Promise<void>((resolve) => {
-            state.holdResponse = resolve;
-          });
-          return new Response(TEXT_SSE, {
-            status: 200,
-            headers: { 'content-type': 'text/event-stream' }
-          });
-        }
-        return new Response(payload, {
-          status: 200,
-          headers: { 'content-type': 'text/event-stream' }
-        });
-      })
-    );
+    stubFetch(state.responses, {
+      fetched: state.fetched,
+      headers: state.headers,
+      bodies: state.bodies
+    });
   });
 
   it('registers every command and the panel', async () => {
