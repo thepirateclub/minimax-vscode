@@ -97,6 +97,10 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
   // The connection to MiniMax is lost, the request is repeated. The panel
   // shows the attempt.
   const [retryStatus, setRetryStatus] = useState<UiRetryStatus | undefined>(undefined);
+  // The feed goes to the end of the history: the chat was replaced or
+  // the request runs again. The flag lives in the app, the feed is built
+  // from scratch when the history goes away.
+  const [followEnd, setFollowEnd] = useState(false);
   // The queue of the messages of the chat.
   const [queue, setQueue] = useState<UiQueuedMessage[]>([]);
   // When the action that runs now started. The clock of the status over the
@@ -236,6 +240,10 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
         return;
       }
       if (message.type === 'session_loaded') {
+        // The host replaced the history of the chat: another chat was
+        // opened, or the request runs again and the messages of the failed
+        // turn went away. The feed shows the end of the history.
+        setFollowEnd(true);
         setMessages(message.messages);
         setOlderMessages(message.olderMessages ?? 0);
         return;
@@ -453,8 +461,15 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
             onApprove={approve}
             onReject={reject}
             onOpenFile={openFile}
-            onRetry={(id) => vscode.postMessage({ type: 'retry', id })}
+            onRetry={(id) => {
+              // The reader asked for a new turn: the feed shows the end of
+              // the history and follows the turn.
+              setFollowEnd(true);
+              vscode.postMessage({ type: 'retry', id });
+            }}
             onRewind={(id) => vscode.postMessage({ type: 'rewind', id })}
+            followEnd={followEnd}
+            onFollowEnd={() => setFollowEnd(false)}
           />
         )}
         <SummaryBar

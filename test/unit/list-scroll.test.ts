@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   BOTTOM_GAP,
   contentChanged,
+  feedAction,
   isAtBottom,
   measure,
   shouldFollow
@@ -45,5 +46,48 @@ describe('scroll of the message list', () => {
     const next = measure([{ text: 'a' }, { text: 'b' }]);
     expect(contentChanged(previous, next)).toBe(true);
     expect(shouldFollow(previous, next, true)).toBe(true);
+  });
+});
+
+describe('the repeat of the request', () => {
+  it('puts the feed at the end of the history', () => {
+    // The reader scrolled up and pressed the repeat: the feed shows the
+    // end of the history and follows the new turn.
+    const previous = measure([{ id: 'u1', text: 'the request' }]);
+    const next = measure([
+      { id: 'u1', text: 'the request' },
+      { id: 'a1', text: 'the answer' }
+    ]);
+    expect(feedAction(previous, next, false, true)).toBe('bottom');
+  });
+
+  it('puts the feed at the end even when the reader was there', () => {
+    const previous = measure([{ id: 'u1', text: 'the request' }]);
+    const next = measure([
+      { id: 'u1', text: 'the request' },
+      { id: 'a1', text: 'the answer' }
+    ]);
+    expect(feedAction(previous, next, true, true)).toBe('bottom');
+  });
+
+  it('sees the history that was replaced by another one of the same size', () => {
+    const previous = measure([{ id: 'u1', text: 'the request' }]);
+    const next = measure([{ id: 'u2', text: 'the request' }]);
+    // The count and the length of the text are the same, only the ids of
+    // the messages differ: the history was replaced.
+    expect(contentChanged(previous, next)).toBe(true);
+    expect(feedAction(previous, next, false, true)).toBe('bottom');
+  });
+
+  it('keeps the place of the reader while the content grows above him', () => {
+    const previous = measure([{ id: 'u1', text: 'a' }]);
+    const next = measure([{ id: 'u1', text: 'ab' }]);
+    expect(feedAction(previous, next, false, false)).toBe('pending');
+    expect(feedAction(previous, next, true, false)).toBe('bottom');
+  });
+
+  it('does not move the feed when nothing changed', () => {
+    const state = measure([{ id: 'u1', text: 'the request' }]);
+    expect(feedAction(state, state, true, false)).toBe('keep');
   });
 });

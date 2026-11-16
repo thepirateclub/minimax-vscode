@@ -235,6 +235,44 @@ export const SECTIONS_STEPS: UiMessage[] = [
   { id: 'w-th2', role: 'assistant', thinking: 'The change touches the storage of the chats.' }
 ];
 
+// The chat of the repeat of a request: one turn in the middle of the chat
+// failed, so the panel shows the button of the repeat at that request. The
+// chat is long enough to scroll and the reader has to scroll up to the old
+// failure to press the button.
+export const RETRY_MESSAGES: UiMessage[] = Array.from({ length: 100 }, (_, i) => {
+  const turn: UiMessage[] = [
+    {
+      id: 'r-u' + i,
+      role: 'user',
+      text: 'Request ' + (i + 1) + ': check the module and tell me what is wrong in it.'
+    },
+    {
+      id: 'r-a' + i,
+      role: 'assistant',
+      text:
+        'Answer ' +
+        (i + 1) +
+        ': the module reads the file and returns the result. ' +
+        'The check of the details of the work. '.repeat(6)
+    }
+  ];
+  if (i === 70) {
+    turn.push({
+      id: 'r-err',
+      role: 'notice',
+      kind: 'error' as const,
+      text: 'The request failed: 500 Internal Server Error'
+    });
+  }
+  return turn;
+}).flat();
+
+// The panel holds the tail of the chat, the older part waits in the host.
+// The repeat of a request brings another tail of the same size, so the
+// panel does not see the change by the number of the messages.
+export const RETRY_PAGE = 120;
+export const RETRY_TAIL: UiMessage[] = RETRY_MESSAGES.slice(-RETRY_PAGE);
+
 export function sessions(now: number): UiSessionSummary[] {
   return [
     { id: 's1', title: 'Rounding of the token counter', updatedAt: now },

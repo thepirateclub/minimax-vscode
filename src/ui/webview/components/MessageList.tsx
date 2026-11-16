@@ -5,7 +5,7 @@ import { collectFileSources, type CodeSource } from '../codeBlock';
 import { commandHints, type CommandHint } from '../commandHistory';
 import { failedRequests } from '../failedRequests';
 import { IconRetry, IconRewind } from '../icons';
-import { contentChanged, isAtBottom, measure, shouldFollow } from '../listScroll';
+import { feedAction, isAtBottom, measure } from '../listScroll';
 import { formatDuration } from '../../format';
 import { writeToClipboard } from '../clipboard';
 import { renderMarkdown } from '../markdown';
@@ -215,7 +215,9 @@ export function MessageList({
   onReject,
   onOpenFile,
   onRetry,
-  onRewind
+  onRewind,
+  followEnd,
+  onFollowEnd
 }: {
   messages: UiMessage[];
   // How many messages of the chat wait in the host. The panel asks for
@@ -234,6 +236,13 @@ export function MessageList({
   onOpenFile: (path: string, line?: number) => void;
   onRetry: (id: string) => void;
   onRewind: (id: string) => void;
+  // The feed goes to the end of the history: the chat was replaced or
+  // the request runs again. The feed follows the new turn, whatever place
+  // the reader had.
+  followEnd: boolean;
+  // The reader took the place of the feed, the feed does not pull itself
+  // down any more.
+  onFollowEnd: () => void;
 }) {
   const listRef = useRef<HTMLDivElement>(null);
   const atBottomRef = useRef(true);
@@ -280,23 +289,21 @@ export function MessageList({
       });
       return;
     }
-    if (next.count < previous.count) {
-      // Another chat was opened, the list shows its end.
+    const action = feedAction(previous, next, atBottomRef.current, followEnd);
+    if (action === 'keep') {
+      return;
+    }
+    if (action === 'bottom') {
+      // The feed goes to the end of the history: another chat was opened, or
+      // the request runs again and the reader waits for the new turn.
       root.scrollTop = root.scrollHeight;
       atBottomRef.current = true;
       setAtBottom(true);
       setPending(0);
       return;
     }
-    if (!contentChanged(previous, next)) {
-      return;
-    }
-    if (shouldFollow(previous, next, atBottomRef.current)) {
-      root.scrollTop = root.scrollHeight;
-      return;
-    }
     setPending((value) => value + 1);
-  }, [messages]);
+  }, [messages, followEnd]);
 
   const handleScroll = useCallback((): void => {
     const root = listRef.current;
@@ -308,8 +315,14 @@ export function MessageList({
     setAtBottom(bottom);
     if (bottom) {
       setPending(0);
+      return;
     }
-  }, []);
+    if (followEnd) {
+      // The reader scrolled up: he took the place of the feed, the feed
+      // does not pull itself down any more.
+      onFollowEnd();
+    }
+  }, [followEnd, onFollowEnd]);
 
   const loadEarlier = useCallback((): void => {
     const root = listRef.current;

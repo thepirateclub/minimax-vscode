@@ -23,7 +23,9 @@ function render(messages: UiMessage[], olderMessages = 0): string {
       onReject: () => undefined,
       onOpenFile: () => undefined,
       onRetry: () => undefined,
-      onRewind: () => undefined
+      onRewind: () => undefined,
+      followEnd: false,
+      onFollowEnd: () => undefined
     })
   );
 }

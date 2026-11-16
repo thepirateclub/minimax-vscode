@@ -9,9 +9,15 @@ export const BOTTOM_GAP = 80;
 export interface ListState {
   count: number;
   textLength: number;
+  // The identity of the list: the ids of the first and of the last message.
+  // The history can be replaced by another one of the same size and of the
+  // same length of the text, and the count and the length do not see it.
+  firstId?: string;
+  lastId?: string;
 }
 
 export interface MeasurableMessage {
+  id?: string;
   text?: string;
   tool?: { content?: string };
 }
@@ -33,11 +39,21 @@ export function measure(messages: MeasurableMessage[]): ListState {
     textLength += message.text?.length ?? 0;
     textLength += message.tool?.content?.length ?? 0;
   }
-  return { count: messages.length, textLength };
+  return {
+    count: messages.length,
+    textLength,
+    firstId: messages[0]?.id,
+    lastId: messages[messages.length - 1]?.id
+  };
 }
 
 export function contentChanged(previous: ListState, next: ListState): boolean {
-  return next.count !== previous.count || next.textLength !== previous.textLength;
+  return (
+    next.count !== previous.count ||
+    next.textLength !== previous.textLength ||
+    next.firstId !== previous.firstId ||
+    next.lastId !== previous.lastId
+  );
 }
 
 // The list follows the content only while the reader stays at the bottom.
@@ -50,4 +66,37 @@ export function shouldFollow(
     return false;
   }
   return atBottom;
+}
+
+// What the feed does when the content of the list changes.
+export type FeedAction =
+  // The feed goes to the end of the history.
+  | 'bottom'
+  // The feed keeps the place of the reader.
+  | 'keep'
+  // The reader is not at the end, the button of the end counts the new rows.
+  | 'pending';
+
+export function feedAction(
+  previous: ListState,
+  next: ListState,
+  atBottom: boolean,
+  followEnd: boolean
+): FeedAction {
+  // The chat was replaced or the request runs again: the feed shows the end
+  // of the history and follows the new turn. The old place of the reader
+  // does not matter here: the history under him has just been replaced.
+  if (followEnd) {
+    return 'bottom';
+  }
+  // Another chat was opened, the feed shows its end.
+  if (next.count < previous.count) {
+    return 'bottom';
+  }
+  // Nothing changed.
+  if (!contentChanged(previous, next)) {
+    return 'keep';
+  }
+  // The reader is at the end, the feed follows the content.
+  return atBottom ? 'bottom' : 'pending';
 }

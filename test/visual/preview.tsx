@@ -10,7 +10,16 @@ import { MODELS } from '../../src/config/models';
 // panel and never falls behind the build.
 import manifest from '../../package.json';
 import type { ExtToWeb, UiSettings, UiState } from '../../src/ui/protocol';
-import { MESSAGES, SECTIONS, SECTIONS_STEPS, USAGE, sessions } from './fixture';
+import {
+  MESSAGES,
+  RETRY_MESSAGES,
+  RETRY_PAGE,
+  RETRY_TAIL,
+  SECTIONS,
+  SECTIONS_STEPS,
+  USAGE,
+  sessions
+} from './fixture';
 import dark from './themes/dark.json';
 import light from './themes/light.json';
 
@@ -53,18 +62,20 @@ const STATE: UiState = {
         { id: 'q2', text: 'Then add the tests for it', state: 'waiting' as const }
       ]
     : [],
-  olderMessages: 0,
+  olderMessages: params.get('retry') === '1' ? RETRY_MESSAGES.length - RETRY_PAGE : 0,
   // ?sections=1 shows the chat with the folding sections: the heads of the
   // sections have to stand on one grid. ?steps=1 shows the steps of the work:
   // the group of the actions ends at the thought of the model.
   messages:
     params.get('empty') === '1'
       ? []
-      : params.get('sections') === '1'
-        ? SECTIONS
-        : params.get('steps') === '1'
-          ? SECTIONS_STEPS
-          : MESSAGES,
+      : params.get('retry') === '1'
+        ? RETRY_TAIL
+        : params.get('sections') === '1'
+          ? SECTIONS
+          : params.get('steps') === '1'
+            ? SECTIONS_STEPS
+            : MESSAGES,
   model: MODELS[0]!.id,
   models: MODELS,
   effort: 'max',
@@ -169,6 +180,34 @@ const vscode = {
     // The host drops the tasks, the stand does the same.
     if (message.type === 'clear_todos') {
       post({ type: 'todos', todos: [] });
+    }
+    // The host runs the request again: the messages of the failed turn go
+    // away, the request comes back and the answer of the model follows.
+    if (message.type === 'retry') {
+      const id = (message as { type: 'retry'; id: string }).id;
+      const index = RETRY_MESSAGES.findIndex((item) => item.id === id);
+      if (index === -1) {
+        // The chat of the stand does not hold this request.
+        return;
+      }
+      const text = RETRY_MESSAGES[index]?.text ?? '';
+      // The host cuts the history before the request and sends the tail of
+      // it: the panel holds the same number of messages as before, the
+      // history under the reader is another one.
+      const cut = RETRY_MESSAGES.slice(0, index);
+      post({
+        type: 'session_loaded',
+        messages: cut.slice(-RETRY_PAGE),
+        olderMessages: Math.max(0, cut.length - RETRY_PAGE)
+      });
+      post({ type: 'user_message', id: id + '-again', text });
+      post({ type: 'assistant_start', id: id + '-answer' });
+      window.setTimeout(() => {
+        post({
+          type: 'text_delta',
+          text: 'The tests run now. The failure was in the helper of the round of the token count.'
+        });
+      }, 150);
     }
     if (message.type === 'request_settings') {
       post({ type: 'settings', settings: SETTINGS });
