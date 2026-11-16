@@ -129,12 +129,44 @@ describe('the folded sections of the chat', () => {
   it('draws the preview as one italic line', () => {
     const preview = rule('.section-preview');
     expect(preview).toMatch(/font-style:\s*italic/);
-    // The text of the preview stands in the column of the title of the head.
-    expect(preview).toMatch(/grid-template-columns:\s*14px 14px minmax\(0, 1fr\) auto/);
+    // The preview takes the free middle of the head, the title keeps its
+    // place and the counter stands on the right.
+    expect(preview).toMatch(/grid-column:\s*4/);
+    expect(rule('.section-head')).toMatch(
+      /grid-template-columns:\s*14px 14px auto minmax\(0, 1fr\) auto/
+    );
+    expect(rule('.tool-steps-count')).toMatch(/grid-column:\s*5/);
     const text = rule('.section-preview-text');
     expect(text).toMatch(/white-space:\s*nowrap/);
     expect(text).toMatch(/text-overflow:\s*ellipsis/);
     expect(text).toMatch(/overflow:\s*hidden/);
+  });
+
+  it('puts the preview in the same row as the name of the section', () => {
+    const markup = renderToStaticMarkup(
+      createElement(ThinkingBlock, { text: 'The model thinks about the file.' })
+    );
+    const head = markup.indexOf('section-head');
+    const title = markup.indexOf('section-title');
+    const preview = markup.indexOf('section-preview');
+    expect(head).toBeGreaterThan(-1);
+    // The name of the section stands before the preview.
+    expect(title).toBeGreaterThan(head);
+    expect(preview).toBeGreaterThan(title);
+    // The preview is a part of the head, not a row of its own: between the
+    // head and the preview no row of the section closes.
+    expect(markup.slice(head, preview)).not.toContain('</div>');
+  });
+
+  it('keeps the counter of the group on the right of the preview', () => {
+    const tools = [toolMessage('t1', 'read_file', { path: 'src/tools/git.ts' })];
+    const markup = renderToStaticMarkup(
+      createElement(ToolSteps, { step: { id: 'step-1', tools }, collapsed: false })
+    );
+    const preview = markup.indexOf('section-preview');
+    const count = markup.indexOf('tool-steps-count');
+    expect(preview).toBeGreaterThan(-1);
+    expect(count).toBeGreaterThan(preview);
   });
 
   it('has no live status over the field of the request', () => {

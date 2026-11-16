@@ -17,24 +17,29 @@ export function ThinkingBlock({
   const [open, setOpen] = useState(false);
   return (
     <div className={'thinking' + (repeated ? ' thinking-repeated' : '')}>
-      <button
-        className="section-head thinking-toggle"
-        aria-expanded={open}
-        onClick={() => setOpen((value) => !value)}
-      >
-        <Chevron open={open} />
-        <span className="section-icon thinking-icon">
-          <IconThinking />
-        </span>
-        <span className="section-title">{STRINGS.thinking}</span>
-      </button>
-      {open ? (
-        <pre className="thinking-body">{text}</pre>
-      ) : (
-        // The folded reasoning shows its first words: the reader sees what
-        // the model thought about without reading all of it.
-        <SectionPreview text={thinkingPreview(text)} onOpen={() => setOpen(true)} />
-      )}
+      <div className="section-head thinking-head">
+        <button
+          className="section-toggle thinking-toggle"
+          aria-expanded={open}
+          onClick={() => setOpen((value) => !value)}
+        >
+          <Chevron open={open} />
+          <span className="section-icon thinking-icon">
+            <IconThinking />
+          </span>
+          <span className="section-title">{STRINGS.thinking}</span>
+        </button>
+        {open ? null : (
+          // The folded reasoning shows its first words in the free middle of
+          // the head: the reader sees what the model thought about without
+          // reading all of it.
+          <SectionPreview
+            text={thinkingPreview(text)}
+            onOpen={() => setOpen(true)}
+          />
+        )}
+      </div>
+      {open ? <pre className="thinking-body">{text}</pre> : null}
     </div>
   );
 }

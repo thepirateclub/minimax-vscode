@@ -921,50 +921,56 @@ input:focus {
   appearance: none;
 }
 
-/* The head of a folding section. The chevron, the icon, the title and the
-   counter stand on one grid, so the sections of the chat read as one column:
-   the rows of the panel used to drift apart, the icon of the reasoning stood
-   12 pixels left of the icon of the actions and the counter hung in the
-   margin. The row has one height for every section: 18 pixels of the line
-   and 2 pixels of the padding above and below. */
+/* The head of a folding section. The chevron, the icon and the title
+   stand on the left, the preview of the section takes the free middle of the
+   row, the counter stands on the right edge. The rows of the chat read as
+   one column: the icon of the reasoning used to stand 12 pixels left of the
+   icon of the actions and the counter hung in the margin. The row has one
+   height for every section: 18 pixels of the line and 2 pixels of the
+   padding above and below. */
 .section-head {
   display: grid;
-  grid-template-columns: 14px 14px minmax(0, 1fr) auto;
-  align-items: center;
+  grid-template-columns: 14px 14px auto minmax(0, 1fr) auto;
+  align-items: baseline;
   column-gap: 6px;
   width: 100%;
   min-height: var(--control-h);
   padding: 2px 0;
-  border: none;
-  border-radius: var(--radius-sm);
-  background: transparent;
   color: var(--muted);
   font-size: var(--fs-sm);
   line-height: 18px;
   text-align: left;
+}
+
+/* The name of the section and the marks of it open the section. The title
+   keeps its place: the preview stands in the free middle of the row, the
+   title does not move when the preview appears. */
+.section-toggle {
+  display: grid;
+  grid-template-columns: 14px 14px auto;
+  align-items: baseline;
+  column-gap: 6px;
+  grid-column: 1 / 4;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  text-align: left;
   cursor: pointer;
 }
 
-/* The words of the head and the counter stand on one baseline: the counter
-   is a number of a smaller font, it hung above the title without it. */
-.section-title {
-  align-self: baseline;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 /* The preview of a folded section: one italic line that says what the
-   section holds. It stands in the column of the title of the head, the
-   ellipsis cuts it when the line does not fit, and a click on it opens the
-   section. */
+   section holds. It stands in the middle of the head, the ellipsis cuts it
+   when the line does not fit, and a click on it opens the section. */
 .section-preview {
-  display: grid;
-  grid-template-columns: 14px 14px minmax(0, 1fr) auto;
-  column-gap: 6px;
-  align-items: center;
-  width: 100%;
+  grid-column: 4;
+  display: block;
+  min-width: 0;
   margin: 0;
   padding: 0;
   border: none;
@@ -978,28 +984,44 @@ input:focus {
   cursor: pointer;
 }
 
-/* The text of the preview stands in the column of the title of the head:
-   the preview reads as the next line of the same section. */
+/* The text of the preview is one line: the ellipsis cuts it when the row
+   does not have room for it. */
 .section-preview-text {
-  grid-column: 3;
+  display: block;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+/* The row of the head is one surface: the name of the section and the
+   preview of it open the section, the whole row answers the mouse. */
+.section-head:hover {
+  background: var(--row-hover);
+}
+
+.section-toggle:hover,
 .section-preview:hover {
   color: var(--fg);
-  background: var(--row-hover);
+}
+
+/* The words of the head and the counter stand on one baseline: the counter
+   is a number of a smaller font, it hung above the title without it. */
+.section-title {
+  align-self: baseline;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* The chevron and the icon are marks, not words: they stand in the middle
    of the row, not on the baseline of the title. */
-.section-head .chevron {
+.section-toggle .chevron {
   align-self: center;
 }
 
-.section-head .section-icon {
+.section-toggle .section-icon {
   align-self: center;
 }
 
@@ -2924,16 +2946,14 @@ html {
   margin: 2px 0 0;
 }
 
-.tool-steps-head:hover {
-  color: var(--fg);
-  background: var(--row-hover);
-}
-
 .tool-steps-icon {
   color: var(--muted);
 }
 
+/* The counter of the group stands on the right edge of the head, on the
+   baseline of the title. */
 .tool-steps-count {
+  grid-column: 5;
   align-self: baseline;
   color: var(--muted);
   font-size: var(--fs-xs);

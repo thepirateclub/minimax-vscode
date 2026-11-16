@@ -242,13 +242,17 @@ describe('panel layout', () => {
     // the actions and the counter hung in the margin.
     const head = rule('.section-head');
     expect(head).toMatch(/display:\s*grid/);
-    expect(head).toMatch(/grid-template-columns:\s*14px 14px minmax\(0, 1fr\) auto/);
+    // The chevron, the icon and the title stand on the left, the preview of
+    // the section takes the free middle of the row, the counter on the right.
+    expect(head).toMatch(
+      /grid-template-columns:\s*14px 14px auto minmax\(0, 1fr\) auto/
+    );
     expect(head).toMatch(/column-gap:\s*6px/);
     // The words of the head and the counter stand on one baseline.
     expect(rule('.section-title')).toMatch(/align-self:\s*baseline/);
     expect(rule('.tool-steps-count')).toMatch(/align-self:\s*baseline/);
     // The chevron and the icon stand in the middle of the row.
-    expect(rule('.section-head .chevron')).toMatch(/align-self:\s*center/);
+    expect(rule('.section-toggle .chevron')).toMatch(/align-self:\s*center/);
     // The group of the actions does not hang in the margin of the panel.
     expect(rule('.tool-steps')).toMatch(/margin:\s*2px 0 0/);
   });

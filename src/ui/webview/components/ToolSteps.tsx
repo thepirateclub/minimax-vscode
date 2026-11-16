@@ -23,19 +23,30 @@ export function ToolSteps({
   const last = step.tools[step.tools.length - 1]?.tool;
   return (
     <div className={'tool-steps' + (failed ? ' tool-steps-failed' : '')}>
-      <button
-        className="section-head tool-steps-head"
-        aria-expanded={open}
-        onClick={() => setOpen(!open)}
-        title={STRINGS.toolStepsOpen}
-      >
-        <Chevron open={open} />
-        <span className="section-icon tool-steps-icon">
-          <IconList />
-        </span>
-        <span className="section-title tool-steps-title">{STRINGS.toolSteps}</span>
+      <div className="section-head tool-steps-head">
+        <button
+          className="section-toggle tool-steps-toggle"
+          aria-expanded={open}
+          onClick={() => setOpen(!open)}
+          title={STRINGS.toolStepsOpen}
+        >
+          <Chevron open={open} />
+          <span className="section-icon tool-steps-icon">
+            <IconList />
+          </span>
+          <span className="section-title tool-steps-title">{STRINGS.toolSteps}</span>
+        </button>
+        {open ? null : last ? (
+          // The folded group shows its last action in the free middle of the
+          // head: the reader sees what the agent did last without opening
+          // the cards.
+          <SectionPreview
+            text={actionPreview(last)}
+            onOpen={() => setOpen(true)}
+          />
+        ) : null}
         <span className="tool-steps-count">{step.tools.length}</span>
-      </button>
+      </div>
       {open ? (
         <div className="tool-steps-body">
           {step.tools.map((message) =>
@@ -48,16 +59,7 @@ export function ToolSteps({
             ) : null
           )}
         </div>
-      ) : (
-        // The folded group shows its last action: the reader sees what the
-        // agent did last without opening the cards.
-        last ? (
-          <SectionPreview
-            text={actionPreview(last)}
-            onOpen={() => setOpen(true)}
-          />
-        ) : null
-      )}
+      ) : null}
     </div>
   );
 }
