@@ -12,6 +12,7 @@ import manifest from '../../package.json';
 import type { ExtToWeb, UiSettings, UiState } from '../../src/ui/protocol';
 import {
   MESSAGES,
+  PREVIEW_MESSAGES,
   RETRY_MESSAGES,
   RETRY_PAGE,
   RETRY_TAIL,
@@ -71,7 +72,9 @@ const STATE: UiState = {
       ? []
       : params.get('retry') === '1'
         ? RETRY_TAIL
-        : params.get('sections') === '1'
+        : params.get('preview') === '1'
+          ? PREVIEW_MESSAGES
+          : params.get('sections') === '1'
           ? SECTIONS
           : params.get('steps') === '1'
             ? SECTIONS_STEPS

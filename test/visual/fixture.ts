@@ -273,6 +273,46 @@ export const RETRY_MESSAGES: UiMessage[] = Array.from({ length: 100 }, (_, i) =>
 export const RETRY_PAGE = 120;
 export const RETRY_TAIL: UiMessage[] = RETRY_MESSAGES.slice(-RETRY_PAGE);
 
+// The chat of the previews of the sections: a long reasoning and a group of
+// actions. The folded sections show one line of them, the reader opens the
+// section by a click.
+export const PREVIEW_MESSAGES: UiMessage[] = [
+  {
+    id: 'p-u1',
+    role: 'user',
+    text: 'Перенеси хранилище на SQLite и проверь, как устроен сервер.'
+  },
+  {
+    id: 'p-a1',
+    role: 'assistant',
+    thinking:
+      'The user wants the storage on SQLite. I look at the server first: the chats live in the state of the editor and the store writes them down. Then I read the module of the sessions and the way the panel shows them. The change touches the storage of the chats and the server that keeps them.',
+    text: 'Принято: v1 остаётся рабочей веткой, main не трогаю. Теперь переношу хранилище.'
+  },
+  {
+    id: 'p-t1',
+    role: 'tool',
+    tool: {
+      id: 'p-t1',
+      name: 'read_file',
+      input: { path: 'src/storage/sessions.ts' },
+      content: 'export function read(): Session[] { return []; }',
+      durationMs: 4
+    }
+  },
+  {
+    id: 'p-t2',
+    role: 'tool',
+    tool: {
+      id: 'p-t2',
+      name: 'read_file',
+      input: { path: 'src/tools/git.ts' },
+      content: 'export function status(): string { return ""; }',
+      durationMs: 3
+    }
+  }
+];
+
 export function sessions(now: number): UiSessionSummary[] {
   return [
     { id: 's1', title: 'Rounding of the token counter', updatedAt: now },

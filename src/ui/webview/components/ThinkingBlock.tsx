@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Chevron, IconThinking } from '../icons';
 import { STRINGS } from '../strings';
+import { thinkingPreview } from '../sectionPreview';
+import { SectionPreview } from './SectionPreview';
 
 export function ThinkingBlock({
   text,
@@ -26,7 +28,13 @@ export function ThinkingBlock({
         </span>
         <span className="section-title">{STRINGS.thinking}</span>
       </button>
-      {open ? <pre className="thinking-body">{text}</pre> : null}
+      {open ? (
+        <pre className="thinking-body">{text}</pre>
+      ) : (
+        // The folded reasoning shows its first words: the reader sees what
+        // the model thought about without reading all of it.
+        <SectionPreview text={thinkingPreview(text)} onOpen={() => setOpen(true)} />
+      )}
     </div>
   );
 }

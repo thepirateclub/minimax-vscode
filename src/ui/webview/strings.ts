@@ -201,6 +201,7 @@ export const STRINGS = {
   approveCommand: 'Run this command?',
   toolSteps: 'Actions',
   toolStepsOpen: 'The actions of the step open on a click.',
+  previewOpen: 'The section opens on a click.',
   showToolSteps: 'Show the steps of the tools',
   showToolStepsHint:
     'The actions of the agent are grouped by step. The step shows its header, the cards of it open on a click.',

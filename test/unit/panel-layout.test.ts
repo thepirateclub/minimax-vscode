@@ -9,7 +9,6 @@ import { MODELS } from '../../src/config/models';
 import { STRINGS } from '../../src/ui/webview/strings';
 import type { UiQueuedMessage } from '../../src/ui/protocol';
 import type { ReactElement } from 'react';
-import type { ActiveAction } from '../../src/ui/webview/activityStatus';
 
 // The layout of the panel is drawn with css, the markup cannot express it,
 // so the tests read the rules of the stylesheet.
@@ -34,8 +33,7 @@ function renderComposer(
   busy: boolean,
   goalMode = false,
   retryStatus?: { attempt: number; total: number; delayMs: number },
-  queue?: UiQueuedMessage[],
-  action?: ActiveAction
+  queue?: UiQueuedMessage[]
 ): string {
   return renderToStaticMarkup(
     createElement(Composer, {
@@ -64,8 +62,7 @@ function renderComposer(
       goalMode,
       onGoalMode: noop,
       retryStatus,
-      queue,
-      action
+      queue
     }) as ReactElement
   );
 }
@@ -260,23 +257,6 @@ describe('panel layout', () => {
     // Two thoughts in a row are two steps of the reasoning, a thin line
     // between them keeps them from melting into one block.
     expect(rule('.thinking-repeated')).toMatch(/border-top:\s*1px solid var\(--border\)/);
-  });
-
-  it('shows the action of the agent over the field of the request', () => {
-    const markup = renderComposer(true, false, undefined, undefined, {
-      name: 'git_diff',
-      detail: 'shows the changes',
-      target: ''
-    });
-    expect(markup).toContain('composer-activity');
-    expect(markup).toContain('git_diff');
-    expect(markup).toContain('shows the changes');
-    // The row stands over the field, the reader sees it at once.
-    expect(markup.indexOf('composer-activity')).toBeLessThan(
-      markup.indexOf('composer-input-wrap')
-    );
-    // Without an action the row is not there at all.
-    expect(renderComposer(true)).not.toContain('composer-activity');
   });
 
   it('draws one column per action of the session', () => {

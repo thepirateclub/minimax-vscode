@@ -26,9 +26,7 @@ import {
 import { splitRestore } from '../restoreInput';
 import { STRINGS } from '../strings';
 import { IconSelect, type IconSelectOption } from './IconSelect';
-import { ActivityBar } from './ActivityBar';
 import { QueueBar } from './QueueBar';
-import type { ActiveAction } from '../activityStatus';
 
 export interface InsertRequest {
   paths: string[];
@@ -304,9 +302,7 @@ export function Composer({
   queue = [],
   onSendQueued,
   onSendAllQueued,
-  onRemoveQueued,
-  action,
-  actionStartedAt
+  onRemoveQueued
 }: {
   busy: boolean;
   selections: UiSelection[];
@@ -345,10 +341,6 @@ export function Composer({
   onSendQueued?: (id: string) => void;
   onSendAllQueued?: () => void;
   onRemoveQueued?: (id: string) => void;
-  // The action of the agent that runs now. The row of it stands above the
-  // field of the request.
-  action?: ActiveAction;
-  actionStartedAt?: number;
 }) {
   const currentModel = models.find((item) => item.id === model);
   const modelOptions: IconSelectOption<string>[] = models.map((item) => ({
@@ -619,7 +611,6 @@ export function Composer({
           </span>
         </div>
       ) : null}
-      <ActivityBar action={action} startedAt={actionStartedAt} />
       <div className={'composer-input-wrap' + (goalMode ? ' goal-mode' : '')}>
         <div
           ref={editorRef}

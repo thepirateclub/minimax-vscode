@@ -955,6 +955,44 @@ input:focus {
   white-space: nowrap;
 }
 
+/* The preview of a folded section: one italic line that says what the
+   section holds. It stands in the column of the title of the head, the
+   ellipsis cuts it when the line does not fit, and a click on it opens the
+   section. */
+.section-preview {
+  display: grid;
+  grid-template-columns: 14px 14px minmax(0, 1fr) auto;
+  column-gap: 6px;
+  align-items: center;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: var(--fs-sm);
+  font-style: italic;
+  line-height: 18px;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* The text of the preview stands in the column of the title of the head:
+   the preview reads as the next line of the same section. */
+.section-preview-text {
+  grid-column: 3;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.section-preview:hover {
+  color: var(--fg);
+  background: var(--row-hover);
+}
+
 /* The chevron and the icon are marks, not words: they stand in the middle
    of the row, not on the baseline of the title. */
 .section-head .chevron {
@@ -1523,56 +1561,6 @@ input:focus {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-/* The live status of the agent: what it does now. The row stands above the
-   field of the request, the dot of it pulses while the action runs. It is a
-   status and not a history: the row hides itself when nothing runs. */
-.composer-activity {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 2px 2px 0;
-  font-size: var(--fs-sm);
-  line-height: 18px;
-  color: var(--muted);
-}
-
-.composer-activity-dot {
-  flex: 0 0 auto;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--accent);
-  animation: mm-pulse 1.2s ease-in-out infinite;
-}
-
-.composer-activity-name {
-  flex: 0 0 auto;
-  font-family: var(--mono);
-  color: var(--fg);
-}
-
-.composer-activity-detail {
-  flex: 0 0 auto;
-}
-
-.composer-activity-target {
-  flex: 0 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-family: var(--mono);
-  font-size: var(--fs-xs);
-}
-
-/* The clock of the action stands in the right edge of the row. */
-.composer-activity-time {
-  flex: 0 0 auto;
-  margin-left: auto;
-  font-size: var(--fs-xs);
-  font-variant-numeric: tabular-nums;
 }
 
 /* The queue of the messages of the chat. A compact strip over the field

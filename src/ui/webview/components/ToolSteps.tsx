@@ -2,6 +2,8 @@ import { useState } from 'react';
 import type { UiMessage } from '../../protocol';
 import { Chevron, IconList } from '../icons';
 import { STRINGS } from '../strings';
+import { actionPreview } from '../sectionPreview';
+import { SectionPreview } from './SectionPreview';
 import { ToolCard } from './ToolCard';
 
 // The actions of one step of the agent. The step is folded by default, the
@@ -17,6 +19,8 @@ export function ToolSteps({
 }) {
   const [open, setOpen] = useState(false);
   const failed = step.tools.some((item) => item.tool?.isError === true);
+  // The last action of the group: the folded step says what it did last.
+  const last = step.tools[step.tools.length - 1]?.tool;
   return (
     <div className={'tool-steps' + (failed ? ' tool-steps-failed' : '')}>
       <button
@@ -44,7 +48,16 @@ export function ToolSteps({
             ) : null
           )}
         </div>
-      ) : null}
+      ) : (
+        // The folded group shows its last action: the reader sees what the
+        // agent did last without opening the cards.
+        last ? (
+          <SectionPreview
+            text={actionPreview(last)}
+            onOpen={() => setOpen(true)}
+          />
+        ) : null
+      )}
     </div>
   );
 }

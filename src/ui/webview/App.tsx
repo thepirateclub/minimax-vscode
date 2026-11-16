@@ -30,7 +30,6 @@ import { SummaryBar } from './components/SummaryBar';
 import { SettingsView } from './components/SettingsView';
 import { TaskList } from './components/TaskList';
 import { appendNotice } from './notices';
-import { activeAction } from './activityStatus';
 import { STRINGS } from './strings';
 import { endTool } from './toolEnd';
 import { DeltaBatch } from './deltaBatch';
@@ -103,9 +102,6 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
   const [followEnd, setFollowEnd] = useState(false);
   // The queue of the messages of the chat.
   const [queue, setQueue] = useState<UiQueuedMessage[]>([]);
-  // When the action that runs now started. The clock of the status over the
-  // field counts from it.
-  const [actionStartedAt, setActionStartedAt] = useState<number | undefined>(undefined);
 
   useEffect(() => {
     // The deltas of the answer wait in a batch and go to the panel in one
@@ -169,7 +165,6 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
             tool: { id: message.id, name: message.name, input: message.input, running: true }
           }
         ]);
-        setActionStartedAt(Date.now());
         return;
       }
       if (message.type === 'tool_end') {
@@ -177,7 +172,6 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
         // same id of a tool call can come back in a later turn, the card of
         // the earlier turn keeps its own result.
         setMessages((prev) => endTool(prev, message));
-        setActionStartedAt(undefined);
         return;
       }
       if (message.type === 'tool_progress') {
@@ -356,9 +350,6 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
   }, [state.fontSize]);
 
   const busy = state.state !== 'idle' && state.state !== 'error';
-  // The action of the agent that runs now. The status over the field of the
-  // request shows it, the row hides itself when the agent does nothing.
-  const action = busy ? activeAction(messages) : undefined;
 
   // The handlers keep their identity, the rows of the chat are not redrawn
   // when the answer of the model grows.
@@ -546,8 +537,6 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
           onSendQueued={(id) => vscode.postMessage({ type: 'send_queued', id })}
           onSendAllQueued={() => vscode.postMessage({ type: 'send_all_queued' })}
           onRemoveQueued={(id) => vscode.postMessage({ type: 'remove_queued', id })}
-          action={action}
-          actionStartedAt={action ? actionStartedAt : undefined}
           onVoiceStart={() => vscode.postMessage({ type: 'voice_start' })}
           onVoiceStop={() => vscode.postMessage({ type: 'voice_stop' })}
         />
