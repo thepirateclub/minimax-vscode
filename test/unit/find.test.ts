@@ -1,6 +1,6 @@
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { findInText, findInTree, matchLine } from '../../src/search/find';
 
@@ -73,6 +73,20 @@ describe('the search of findstr', () => {
     });
     expect(hits).toHaveLength(1);
     expect(hits[0]?.path).toBe('app.ts');
+  });
+
+  it('refuses a path outside the root', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-find-'));
+    const outside = await mkdtemp(join(tmpdir(), 'mm-outside-'));
+    await writeFile(join(outside, 'creds.txt'), 'TOKEN=abc123\n', 'utf8');
+    await expect(
+      findInTree(root, {
+        patterns: ['TOKEN'],
+        ignoreCase: false,
+        limit: 10,
+        sub: join('..', basename(outside))
+      })
+    ).rejects.toThrow('escapes the workspace root');
   });
 
   it('reports a path that does not exist', async () => {
