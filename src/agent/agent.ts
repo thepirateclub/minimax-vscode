@@ -1,9 +1,7 @@
 import { balanceHistory } from '../api/history';
-import { MiniMaxApiError } from '../api/errors';
 import type {
   AnthropicContentBlock,
   AnthropicMessage,
-  StopReason,
   StreamEvent,
   Usage,
 } from '../api/types';
@@ -14,21 +12,12 @@ import {
   previewOf,
   signatureOf
 } from './toolRunner';
+import { streamWithRetry } from './retry';
 import type { AgentOptions, AgentRunResult } from './types';
+export { DEFAULT_MAX_RETRIES, retryDelay } from './retry';
 export type { AgentEvent, AgentOptions, AgentRunResult } from './types';
 import type { ToolStateUpdate } from './state';
 
-
-// How many times a request is repeated when the connection is lost.
-export const DEFAULT_MAX_RETRIES = 5;
-const RETRY_BASE_DELAY_MS = 1000;
-const RETRY_MAX_DELAY_MS = 30_000;
-
-// The delay grows with every attempt: a second, two, four, eight. The
-// server needs time, a fast second attempt hits the same overload.
-export function retryDelay(attempt: number, baseMs = RETRY_BASE_DELAY_MS): number {
-  return Math.min(baseMs * 2 ** Math.max(0, attempt), RETRY_MAX_DELAY_MS);
-}
 
 
 // One action can send several requests to the API, the spend of the action
@@ -73,7 +62,7 @@ export class Agent {
 
     for (let iteration = 0; iteration < this.options.maxIterations; iteration++) {
       this.pendingAssistantStart = true;
-      const streamed = await this.streamWithRetry(messages);
+      const streamed = await streamWithRetry(this.options, this.controller, messages, (event) => this.handleEvent(event));
       const blocks = streamed.blocks;
       usage = addUsage(usage, streamed.usage);
       // The spend of every request goes to the host, the limits of the goal
@@ -286,116 +275,6 @@ export class Agent {
 
     this.options.onEvent({ type: 'done', stopReason: 'max_iterations', usage });
     return { messages, stopReason: 'max_iterations', usage, requestIndex };
-  }
-
-  // The change of a file, it is taken before the write. A path outside of
-  // the workspace throws inside the preview, the action still runs.
-
-  private async streamWithRetry(
-    messages: AnthropicMessage[]
-  ): Promise<{
-    blocks: AnthropicContentBlock[];
-    stopReason: StopReason;
-    usage: Usage;
-  }> {
-    const maxRetries = Math.max(0, this.options.maxRetries ?? DEFAULT_MAX_RETRIES);
-    const baseDelay = this.options.retryBaseDelayMs ?? RETRY_BASE_DELAY_MS;
-    let attempt = 0;
-    for (;;) {
-      let emitted = false;
-      let blocks: AnthropicContentBlock[] = [];
-      let stopReason: StopReason = 'end_turn';
-      let usage: Usage = { inputTokens: 0, outputTokens: 0 };
-      // The budget of the goal ran out in the middle of the answer.
-      let budgetStopped = false;
-      try {
-        const stream = this.options.client.stream(
-          {
-            model: this.options.model,
-            maxTokens: this.options.maxTokens,
-            system: this.options.systemPrompt,
-            messages: [...messages],
-            tools: this.options.registry.toAnthropicTools(this.options.mode),
-            effort: this.options.effort,
-            thinking: this.options.thinking,
-            signal: this.controller.signal
-          },
-          { signal: this.controller.signal }
-        );
-        for await (const event of stream) {
-          // The budget of the goal is checked before every event of the
-          // stream: a long answer stops in the middle of the turn when
-          // the time of the goal is over. Only the limit of the time can
-          // trip here, the spend of the request is counted after it.
-          if (this.options.budget && !this.options.budget()) {
-            budgetStopped = true;
-            break;
-          }
-          this.handleEvent(event);
-          if (event.type === 'text_delta' || event.type === 'thinking_delta') {
-            emitted = true;
-          }
-          if (event.type === 'message_stop') {
-            blocks = event.blocks;
-            stopReason = event.stopReason;
-            usage = event.usage;
-          }
-        }
-        if (budgetStopped) {
-          // The answer was cut. The text that came stays visible in the
-          // panel, the tools of the request do not run and the history
-          // keeps no call without a result.
-          blocks = [];
-          stopReason = 'goal_limit';
-        }
-        return { blocks, stopReason, usage };
-      } catch (error) {
-        const retryable = error instanceof MiniMaxApiError && error.retryable;
-        // A request that the user stopped is not a failure of the server,
-        // a retry would wait and fail again.
-        if (this.controller.signal.aborted || !retryable || attempt >= maxRetries) {
-          const message = error instanceof Error ? error.message : String(error);
-          this.options.onEvent({ type: 'error', message });
-          throw error;
-        }
-        const delay = retryDelay(attempt, baseDelay);
-        attempt += 1;
-        if (emitted) {
-          // The answer broke in the middle: the piece that came is not the
-          // answer, the whole request runs again.
-          this.options.onEvent({ type: 'assistant_reset' });
-        }
-        this.options.onEvent({
-          type: 'retrying',
-          attempt,
-          total: maxRetries,
-          delayMs: delay
-        });
-        this.options.logger.info(
-          'retrying MiniMax request in ' + delay + 'ms: ' + error.message
-        );
-        await this.waitBeforeRetry(delay);
-      }
-    }
-  }
-
-  // The pause between the attempts ends at once when the user stops the
-  // turn, the panel must not wait for the delay.
-  private async waitBeforeRetry(ms: number): Promise<void> {
-    if (this.controller.signal.aborted) {
-      return;
-    }
-    await new Promise<void>((resolve) => {
-      const timer = setTimeout(() => {
-        this.controller.signal.removeEventListener('abort', onAbort);
-        resolve();
-      }, ms);
-      const onAbort = (): void => {
-        clearTimeout(timer);
-        resolve();
-      };
-      this.controller.signal.addEventListener('abort', onAbort, { once: true });
-    });
   }
 
   private handleEvent(event: StreamEvent): void {
