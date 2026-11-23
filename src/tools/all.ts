@@ -1,0 +1,42 @@
+import type { BackupStore } from '../storage/backups';
+import type { ProjectSearch } from '../search/project';
+import { createCmdTools } from './cmd';
+import { createContainerTools } from './containers';
+import { createExploreTools } from './explore';
+import { createFileTools } from './fs';
+import { createGitTools } from './git';
+import { createGoalTools } from './goal';
+import { createReplTools } from './repl';
+import { createTaskTools, type TaskOptions } from './task';
+import { createTaskFileTools } from './tasks';
+import { createTerminalTools } from './terminal';
+import { createTodoTools } from './todo';
+import type { ToolEntry } from './types';
+
+// The tools of the agent, one list for the host and for the tests. The list
+// of the panel and the list of the tools must not drift apart: a tool
+// without a card in the panel is a tool the reader does not understand.
+export interface AllToolDeps {
+  // The store of the backups of the written files.
+  backups: BackupStore;
+  // The index of the project, the search tool uses it.
+  search: (workspaceRoot: string) => ProjectSearch | undefined;
+  // The host starts the child of the task tool.
+  spawn: TaskOptions['spawn'];
+}
+
+export function createAllTools(deps: AllToolDeps): ToolEntry[] {
+  return [
+    ...createFileTools({ backups: deps.backups }),
+    ...createExploreTools({ search: deps.search }),
+    ...createGitTools(),
+    ...createTerminalTools(),
+    ...createCmdTools(),
+    ...createTodoTools(),
+    ...createTaskFileTools(),
+    ...createReplTools(),
+    ...createContainerTools(),
+    ...createGoalTools(),
+    ...createTaskTools({ spawn: deps.spawn })
+  ];
+}

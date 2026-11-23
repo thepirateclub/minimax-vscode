@@ -59,9 +59,16 @@ type Describer = (ctx: DescriberContext) => ToolView;
 
 // The REPL of node and the REPL of python are the same card, only the
 // name of the language differs. Both rows point at one describer.
+const REPL_TITLES: Record<string, string> = {
+  repl_node: STRINGS.toolReplNode,
+  repl_python: STRINGS.toolReplPython
+};
+
 const replDescriber: Describer = ({ tool, content }) => ({
   icon: <IconTerminal />,
-  title: tool.name === 'repl_node' ? STRINGS.toolReplNode : STRINGS.toolReplPython,
+  // An unknown REPL keeps its own name: the card must not call a language
+  // that it does not know.
+  title: REPL_TITLES[tool.name] ?? tool.name,
   summary: firstLine(content)
 });
 

@@ -10,8 +10,9 @@ export const REPL_MIN_TIMEOUT_MS = 1_000;
 export const REPL_MAX_TIMEOUT_MS = 60_000;
 export const REPL_MAX_OUTPUT_CHARS = 30_000;
 
-// A chat keeps two interpreters at most, the machine does not hold a process
-// per chat that was ever opened.
+// The machine holds six live interpreters at most. The limit is global: the
+// chats that work in the background share it, and when it is reached the
+// oldest process that waits for nothing goes away.
 export const MAX_REPL_PROCESSES = 6;
 
 export type ReplLanguage = 'node' | 'python';

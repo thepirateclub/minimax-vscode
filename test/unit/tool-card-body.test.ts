@@ -45,6 +45,10 @@ describe('the body of a card', () => {
     // The card names the language, the raw name of the tool is not a title.
     expect(titleOf(node)).toBe('Node REPL');
     expect(titleOf(python)).toBe('Python REPL');
+    // The icon is the terminal. The icon of the read is the one of the
+    // generic card, a card without its own row.
+    expect(python).toContain('m4 17 6-6-6-6');
+    expect(python).not.toContain('M15 2H6');
   });
 
   it('names the words of the search', () => {

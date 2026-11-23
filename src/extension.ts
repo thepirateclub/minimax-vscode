@@ -6,17 +6,9 @@ import { ProjectSearch } from './search/project';
 import { InMemoryBackupStore } from './storage/backups';
 import { projectLabel, SessionStore } from './storage/sessions';
 import { UsageLedger } from './storage/usage';
-import { createExploreTools } from './tools/explore';
-import { createFileTools } from './tools/fs';
-import { createGoalTools } from './tools/goal';
+import { createAllTools } from './tools/all';
 import { ToolRegistry } from './tools/registry';
-import { createGitTools } from './tools/git';
-import { createTerminalTools } from './tools/terminal';
-import { createTodoTools } from './tools/todo';
-import { createTaskFileTools } from './tools/tasks';
-import { createReplTools, resetReplProcesses } from './tools/repl';
-import { createContainerTools } from './tools/containers';
-import { createCmdTools } from './tools/cmd';
+import { resetReplProcesses } from './tools/repl';
 import type { ApprovalDecision } from './ui/approvals';
 import { AgentPanelProvider } from './ui/panel';
 import { themeKind } from './ui/theme';
@@ -34,7 +26,7 @@ import { applySettings, addApiKey, clearApiKey, setEndpoint, warnAboutTheBaseUrl
 import { showLogs, showUsage, generateCommitMessage, refreshQuota, undoLastChange, refreshContext, prepareIndex, reindex } from './host/commands';
 import { searchFor, addSelectionToChat, addFileToChat } from './host/workspace';
 import type { AgentState } from './ui/protocol';
-import { createTaskTools } from './tools/task';
+
 import { getApiKey } from './config/secrets';
 import { resolveBaseUrl, MODELS } from './config/models';
 import * as vscode from 'vscode';
@@ -112,22 +104,12 @@ export class MiniMaxController {
       }
     });
 
-    for (const tool of [
-      ...createFileTools({ backups: this.backups }),
-      ...createExploreTools({ search: (root) => searchFor(this, root) }),
-      ...createGitTools(),
-      ...createTerminalTools(),
-      ...createCmdTools(),
-      ...createTodoTools(),
-      ...createTaskFileTools(),
-      ...createReplTools(),
-      ...createContainerTools(),
-      ...createGoalTools(),
-      ...createTaskTools({
-        spawn: async (request, ctx, progress) =>
-          await spawnTask(this, request, ctx, progress)
-      })
-    ]) {
+    for (const tool of createAllTools({
+      backups: this.backups,
+      search: (root) => searchFor(this, root),
+      spawn: async (request, ctx, progress) =>
+        await spawnTask(this, request, ctx, progress)
+    })) {
       this.registry.register(tool);
     }
   }
