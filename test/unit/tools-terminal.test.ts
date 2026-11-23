@@ -13,6 +13,22 @@ function makeContext(root: string) {
 }
 
 describe('run_terminal', () => {
+  it('runs the powershell syntax on windows', async () => {
+    if (process.platform !== 'win32') {
+      return;
+    }
+    const root = await mkdtemp(join(tmpdir(), 'mm-'));
+    const tool = createTerminalTools().find((t) => t.name === 'run_terminal');
+    const result = await tool!.execute(
+      { command: 'Write-Output ("ps" + $PSVersionTable.PSVersion.Major)' },
+      makeContext(root)
+    );
+    // The model is told the shell is powershell, the syntax it writes has
+    // to work: cmd.exe would take this line for noise.
+    expect(result.isError).toBeFalsy();
+    expect(result.content.trim()).toMatch(/^ps\d+$/);
+  });
+
   it('captures stdout', async () => {
     const root = await mkdtemp(join(tmpdir(), 'mm-'));
     const tool = createTerminalTools().find((t) => t.name === 'run_terminal');

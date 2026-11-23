@@ -1,10 +1,32 @@
-import { exec } from 'node:child_process';
+import { exec, execFile, type ExecFileException } from 'node:child_process';
 import { isAbsolute, relative, resolve } from 'node:path';
 import type { ToolEntry } from './types';
 
 const DEFAULT_TIMEOUT_MS = 60_000;
 const MAX_TIMEOUT_MS = 120_000;
 const MAX_OUTPUT_CHARS = 30_000;
+
+// The model is told the shell of Windows is powershell, so the commands
+// have to run in it too: the syntax of powershell dies quietly in cmd.exe.
+// pwsh (PowerShell 7) comes first, it takes `&&` and `||`, powershell.exe
+// (5.1) ships with every Windows. The answer is probed once and kept.
+let windowsShellProbe: Promise<string> | undefined;
+
+function windowsShell(): Promise<string> {
+  if (!windowsShellProbe) {
+    windowsShellProbe = new Promise((resolve) => {
+      execFile(
+        'pwsh.exe',
+        ['-NoProfile', '-NonInteractive', '-Command', 'exit 0'],
+        { windowsHide: true, timeout: 15_000 },
+        (error) => {
+          resolve(error ? 'powershell.exe' : 'pwsh.exe');
+        }
+      );
+    });
+  }
+  return windowsShellProbe;
+}
 
 function resolveCwd(root: string, candidate: string | undefined): string {
   if (!candidate) {
@@ -143,32 +165,50 @@ export function createTerminalTools(): ToolEntry[] {
         };
       }
       return await new Promise((resolvePromise) => {
+        const done = (
+          error: ExecFileException | null,
+          stdout: string,
+          stderr: string
+        ): void => {
+          const parts: string[] = [];
+          if (stdout.trim().length > 0) {
+            parts.push(stdout.trim());
+          }
+          if (stderr.trim().length > 0) {
+            parts.push('[stderr] ' + stderr.trim());
+          }
+          let text = parts.join('\n');
+          if (text.length > MAX_OUTPUT_CHARS) {
+            text = text.slice(0, MAX_OUTPUT_CHARS) + '\n[output truncated]';
+          }
+          if (error) {
+            const code = typeof error.code === 'number' ? error.code : 1;
+            const detail = text.length > 0 ? text : error.message;
+            resolvePromise({
+              content: 'Command failed with exit code ' + code + '\n' + detail,
+              isError: true
+            });
+            return;
+          }
+          resolvePromise({ content: text.length > 0 ? text : '[no output]', isError: false });
+        };
+        if (process.platform === 'win32') {
+          // The command runs as one PowerShell script: the exit code of the
+          // last native command becomes the exit code of the run.
+          void windowsShell().then((shell) => {
+            execFile(
+              shell,
+              ['-NoProfile', '-NonInteractive', '-Command', command],
+              { cwd, timeout, maxBuffer: 10 * 1024 * 1024, signal: ctx.signal, windowsHide: true },
+              done
+            );
+          });
+          return;
+        }
         exec(
           command,
           { cwd, timeout, maxBuffer: 10 * 1024 * 1024, signal: ctx.signal, windowsHide: true },
-          (error, stdout, stderr) => {
-            const parts: string[] = [];
-            if (stdout.trim().length > 0) {
-              parts.push(stdout.trim());
-            }
-            if (stderr.trim().length > 0) {
-              parts.push('[stderr] ' + stderr.trim());
-            }
-            let text = parts.join('\n');
-            if (text.length > MAX_OUTPUT_CHARS) {
-              text = text.slice(0, MAX_OUTPUT_CHARS) + '\n[output truncated]';
-            }
-            if (error) {
-              const code = typeof error.code === 'number' ? error.code : 1;
-              const detail = text.length > 0 ? text : error.message;
-              resolvePromise({
-                content: 'Command failed with exit code ' + code + '\n' + detail,
-                isError: true
-              });
-              return;
-            }
-            resolvePromise({ content: text.length > 0 ? text : '[no output]', isError: false });
-          }
+          done
         );
       });
     }
