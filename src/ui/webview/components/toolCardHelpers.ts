@@ -1,5 +1,9 @@
 
 // The helpers of the description of a card of an action.
+import { text } from '../value';
+
+export { text };
+
 export function filePaths(input: Record<string, unknown>): string[] {
   const paths: string[] = [];
   const single = input['path'];
@@ -15,16 +19,6 @@ export function filePaths(input: Record<string, unknown>): string[] {
     }
   }
   return paths;
-}
-
-export function text(value: unknown): string {
-  if (typeof value === 'string') {
-    return value;
-  }
-  if (value === undefined) {
-    return '';
-  }
-  return JSON.stringify(value);
 }
 
 export function countLines(value: string | undefined): number {

@@ -1,4 +1,5 @@
 import type { UiDiffLine, UiToolCall } from '../protocol';
+import { textOrEmpty } from './value';
 
 // The chats of the old sessions keep the arguments of an edit, not its diff.
 // The panel can still show what the edit did: the replaced lines are gone and
@@ -14,17 +15,13 @@ export function editDiff(tool: UiToolCall): UiDiffLine[] | undefined {
     return undefined;
   }
   const lines: UiDiffLine[] = [];
-  for (const line of splitLines(text(tool.input['old_string']))) {
+  for (const line of splitLines(textOrEmpty(tool.input['old_string']))) {
     lines.push({ type: 'remove', text: line });
   }
-  for (const line of splitLines(text(tool.input['new_string']))) {
+  for (const line of splitLines(textOrEmpty(tool.input['new_string']))) {
     lines.push({ type: 'add', text: line });
   }
   return lines.length > 0 ? lines : undefined;
-}
-
-function text(value: unknown): string {
-  return typeof value === 'string' ? value : '';
 }
 
 // A text ends with a newline, the empty line after it is not a line.

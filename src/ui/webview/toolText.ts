@@ -1,14 +1,5 @@
 import { STRINGS } from './strings';
-
-function text(value: unknown): string {
-  if (typeof value === 'string') {
-    return value;
-  }
-  if (value === undefined) {
-    return '';
-  }
-  return JSON.stringify(value);
-}
+import { text } from './value';
 
 // The arguments are shown as a short list, not as a json dump.
 export function formatInput(input: Record<string, unknown>): string {
