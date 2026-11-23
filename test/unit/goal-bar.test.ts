@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -11,11 +10,9 @@ import {
 } from '../../src/ui/webview/components/GoalBar';
 import { STRINGS } from '../../src/ui/webview/strings';
 import type { GoalState } from '../../src/agent/state';
+import { readStyles } from '../helpers/styles';
 
-const CSS = readFileSync(
-  new URL('../../src/ui/webview/styles.css', import.meta.url),
-  'utf8'
-);
+const CSS = readStyles();
 
 const GOAL: GoalState = {
   objective: 'Rewrite the parser',

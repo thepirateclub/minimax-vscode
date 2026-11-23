@@ -1,0 +1,382 @@
+.term-body {
+  max-height: 300px;
+  overflow: auto;
+  padding: 6px 8px;
+  font-family: var(--mono);
+  font-size: var(--fs-sm);
+  line-height: var(--lh);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.term-line-error {
+  color: var(--err);
+}
+
+.term-line-note {
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* The status of the request that is repeated after the loss of the
+   connection. It stands above the field, the reader sees it at once. */
+.composer-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 2px 6px;
+  font-size: var(--fs-sm);
+  color: var(--warn);
+}
+
+.composer-status-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The queue of the messages of the chat. A compact strip over the field
+   of the request: every message has its state. */
+.queue-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+}
+
+.queue-items {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 84px;
+  overflow-y: auto;
+}
+
+.queue-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 2px 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--row-hover);
+  font-size: var(--fs-xs);
+}
+
+.queue-item.queue-error {
+  border-color: var(--err);
+}
+
+.queue-item.queue-done {
+  opacity: 0.6;
+}
+
+.queue-state {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  color: var(--muted);
+}
+
+.queue-item.queue-sending .queue-state {
+  color: var(--accent);
+}
+
+.queue-item.queue-error .queue-state {
+  color: var(--err);
+}
+
+.queue-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.queue-send,
+.queue-remove {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  padding: 2px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.queue-send:hover,
+.queue-remove:hover {
+  color: var(--fg);
+  background: var(--hover);
+}
+
+.queue-send:disabled,
+.queue-remove:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.queue-send-all {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--fg);
+  font-size: var(--fs-xs);
+  cursor: pointer;
+}
+
+.queue-send-all:hover {
+  background: var(--hover);
+}
+
+/* composer */
+.composer {
+  position: relative;
+  border-top: 1px solid var(--border);
+  padding: 8px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* The field holds the text, the paperclip in its corner and the row of the
+   controls under the text: the model, the reasoning and the send button. */
+.composer-input-wrap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: var(--vscode-input-background, #2b2b2b);
+  border: 1px solid var(--vscode-input-border, var(--border));
+  border-radius: var(--radius);
+}
+
+.composer-input-wrap:focus-within {
+  border-color: var(--vscode-focusBorder, #007fd4);
+}
+
+.composer-input {
+  min-height: 68px;
+  max-height: 180px;
+  overflow-y: auto;
+  font-family: inherit;
+  font-size: var(--fs-md);
+  line-height: var(--lh);
+  color: var(--vscode-input-foreground, var(--fg));
+  background: transparent;
+  border: none;
+  /* The room on the right belongs to the paperclip. */
+  padding: 6px 32px 2px 8px;
+  outline: none;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* The live text of the speech is gray until the recording ends, the reader
+   sees which words may still change. */
+.dictation-live {
+  color: var(--muted);
+}
+
+/* the placeholder lives in the attribute, the field itself stays empty */
+.composer-input.is-empty::before {
+  content: attr(data-placeholder);
+  color: var(--muted);
+  pointer-events: none;
+}
+
+/* a file reference inside the input field */
+.mention {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin: 0 1px;
+  padding: 0 2px 0 6px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--code-bg);
+  color: var(--fg);
+  font-size: var(--fs-sm);
+  line-height: var(--lh);
+  vertical-align: baseline;
+  user-select: none;
+}
+
+.mention-label {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The cross of a chip is a letter, an svg inside the editable field moves
+   the caret. The only glyph of the panel, see docs/styleguide.md. */
+.mention-remove {
+  appearance: none;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0 2px;
+  font-size: var(--fs-md);
+  line-height: 1;
+}
+
+.mention-remove:hover {
+  color: var(--fg);
+  background: var(--hover);
+}
+
+.composer-attach {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-h);
+  height: var(--control-h);
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.composer-attach:hover {
+  background: var(--hover);
+  color: var(--fg);
+}
+
+/* the last row of the field */
+.composer-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 2px 4px 4px;
+}
+
+.composer-toolbar-start,
+.composer-toolbar-end {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.composer-toolbar-start {
+  flex: 1 1 auto;
+}
+
+.composer-toolbar-end {
+  flex: 0 0 auto;
+}
+
+/* In a narrow panel the labels give way, the icons stay: a select without
+   min-width 0 keeps its full width and runs over its neighbour. */
+.composer-toolbar .icon-select {
+  min-width: 0;
+  flex: 0 1 auto;
+}
+
+/* The mode is a short word and keeps it, the name of the model gives way
+   first: "C…" said nothing, "M3.1 Fl…" still names the model. */
+.composer-toolbar .icon-select:first-child {
+  flex-shrink: 0;
+}
+
+.composer-toolbar .icon-select-trigger .icon {
+  flex: 0 0 auto;
+}
+
+/* The selects inside the field are quiet text with a chevron, like the
+   switches of the chat of VS Code. The frame shows on the mouse only. */
+.composer-toolbar .icon-select-trigger {
+  border-color: transparent;
+  background: transparent;
+}
+
+.composer-toolbar .icon-select-trigger:hover,
+.composer-toolbar .icon-select-trigger.open {
+  background: var(--hover);
+}
+
+/* The goal button stands after the model, an icon button of the field. */
+.composer-goal {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-h);
+  height: var(--control-h);
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.composer-goal:hover {
+  background: var(--hover);
+  color: var(--fg);
+}
+
+/* the pressed button: the field takes the goal */
+.composer-goal.active {
+  color: var(--accent);
+}
+
+.composer-goal.active:hover {
+  color: var(--accent);
+}
+
+/* The frame of the field says that the text is the goal, not a request. */
+.composer-input-wrap.goal-mode {
+  border-color: var(--accent);
+}
+
+.composer-input-wrap.goal-mode:focus-within {
+  border-color: var(--accent);
+}
+
+/* The microphone stands right before the send button, an icon button of
+   the field like the paperclip. */
+.composer-mic {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-h);
+  height: var(--control-h);
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.composer-mic:hover {
+  background: var(--hover);
+  color: var(--fg);
+}
+

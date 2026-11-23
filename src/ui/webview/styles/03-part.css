@@ -1,0 +1,391 @@
+.goal-review dt {
+  color: var(--muted);
+  /* the names share the words of the limit fields, the review starts them
+     with a capital like the name of the goal */
+  text-transform: capitalize;
+}
+
+.goal-review dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* the one main button of the form */
+.goal-button.goal-button-primary {
+  border-color: transparent;
+  background: var(--vscode-button-background, var(--accent));
+  color: var(--vscode-button-foreground, #fff);
+}
+
+.goal-button.goal-button-primary:hover {
+  background: var(--vscode-button-hoverBackground, var(--accent));
+}
+
+/* messages */
+.messages-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* The actions of one step stand together, a row of cards reads as a group. */
+.message-tool + .message-tool {
+  margin-top: -8px;
+}
+
+.load-earlier {
+  align-self: center;
+  padding: 2px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+
+.load-earlier:hover {
+  background: var(--hover);
+  color: var(--fg);
+}
+
+.jump-latest {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--popup-bg);
+  color: var(--fg);
+  font-size: var(--fs-sm);
+  box-shadow: var(--shadow);
+}
+
+.jump-latest:hover {
+  background: var(--popup-bg);
+  border-color: var(--vscode-focusBorder, #007fd4);
+}
+
+.message {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.bubble {
+  padding: 6px 12px;
+  border-radius: var(--radius);
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: var(--fs-md);
+}
+
+.message-user {
+  align-items: flex-end;
+}
+
+/* The request stands with the button that takes the chat back to it, or
+   with the button that runs it again after a failure. One of the two at
+   a time, the button points at the message, so it stands on the left of
+   the words. */
+.user-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  width: 100%;
+}
+
+.message-rewind,
+.message-retry {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: var(--control-h);
+  height: var(--control-h);
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.message-rewind:hover,
+.message-retry:hover {
+  /* an icon button, the same hover as the buttons of the header */
+  background: var(--hover);
+  color: var(--fg);
+}
+
+/* The words of the user sit on a quiet plate. A fill in the color of the
+   button made the question louder than the answer. */
+.bubble.user-bubble {
+  max-width: 92%;
+  /* The arrow takes its place, the words of the request give way. */
+  min-width: 0;
+  background: var(--vscode-textBlockQuote-background, rgba(128, 128, 128, 0.12));
+  border: 1px solid var(--border);
+  color: var(--fg);
+}
+
+.assistant-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  word-break: break-word;
+}
+
+/* thinking */
+.thinking-toggle {
+  appearance: none;
+}
+
+/* The head of a folding section. The chevron, the icon and the title
+   stand on the left, the preview of the section takes the free middle of the
+   row, the counter stands on the right edge. The rows of the chat read as
+   one column: the icon of the reasoning used to stand 12 pixels left of the
+   icon of the actions and the counter hung in the margin. The row has one
+   height for every section: 18 pixels of the line and 2 pixels of the
+   padding above and below. */
+.section-head {
+  display: grid;
+  grid-template-columns: 14px 14px auto minmax(0, 1fr) auto;
+  align-items: baseline;
+  column-gap: 6px;
+  width: 100%;
+  min-height: var(--control-h);
+  padding: 2px 0;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  line-height: 18px;
+  text-align: left;
+}
+
+/* The name of the section and the marks of it open the section. The title
+   keeps its place: the preview stands in the free middle of the row, the
+   title does not move when the preview appears. */
+.section-toggle {
+  display: grid;
+  grid-template-columns: 14px 14px auto;
+  align-items: baseline;
+  column-gap: 6px;
+  grid-column: 1 / 4;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* The preview of a folded section: one italic line that says what the
+   section holds. It stands in the middle of the head, the ellipsis cuts it
+   when the line does not fit, and a click on it opens the section. */
+.section-preview {
+  grid-column: 4;
+  display: block;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: var(--fs-sm);
+  font-style: italic;
+  line-height: 18px;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* The text of the preview is one line: the ellipsis cuts it when the row
+   does not have room for it. */
+.section-preview-text {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The row of the head is one surface: the name of the section and the
+   preview of it open the section, the whole row answers the mouse. */
+.section-head:hover {
+  background: var(--row-hover);
+}
+
+.section-toggle:hover,
+.section-preview:hover {
+  color: var(--fg);
+}
+
+/* The words of the head and the counter stand on one baseline: the counter
+   is a number of a smaller font, it hung above the title without it. */
+.section-title {
+  align-self: baseline;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The chevron and the icon are marks, not words: they stand in the middle
+   of the row, not on the baseline of the title. */
+.section-toggle .chevron {
+  align-self: center;
+}
+
+.section-toggle .section-icon {
+  align-self: center;
+}
+
+.section-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* The head of a section is a quiet row, not a button of the panel. The
+   general rule of the buttons paints it with the fill of the primary button
+   on hover, the row keeps the plate of the rows of the list. */
+.thinking-toggle:hover {
+  color: var(--fg);
+  background: var(--row-hover);
+}
+
+.thinking-toggle:hover .chevron {
+  color: var(--fg);
+  background: transparent;
+}
+
+/* Two thoughts in a row are two steps of the reasoning. A thin line
+   between them keeps them apart: without it they melted into one block. */
+.thinking-repeated {
+  border-top: 1px solid var(--border);
+  padding-top: 6px;
+}
+
+.thinking-body {
+  margin: 6px 0 0;
+  padding: 8px;
+  font-family: var(--mono);
+  font-size: var(--fs-sm);
+  line-height: var(--lh);
+  white-space: pre-wrap;
+  color: var(--muted);
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  max-height: 320px;
+  overflow: auto;
+}
+
+/* The card of an action is a quiet note under the answer, it must not
+   compete with the text of the chat. */
+.tool-card {
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  overflow: hidden;
+  /* The chevron and the blocks stand on the left edge of the answer. The
+     hover of the row and the bar of a failure go into the margin of the
+     panel, like the rows of the lists of VS Code. */
+  margin: 0 -6px;
+}
+
+/* a failure of the panel is a notice, it is not a part of the answer */
+.message-notice {
+  border-left: 2px solid var(--err);
+  /* The bar stands in the margin of the panel, the text on the left edge,
+     like the bar of a failed action. */
+  margin-left: -6px;
+  padding: 2px 0 2px 4px;
+  color: var(--muted);
+  font-size: var(--fs-md);
+  line-height: var(--lh);
+  overflow-wrap: anywhere;
+}
+
+/* The bar of a note tells how serious it is. A note that is not a
+   failure keeps the quiet color of the text. */
+.message-notice.notice-info {
+  border-left-color: var(--muted);
+}
+
+.message-notice.notice-warn {
+  border-left-color: var(--warn);
+}
+
+.message-notice.notice-error {
+  border-left-color: var(--err);
+}
+
+/* The actions of a message: the time of the step. The row is quiet,
+   it holds the time of the last message of the turn. */
+.message-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: var(--control-h);
+}
+
+/* The time of the step stands in the right edge of the row. */
+.message-elapsed {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+/* A failed action is marked with a straight bar in the color of the failed
+   dot. A rounded border drew a bracket, it looked like a decoration, and the
+   color of the theme turned the mark gray. */
+.tool-card.tool-error {
+  border-left: 2px solid var(--err);
+  border-radius: 0;
+}
+
+/* The bar takes 2px of the gutter, the icons stay in one column with the
+   cards around. */
+.tool-card.tool-error .tool-head,
+.tool-card.tool-error .tool-body {
+  padding-left: 4px;
+}
+
+.tool-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: var(--control-h);
+  padding: 2px 6px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--fg);
+  font-size: var(--fs-sm);
+  text-align: left;
+  cursor: pointer;
+}
+

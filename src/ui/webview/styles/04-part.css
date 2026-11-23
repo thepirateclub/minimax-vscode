@@ -1,0 +1,393 @@
+.tool-head:hover {
+  background: var(--row-hover);
+}
+
+.tool-icon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--muted);
+}
+
+.tool-title {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+/* The title of an action is a note, not the headline of the chat. It takes
+   the full color when the reader points at it. */
+.tool-head:hover .tool-title,
+.tool-head:hover .tool-icon,
+.tool-head:hover .chevron {
+  color: var(--fg);
+}
+
+.tool-summary {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: var(--fs-xs);
+}
+
+.tool-time {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* the size of the change sits in the header, it stays when the card folds */
+.tool-stats {
+  display: inline-flex;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+}
+
+.tool-stat-add {
+  color: var(--diff-add-fg);
+}
+
+.tool-stat-remove {
+  color: var(--diff-remove-fg);
+}
+
+/* the time and the dot stand at the right edge of the header */
+.tool-tail {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+/* The result of an action is a dot: green for done, red for a failure.
+   The dot blinks only while the action runs, a finished result burns steady. */
+.tool-dot {
+  flex: 0 0 auto;
+  width: var(--dot);
+  height: var(--dot);
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.tool-dot.tool-dot-done {
+  background: var(--ok);
+}
+
+.tool-dot.tool-dot-failed {
+  background: var(--err);
+}
+
+.tool-dot.tool-dot-running {
+  background: var(--muted);
+  animation: mm-pulse 1s ease-in-out infinite;
+}
+
+/* The body starts under the title, the chevron and the icon stay a gutter. */
+.tool-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 6px 6px;
+}
+
+.tool-input,
+.tool-output {
+  margin: 0;
+  padding: 6px 8px;
+  font-family: var(--mono);
+  font-size: var(--fs-sm);
+  line-height: var(--lh);
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--code-bg);
+  /* Light Modern paints the code ground in the color of the side bar, a
+     block held by its fill alone melts into the panel. */
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  max-height: 260px;
+  overflow: auto;
+}
+
+.tool-output-wrap {
+  position: relative;
+}
+
+.tool-output-wrap .tool-output {
+  padding-right: 32px;
+}
+
+/* the card of a sub-agent */
+.agent-log {
+  margin-bottom: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  background: var(--code-bg);
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: var(--fs-sm);
+  border-radius: var(--radius-sm);
+}
+
+.agent-log-line {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.agent-answer {
+  font-size: var(--fs-md);
+}
+
+/* the copy button of a block, it shows itself when the mouse is over it */
+.tool-copy {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-h);
+  height: var(--control-h);
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--popup-bg);
+  color: var(--muted);
+  opacity: 0;
+  transition: opacity var(--ease);
+}
+
+.tool-output-wrap:hover .tool-copy,
+.file-read:hover .tool-copy,
+.term:hover .tool-copy,
+.tool-copy:focus-visible {
+  opacity: 1;
+}
+
+.tool-copy:hover {
+  color: var(--fg);
+  background: var(--popup-bg);
+}
+
+/* the check after a copy stays visible while the mouse goes away */
+.tool-copy.copied,
+.tool-copy.copied:hover {
+  opacity: 1;
+  color: var(--ok);
+}
+
+/* approval */
+.approval {
+  border: 1px solid var(--vscode-focusBorder, #007fd4);
+  border-radius: var(--radius);
+  padding: 12px;
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.approval-title {
+  font-weight: 600;
+  font-size: var(--fs-md);
+}
+
+.approval-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.approval .tool-input {
+  max-height: 160px;
+}
+
+.approval-command {
+  color: var(--fg);
+}
+
+/* the blocks of a monospace text share one frame */
+.diff,
+.file-read,
+.term {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+/* diff */
+.diff-path {
+  padding: 4px 8px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+  font-size: var(--fs-sm);
+  font-family: var(--mono);
+}
+
+.diff-body {
+  margin: 0;
+  padding: 4px 0;
+  overflow: auto;
+  max-height: 300px;
+}
+
+.diff-line {
+  padding-right: 8px;
+  white-space: pre;
+  font-family: var(--mono);
+  font-size: var(--fs-sm);
+  line-height: var(--lh);
+}
+
+.diff-add {
+  background: var(--diff-add-bg);
+  color: var(--diff-add-fg);
+}
+
+.diff-remove {
+  background: var(--diff-remove-bg);
+  color: var(--diff-remove-fg);
+}
+
+.diff-marker {
+  display: inline-block;
+  width: 2ch;
+  padding-left: 8px;
+  box-sizing: content-box;
+  font-weight: 600;
+  user-select: none;
+}
+
+.diff-add .diff-marker {
+  color: var(--diff-add-fg);
+}
+
+.diff-remove .diff-marker {
+  color: var(--diff-remove-fg);
+}
+
+/* the read of a file */
+.file-read-block + .file-read-block {
+  border-top: 1px solid var(--border);
+}
+
+.file-read-path {
+  padding: 4px 8px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: var(--fs-xs);
+}
+
+.file-read-lines {
+  max-height: 300px;
+  overflow: auto;
+  padding: 4px 0;
+}
+
+.file-read-line {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 0 8px;
+  font-family: var(--mono);
+  font-size: var(--fs-sm);
+  line-height: var(--lh);
+}
+
+.file-read-num {
+  flex: 0 0 auto;
+  min-width: 3ch;
+  text-align: right;
+  color: var(--muted);
+  opacity: 0.6;
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+}
+
+.file-read-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: pre;
+}
+
+/* the output of a command */
+
+/* The command stands on its own line, a click opens a long one. */
+.term-command {
+  appearance: none;
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  /* The room on the right belongs to the copy button. */
+  padding: 4px 32px 4px 8px;
+  background: var(--surface);
+  border: none;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  font-family: var(--mono);
+  font-size: var(--fs-sm);
+  line-height: var(--lh);
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.term-command:hover {
+  background: var(--surface);
+  color: var(--fg);
+}
+
+.term-prompt {
+  flex: 0 0 auto;
+  color: var(--accent);
+  user-select: none;
+}
+
+.term-cmd-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  /* A long command takes three lines, the rest of it opens on a click. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+
+.term-command-open .term-cmd-text {
+  -webkit-line-clamp: none;
+  overflow: visible;
+}
+
+/* the stream of the error is marked, the red text alone says nothing */
+.term-chip {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 0 4px;
+  border: 1px solid currentColor;
+  border-radius: var(--radius-sm);
+  font-family: var(--vscode-font-family);
+  font-size: var(--fs-xs);
+  line-height: var(--lh-tight);
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  opacity: 0.8;
+  vertical-align: 1px;
+}
+

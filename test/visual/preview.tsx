@@ -4,7 +4,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from '../../src/ui/webview/App';
-import styles from '../../src/ui/webview/styles.css';
+import { styles } from '../../src/ui/webview/styles';
 import { MODELS } from '../../src/config/models';
 // The version comes from the manifest, the stand shows the same badge as the
 // panel and never falls behind the build.

@@ -1,14 +1,11 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { TaskList } from '../../src/ui/webview/components/TaskList';
 import { STRINGS } from '../../src/ui/webview/strings';
+import { readStyles } from '../helpers/styles';
 
-const CSS = readFileSync(
-  new URL('../../src/ui/webview/styles.css', import.meta.url),
-  'utf8'
-);
+const CSS = readStyles();
 
 function render(todos: Array<{ content: string; status: string; priority: string }>): string {
   return renderToStaticMarkup(

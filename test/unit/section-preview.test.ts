@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -11,11 +10,9 @@ import {
   thinkingPreview
 } from '../../src/ui/webview/sectionPreview';
 import type { UiMessage } from '../../src/ui/protocol';
+import { readStyles } from '../helpers/styles';
 
-const CSS = readFileSync(
-  new URL('../../src/ui/webview/styles.css', import.meta.url),
-  'utf8'
-);
+const CSS = readStyles();
 
 function rule(selector: string): string {
   const index = CSS.indexOf(selector + ' {');

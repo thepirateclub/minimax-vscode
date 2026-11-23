@@ -1,12 +1,10 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { readStyles } from '../helpers/styles';
 
 // The panel follows docs/styleguide.md. The rules below read the style sheet
 // and keep every size, radius, shadow and color on the scale of the guide.
-const CSS = readFileSync(
-  new URL('../../src/ui/webview/styles.css', import.meta.url),
-  'utf8'
-).replace(/\/\*[\s\S]*?\*\//g, '');
+const CSS = readStyles().replace(/\/\*[\s\S]*?\*\//g, '');
 
 interface Declaration {
   selector: string;

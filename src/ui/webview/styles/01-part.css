@@ -1,0 +1,383 @@
+/* The panel follows docs/styleguide.md: every size, radius, shadow and color
+   below is a token of the body block or a variable of the host theme. The
+   test test/unit/styleguide.test.ts keeps the sheet on the scale. */
+
+* {
+  box-sizing: border-box;
+}
+
+:root {
+  --mm-font-base: 13px;
+  /* the palette of the tokens, the kind of the theme picks the shades */
+  --tok-comment: #6a9955;
+  --tok-string: #ce9178;
+  --tok-number: #b5cea8;
+  --tok-keyword: #569cd6;
+  --tok-type: #4ec9b0;
+  --tok-function: #dcdcaa;
+  --tok-variable: #9cdcfe;
+  --tok-operator: #d4d4d4;
+  --tok-attribute: #9cdcfe;
+  --tok-property: #9cdcfe;
+  --tok-tag: #569cd6;
+  --tok-add: #6a9955;
+  --tok-remove: #d16969;
+  /* a change has to be visible at a glance, the diff paints itself */
+  --diff-add-fg: #6fbf73;
+  --diff-remove-fg: #f97583;
+  --diff-add-bg: rgba(46, 160, 67, 0.16);
+  --diff-remove-bg: rgba(248, 81, 73, 0.16);
+}
+
+/* the light theme of the host paints the tokens in its own shades */
+body.mm-theme-light {
+  --tok-comment: #008000;
+  --tok-string: #a31515;
+  --tok-number: #098658;
+  --tok-keyword: #0000ff;
+  --tok-type: #267f99;
+  --tok-function: #795e26;
+  --tok-variable: #001080;
+  --tok-operator: #000000;
+  --tok-attribute: #e50000;
+  --tok-property: #0451a5;
+  --tok-tag: #800000;
+  --tok-add: #098658;
+  --tok-remove: #a31515;
+}
+
+/* the high contrast themes need the brightest shades */
+body.mm-theme-high-contrast,
+body.mm-theme-high-contrast-light {
+  --tok-comment: #7ca668;
+  --tok-string: #ce9178;
+  --tok-number: #b5cea8;
+  --tok-keyword: #569cd6;
+  --tok-type: #4ec9b0;
+  --tok-function: #dcdcaa;
+  --tok-variable: #9cdcfe;
+  --tok-operator: #ffffff;
+  --tok-attribute: #9cdcfe;
+  --tok-property: #9cdcfe;
+  --tok-tag: #569cd6;
+  --tok-add: #6a9955;
+  --tok-remove: #f48771;
+}
+
+/* the light shades of the host need darker marks of a change */
+body.mm-theme-light,
+body.mm-theme-high-contrast-light {
+  --diff-add-fg: #0b6b2f;
+  --diff-remove-fg: #b31515;
+  --diff-add-bg: rgba(46, 160, 67, 0.14);
+  --diff-remove-bg: rgba(248, 81, 73, 0.12);
+}
+
+/* The tokens live on the body: the panel sets --mm-font-base on the body,
+   a size counted on the root would keep the old base. */
+body {
+  /* type scale */
+  --fs-xs: calc(var(--mm-font-base) * 0.77);
+  --fs-sm: calc(var(--mm-font-base) * 0.85);
+  --fs-md: calc(var(--mm-font-base) * 0.92);
+  --fs-base: var(--mm-font-base);
+  --lh: 1.5;
+  --lh-tight: 1.3;
+  /* sizes */
+  --control-h: 22px;
+  --icon: 14px;
+  --dot: 8px;
+  --radius-sm: 4px;
+  --radius: 6px;
+  /* colors */
+  --fg: var(--vscode-foreground);
+  --muted: var(--vscode-descriptionForeground, #9d9d9d);
+  --border: var(--vscode-widget-border, var(--vscode-panel-border, rgba(128, 128, 128, 0.3)));
+  --accent: var(--vscode-textLink-foreground, #4daafc);
+  --ok: var(--vscode-testing-iconPassed, #3fb950);
+  --err: var(--vscode-testing-iconFailed, #f14c4c);
+  --warn: var(--vscode-inputValidation-warningBorder, #cca700);
+  /* the arrows of the priority of a task, the colors of the theme */
+  --prio-low: var(--vscode-charts-blue, #4daafc);
+  --prio-medium: var(--vscode-charts-yellow, #cca700);
+  --prio-high: var(--vscode-charts-red, #f14c4c);
+  --hover: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.16));
+  --row-hover: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.12));
+  --selected: var(--vscode-list-activeSelectionBackground, rgba(128, 128, 128, 0.24));
+  --selected-fg: var(--vscode-list-activeSelectionForeground, var(--vscode-foreground));
+  --code-bg: var(--vscode-textCodeBlock-background, rgba(128, 128, 128, 0.12));
+  --surface: var(--vscode-editorWidget-background, rgba(128, 128, 128, 0.06));
+  --popup-bg: var(--vscode-dropdown-background, var(--vscode-editorWidget-background, #252526));
+  --bg: var(--vscode-sideBar-background, #181818);
+  --mono: var(--vscode-editor-font-family, ui-monospace, monospace);
+  --shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  --ease: 120ms ease-out;
+
+  margin: 0;
+  padding: 0;
+  font-family: var(--vscode-font-family);
+  font-size: var(--fs-base);
+  line-height: var(--lh);
+  color: var(--fg);
+  background: var(--bg);
+  overflow: hidden;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+button {
+  appearance: none;
+  font-family: inherit;
+  font-size: var(--fs-md);
+  line-height: var(--lh-tight);
+  padding: 4px 12px;
+  border-radius: var(--radius-sm);
+  /* The modern themes draw a secondary button with a clear fill and an outline
+     from this variable: without it the button reads as plain text. */
+  border: 1px solid var(--vscode-button-border, transparent);
+  background: var(--vscode-button-background, #0078d4);
+  color: var(--vscode-button-foreground, #ffffff);
+  cursor: pointer;
+}
+
+button:hover {
+  background: var(--vscode-button-hoverBackground, #026ec1);
+}
+
+/* the keyboard sees where it is, the mouse does not get a frame */
+button:focus {
+  outline: none;
+}
+
+button:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder, #007fd4);
+  outline-offset: -1px;
+}
+
+button.secondary {
+  background: var(--vscode-button-secondaryBackground, rgba(128, 128, 128, 0.16));
+  color: var(--vscode-button-secondaryForeground, var(--fg));
+}
+
+button.secondary:hover {
+  background: var(--vscode-button-secondaryHoverBackground, rgba(128, 128, 128, 0.26));
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+select,
+input[type='text'],
+input[type='password'],
+input[type='number'] {
+  flex: 1;
+  min-width: 0;
+  font-family: inherit;
+  font-size: var(--fs-md);
+  color: var(--vscode-input-foreground, var(--fg));
+  background: var(--vscode-dropdown-background, var(--vscode-input-background, #3c3c3c));
+  border: 1px solid var(--vscode-input-border, var(--border));
+  border-radius: var(--radius-sm);
+  padding: 4px 6px;
+  outline: none;
+}
+
+select:focus,
+input:focus {
+  border-color: var(--vscode-focusBorder, #007fd4);
+}
+
+/* inline icons of the panel */
+.icon {
+  flex: 0 0 auto;
+  display: block;
+}
+
+/* The chevron of a folding block points down when it is open. One icon
+   serves the card of an action, the reasoning and the code block. */
+.chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  color: var(--muted);
+  transform: rotate(-90deg);
+  transition: transform var(--ease);
+}
+
+.chevron.chevron-open {
+  transform: none;
+}
+
+/* header */
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.header-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+/* The state of the agent is a dot, the word stays in the tooltip. */
+.state-dot {
+  flex: 0 0 auto;
+  width: var(--dot);
+  height: var(--dot);
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.state-dot.state-idle {
+  background: var(--ok);
+}
+
+.state-dot.state-thinking,
+.state-dot.state-streaming,
+.state-dot.state-tool {
+  background: var(--accent);
+  animation: mm-pulse 1.2s ease-in-out infinite;
+}
+
+.state-dot.state-error {
+  background: var(--err);
+}
+
+@keyframes mm-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.3;
+    transform: scale(0.8);
+  }
+}
+
+.tabs {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  /* The label of the first tab stands on the left edge of the panel, the
+     padding of the tab goes into the margin of the panel. */
+  margin-left: -8px;
+}
+
+/* The active tab is marked by a rounded bar under the label, the panel
+   divider below the tabs stays untouched. */
+.tab {
+  appearance: none;
+  position: relative;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  font-size: var(--fs-md);
+  padding: 4px 8px 6px;
+}
+
+.tab:hover {
+  color: var(--fg);
+  background: transparent;
+}
+
+.tab.active {
+  color: var(--fg);
+}
+
+.tab.active::after {
+  content: '';
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 0;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--accent);
+}
+
+.tokens {
+  flex: 0 0 auto;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.tabs .state-dot {
+  margin-left: auto;
+  margin-right: 4px;
+}
+
+/* The version of the extension sits in the corner of the tab row, it tells
+   the reader which build is running without opening the settings. */
+.version {
+  flex: 0 0 auto;
+  margin-left: 4px;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* A square button with an icon, it has no frame until the mouse points at
+   it, like the toolbar of VS Code. */
+.icon-button {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: var(--control-h);
+  height: var(--control-h);
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.icon-button:hover,
+.icon-button.open {
+  background: var(--hover);
+  color: var(--fg);
+}
+
+.warning {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--fs-sm);
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  color: var(--vscode-inputValidation-warningForeground, var(--fg));
+  background: var(--vscode-inputValidation-warningBackground, rgba(204, 167, 0, 0.1));
+  border: 1px solid var(--warn);
+}
+
+.warning-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.warning-action {
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  font-size: var(--fs-sm);
+}
+

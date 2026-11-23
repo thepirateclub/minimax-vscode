@@ -1,0 +1,382 @@
+/* views */
+.view {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.view-hidden {
+  display: none;
+}
+
+/* the list of tasks over the feed */
+/* The root of the widget is scoped to the chat view: the markdown of an
+   answer draws its own checklist with the class task-list, an unscoped
+   rule would put a frame around it. */
+.view > .task-list {
+  flex: 0 0 auto;
+  margin: 8px 12px 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.task-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 8px;
+  background: none;
+  border: none;
+  color: var(--fg);
+  cursor: pointer;
+  font-size: var(--fs-md);
+  text-align: left;
+}
+
+.task-head:hover {
+  background: var(--hover);
+}
+
+/* the toggle takes the row, the clear button sits at its right end */
+.task-head-row {
+  display: flex;
+  align-items: center;
+}
+
+.task-head-row > .task-head {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.task-clear {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-h);
+  height: var(--control-h);
+  margin-right: 4px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.task-clear:hover {
+  background: var(--hover);
+  color: var(--fg);
+}
+
+.task-title {
+  font-weight: 600;
+}
+
+.task-count {
+  margin-left: auto;
+  color: var(--muted);
+}
+
+.task-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 6px;
+}
+
+.task-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 2px 8px;
+  color: var(--fg);
+  font-size: var(--fs-md);
+}
+
+.task-marker {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border: 1px solid var(--muted);
+  border-radius: var(--radius-sm);
+}
+
+.task-pending .task-marker {
+  border-color: var(--muted);
+}
+
+.task-in_progress .task-marker {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.task-completed .task-marker {
+  border-color: var(--ok);
+  background: var(--ok);
+}
+
+.task-completed .task-text {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.task-text {
+  flex: 1 1 auto;
+}
+
+/* The priority of a task is an arrow of jira. The color of the arrow
+   comes from the theme of the host. */
+.task-priority {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  color: var(--muted);
+  font-size: var(--fs-xs);
+}
+
+.task-priority-low {
+  color: var(--prio-low);
+}
+
+.task-priority-medium {
+  color: var(--prio-medium);
+}
+
+.task-priority-high {
+  color: var(--prio-high);
+}
+
+.task-priority-very_high {
+  color: var(--prio-high);
+}
+
+/* the note of the model on the card of update_goal */
+.tool-note {
+  margin: 4px 0;
+  color: var(--fg);
+  font-size: var(--fs-md);
+  white-space: pre-wrap;
+}
+
+/* the list inside the card of todo_write sits on the card, not in a frame */
+.tool-body > .task-rows {
+  padding: 4px 0;
+}
+/* the goal over the feed */
+.goal-bar {
+  flex: 0 0 auto;
+  margin: 8px 12px 0;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--fg);
+  font-size: var(--fs-md);
+}
+
+.goal-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.goal-label {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+
+/* The objective takes the row, the buttons keep their size. Next to the
+   spend it had no room and fell to a width of zero. */
+.goal-objective {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.goal-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+
+.goal-spend {
+  white-space: nowrap;
+}
+
+.goal-status {
+  font-weight: 600;
+}
+
+.goal-status-complete .goal-status {
+  color: var(--ok);
+}
+
+.goal-status-blocked .goal-status {
+  color: var(--err);
+}
+
+.goal-icon-button {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-h);
+  height: var(--control-h);
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.goal-icon-button:hover {
+  background: var(--hover);
+  color: var(--fg);
+}
+
+.goal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.goal-limits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.goal-field {
+  flex: 1 1 72px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.goal-field-label {
+  color: var(--muted);
+  font-size: var(--fs-xs);
+}
+
+.goal-input {
+  min-width: 0;
+  padding: 2px 6px;
+  border: 1px solid var(--vscode-input-border, var(--border));
+  border-radius: var(--radius-sm);
+  background: var(--vscode-input-background, var(--bg));
+  color: var(--vscode-input-foreground, var(--fg));
+  font-size: var(--fs-sm);
+  line-height: var(--lh);
+}
+
+.goal-input:focus {
+  outline: none;
+  border-color: var(--vscode-focusBorder, #007fd4);
+}
+
+.goal-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.goal-hint,
+.goal-error {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--fs-xs);
+}
+
+.goal-hint {
+  color: var(--muted);
+}
+
+.goal-error {
+  color: var(--err);
+}
+
+.goal-button {
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  border: 1px solid var(--vscode-button-border, var(--border));
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--fg);
+  cursor: pointer;
+  font-size: var(--fs-sm);
+}
+
+.goal-button:hover {
+  background: var(--hover);
+}
+
+/* The wizard of the goal: a title with the step, a row of dots and one
+   step at a time. */
+.goal-wizard {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.goal-wizard-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.goal-wizard-title {
+  font-weight: 600;
+}
+
+.goal-wizard-step {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+
+.goal-wizard-dots {
+  display: flex;
+  gap: 4px;
+}
+
+.goal-wizard-dot {
+  flex: 1 1 0;
+  height: 2px;
+  border-radius: var(--radius-sm);
+  background: var(--border);
+}
+
+.goal-wizard-dot.goal-wizard-dot-done {
+  background: var(--accent);
+}
+
+.goal-input.goal-input-objective {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  font-family: inherit;
+  font-size: var(--fs-md);
+}
+
+/* the review of the wizard: the name of a value and the value */
+.goal-review {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 12px;
+  margin: 0;
+  font-size: var(--fs-sm);
+}
+

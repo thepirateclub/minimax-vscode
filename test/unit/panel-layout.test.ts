@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -9,13 +8,11 @@ import { MODELS } from '../../src/config/models';
 import { STRINGS } from '../../src/ui/webview/strings';
 import type { UiQueuedMessage } from '../../src/ui/protocol';
 import type { ReactElement } from 'react';
+import { readStyles } from '../helpers/styles';
 
 // The layout of the panel is drawn with css, the markup cannot express it,
 // so the tests read the rules of the stylesheet.
-const css = readFileSync(
-  new URL('../../src/ui/webview/styles.css', import.meta.url),
-  'utf8'
-);
+const css = readStyles();
 
 function rule(selector: string): string {
   const index = css.indexOf(selector + ' {');

@@ -1,7 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
-import styles from './styles.css';
+import { styles } from './styles';
 
 declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
 

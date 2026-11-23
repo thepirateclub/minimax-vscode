@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { ReactElement, ReactNode } from 'react';
@@ -37,6 +36,7 @@ import {
   IconWrite
 } from '../../src/ui/webview/icons';
 import { markupBBox } from '../helpers/iconGeometry';
+import { readStyles } from '../helpers/styles';
 
 const ICONS: Array<[string, () => ReactNode]> = [
   ['IconAlert', IconAlert],
@@ -128,10 +128,7 @@ describe('panel icons', () => {
   }
 
   it('centers the icon inside the square button of the header', () => {
-    const css = readFileSync(
-      new URL('../../src/ui/webview/styles.css', import.meta.url),
-      'utf8'
-    );
+    const css = readStyles();
     const rules = Array.from(css.matchAll(/\.icon-button \{([^}]*)\}/g)).map(
       (match) => match[1] ?? ''
     );
@@ -165,10 +162,7 @@ describe('one family of the icons', () => {
 
 // The buttons of the field keep the colour of their neighbours.
 describe('the buttons of the field', () => {
-  const css = readFileSync(
-    new URL('../../src/ui/webview/styles.css', import.meta.url),
-    'utf8'
-  );
+  const css = readStyles();
 
   it('points the arrow of the send button up', () => {
     const { markup } = renderIcon(IconSend);

@@ -1,14 +1,11 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ToolCard } from '../../src/ui/webview/components/ToolCard';
 import type { UiToolCall } from '../../src/ui/protocol';
+import { readStyles } from '../helpers/styles';
 
-const CSS = readFileSync(
-  new URL('../../src/ui/webview/styles.css', import.meta.url),
-  'utf8'
-);
+const CSS = readStyles();
 
 interface Rule {
   selector: string;
