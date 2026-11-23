@@ -5,8 +5,8 @@ import { HttpEmbeddingsClient } from './api/embeddings';
 import { HttpMiniMaxClient } from './api/client';
 import { HttpSpeechClient } from './api/speech';
 import { fetchQuota, type QuotaSnapshot } from './api/quota';
-import type { AnthropicMessage, EffortLevel } from './api/types';
-import { Agent, type AgentEvent, type AgentRunResult } from './agent/agent';
+import type { EffortLevel } from './api/types';
+import type { AgentEvent } from './agent/agent';
 import { buildWorkspaceSnapshot, renderSnapshot } from './agent/context';
 import { readMentionedFiles } from './agent/mentions';
 import {
@@ -17,7 +17,6 @@ import {
 } from './agent/prompt';
 import { generateCommitMessage } from './agent/commitMessage';
 import { AgentSession } from './agent/session';
-import type { GoalState, TodoItem } from './agent/state';
 import { budgetOver } from './agent/goalBudget';
 import { isAbortMessage, stopNotice } from './agent/stopReason';
 import { cutHistory, findRequestIndex, turnOfMessage, type TurnAnchor } from './agent/turns';
@@ -40,138 +39,67 @@ import { readRepositoryState, summarizeState } from './git/status';
 import { createLogger, type Logger } from './logger';
 import { ProjectSearch } from './search/project';
 import { InMemoryBackupStore } from './storage/backups';
-import { projectLabel, SessionStore, type StoredSession } from './storage/sessions';
+import { projectLabel, SessionStore } from './storage/sessions';
 import { UsageLedger } from './storage/usage';
 import { createExploreTools, isTextFile } from './tools/explore';
 import { createFileTools, resolveWorkspacePath } from './tools/fs';
 import { createGoalTools } from './tools/goal';
-import { buildPreview } from './tools/preview';
 import { ToolRegistry } from './tools/registry';
 import { createGitTools } from './tools/git';
 import { createTerminalTools } from './tools/terminal';
 import { createTodoTools } from './tools/todo';
 import { createTaskFileTools } from './tools/tasks';
-import { createReplTools, resetReplProcesses, stopReplSession } from './tools/repl';
+import { createReplTools, resetReplProcesses } from './tools/repl';
 import { createContainerTools } from './tools/containers';
 import { createCmdTools } from './tools/cmd';
 import {
-  CHILD_MAX_ITERATIONS,
   createTaskTools,
-  describeInput,
-  type TaskOutcome,
-  type TaskRequest,
-  type TaskRole
 } from './tools/task';
-import type { ToolContext } from './tools/types';
-import {
-  ApprovalGate,
-  type ApprovalDecision,
-  type ApprovalRequest
-} from './ui/approvals';
+import type { ApprovalDecision } from './ui/approvals';
 import { fileErrorMessage } from './ui/fileError';
-import { historyPage, historyTail } from './ui/historyPage';
 import { AgentPanelProvider } from './ui/panel';
 import { themeKind } from './ui/theme';
 import { VoiceController } from './voice/controller';
 import { Recorder } from './voice/recorder';
 import type {
   AgentState,
-  ExtToWeb,
   QueuedMessage,
-  UiApproval,
-  UiMessage,
   UiSelection,
   UiSettings,
   UiSettingsValues,
   UiSuggestion,
-  UiUsageTurn,
   WebToExt
 } from './ui/protocol';
 import { StatusBarController } from './ui/statusbar';
 import { showUsageDetails } from './ui/usageDetails';
 import { buildUsageRows } from './ui/usageRows';
-
-interface RuntimeSession {
-  id: string;
-  title: string;
-  updatedAt: number;
-  // The project of the chat: the root of the workspace it belongs to.
-  workspaceRoot: string;
-  history: AnthropicMessage[];
-  uiMessages: UiMessage[];
-  // Where the history of the panel starts in the messages of the session.
-  // The older messages wait in the host until the panel asks for them.
-  panelOffset: number | undefined;
-  agent: AgentSession | undefined;
-  busy: boolean;
-  // The state of the dot: every chat keeps its own, the panel shows the
-  // one of the chat that is open.
-  state: AgentState;
-  // The chat was deleted while its turn was still running: the turn ends,
-  // but nothing of it goes back into the store.
-  deleted: boolean;
-  errorReported: boolean;
-  // The token spend of every action of this session.
-  usage: UiUsageTurn[];
-  // The anchors of the requests, they tell where a request sits in the
-  // history and let the chat roll back to it.
-  turns: TurnAnchor[];
-  // The list of tasks of the session, the model writes it.
-  todos: TodoItem[];
-  // The goal of the session, the user sets it.
-  goal: GoalState | undefined;
-  // When the turn of this moment started, the panel shows how long it
-  // took.
-  turnStartedAt: number;
-  // The tools the reader allowed for the session. The permission of a
-  // child belongs to the chat of this session, it must not leak into
-  // another chat.
-  approvedTools: Set<string>;
-  // The messages the reader wrote while the agent worked. They go out one
-  // after another when the turn is over.
-  queue: QueuedMessage[];
-  // The queue waits until the reader asks for it: the user stopped the
-  // turn, the messages stay in the queue.
-  queuePaused: boolean;
-  // The user stopped the turn of this moment.
-  turnStopped: boolean;
-  // The reason of the last failure of the turn.
-  lastError: string | undefined;
-}
+import { sendQueued, sendAllQueued, removeQueued, enqueue, postQueue, pumpQueue } from './host/queue';
+import type { RuntimeSession } from './host/runtime';
+import { postFor, setState, appendToAssistant, markStepTime, usageTotal } from './host/channel';
+import { persist, startNewSession, restoreSession, selectSession, deleteSession, panelHistory, postHistory, loadOlder } from './host/sessions';
+import { spawnTask } from './host/child';
+import { agentsByPriority, dropApprovalCard, dropApprovalCards } from './host/approvals';
 
 const TITLE_LIMIT = 60;
-// How many messages wait in the queue of a chat.
-const MAX_QUEUE_ITEMS = 30;
 // How many actions the spend graph keeps in the header.
 const MAX_USAGE_TURNS = 24;
 
-// The role of a sub-agent tells it what it may do and what its answer looks
-// like. The text goes to the model, it is English.
-const ROLE_PROMPTS: Record<TaskRole, string> = {
-  explore:
-    'You are a sub-agent of the main agent. Your task is to explore: you read the files and you search the project, you never change anything. Answer with a short report: what you found, the paths and the facts. Your answer is the result of the task, write it as plain text.',
-  worker:
-    'You are a sub-agent of the main agent. Your task is to make the change: you edit the files and you run the commands. Answer with a short report: what you changed and what you checked. Your answer is the result of the task, write it as plain text.',
-  verifier:
-    'You are a sub-agent of the main agent. Your task is to check the work: you read the files and the changes and you look for the defects. Answer with the list of the defects you found, or with the words that there are none. Your answer is the result of the task, write it as plain text.'
-};
-
-class MiniMaxController {
-  private readonly context: vscode.ExtensionContext;
+export class MiniMaxController {
+  readonly context: vscode.ExtensionContext;
   private readonly channel: vscode.OutputChannel;
-  private readonly logger: Logger;
+  readonly logger: Logger;
   private readonly backups = new InMemoryBackupStore();
-  private readonly registry = new ToolRegistry();
-  private readonly store: SessionStore;
+  readonly registry = new ToolRegistry();
+  readonly store: SessionStore;
   private readonly ledger: UsageLedger;
-  private readonly panel: AgentPanelProvider;
-  private readonly statusBar = new StatusBarController();
-  private readonly sessions = new Map<string, RuntimeSession>();
+  readonly panel: AgentPanelProvider;
+  readonly statusBar = new StatusBarController();
+  readonly sessions = new Map<string, RuntimeSession>();
   // The approvals of the sub-agents wait here, the id of the request of the
   // child starts with "child-". The map remembers the name of the tool and
   // the chat the child belongs to, the reader can allow the tool for the
   // whole session of that chat.
-  private readonly childApprovals = new Map<
+  readonly childApprovals = new Map<
     string,
     {
       toolName: string;
@@ -182,11 +110,11 @@ class MiniMaxController {
   // The approval cards that wait for the reader: the id of the card and the
   // chat it belongs to. The card lives in the messages of its chat, so
   // another chat does not show it and a switch of the chats keeps it.
-  private readonly approvalOwner = new Map<string, string>();
+  readonly approvalOwner = new Map<string, string>();
   // The index of the project, one per workspace folder.
   private readonly searches = new Map<string, ProjectSearch>();
-  private activeSessionId: string | undefined;
-  private agentState: AgentState = 'idle';
+  activeSessionId: string | undefined;
+  agentState: AgentState = 'idle';
   private counter = 0;
   private fileCache: { files: string[]; at: number } | undefined;
   private quota: QuotaSnapshot | undefined;
@@ -242,7 +170,7 @@ class MiniMaxController {
       ...createGoalTools(),
       ...createTaskTools({
         spawn: async (request, ctx, progress) =>
-          await this.spawnTask(request, ctx, progress)
+          await spawnTask(this, request, ctx, progress)
       })
     ]) {
       this.registry.register(tool);
@@ -269,7 +197,7 @@ class MiniMaxController {
       }
     });
     context.subscriptions.push(
-      vscode.commands.registerCommand('minimax.newChat', () => this.startNewSession())
+      vscode.commands.registerCommand('minimax.newChat', () => startNewSession(this, ))
     );
     context.subscriptions.push(
       vscode.commands.registerCommand('minimax.addApiKey', () => void this.addApiKey())
@@ -505,22 +433,22 @@ class MiniMaxController {
     showUsageDetails(rows, () => this.panel.reveal());
   }
 
-  private workspaceRoot(): string {
+  workspaceRoot(): string {
     const folders = vscode.workspace.workspaceFolders;
     const first = folders && folders.length > 0 ? folders[0] : undefined;
     return first ? first.uri.fsPath : process.cwd();
   }
 
-  private nextId(prefix: string): string {
+  nextId(prefix: string): string {
     this.counter += 1;
     return prefix + '-' + Date.now().toString(36) + '-' + this.counter;
   }
 
-  private activeSession(): RuntimeSession | undefined {
+  activeSession(): RuntimeSession | undefined {
     return this.activeSessionId ? this.sessions.get(this.activeSessionId) : undefined;
   }
 
-  private async buildPrompt(registry: ToolRegistry = this.registry): Promise<string> {
+  async buildPrompt(registry: ToolRegistry = this.registry): Promise<string> {
     const settings = getSettings();
     const root = this.workspaceRoot();
     const openFiles = vscode.window.visibleTextEditors
@@ -561,7 +489,7 @@ class MiniMaxController {
 
   // The context of the turn carries the state of the repository and the
   // list of tasks, both change between the turns.
-  private async sessionContext(runtime: RuntimeSession): Promise<string> {
+  async sessionContext(runtime: RuntimeSession): Promise<string> {
     const parts: string[] = [];
     const git = await this.gitContext();
     if (git.length > 0) {
@@ -585,7 +513,7 @@ class MiniMaxController {
   // a model that marks the goal as blocked or complete keeps its limit.
   // The idle time between the turns is not work, so the running time is
   // read only while the turn runs.
-  private goalBudgetOk(runtime: RuntimeSession): boolean {
+  goalBudgetOk(runtime: RuntimeSession): boolean {
     const goal = runtime.goal;
     if (!goal) {
       return true;
@@ -604,7 +532,7 @@ class MiniMaxController {
     });
   }
 
-  private async ensureAgent(runtime: RuntimeSession): Promise<AgentSession | undefined> {
+  async ensureAgent(runtime: RuntimeSession): Promise<AgentSession | undefined> {
     if (runtime.agent) {
       return runtime.agent;
     }
@@ -663,7 +591,7 @@ class MiniMaxController {
           approval
         });
         this.approvalOwner.set(approval.id, runtime.id);
-        this.postFor(runtime, { type: 'approval_request', approval });
+        postFor(this, runtime, { type: 'approval_request', approval });
       }
     });
     agent.setHistory(runtime.history);
@@ -671,282 +599,23 @@ class MiniMaxController {
     return agent;
   }
 
-  // The registry of a child: the role decides what it may do. A role that
-  // only reads gets the tools without a side effect. The tool of the task is
-  // not there, a child does not start another child.
-  private registryForRole(role: TaskRole): ToolRegistry {
-    const registry = new ToolRegistry();
-    for (const entry of this.registry.list()) {
-      if (entry.name === 'task') {
-        continue;
-      }
-      if (role === 'worker' || !entry.sideEffect) {
-        registry.register(entry);
-      }
-    }
-    return registry;
-  }
-
-  // The gate of a child is the gate of the session: a write of the child
-  // asks the user too. The tools the reader allowed for the session are
-  // allowed for every child.
-  private childApproval(
-    runtime: RuntimeSession,
-    signal: AbortSignal
-  ): ApprovalGate {
-    return new ApprovalGate({
-      autoApprove: [...getSettings().autoApprove],
-      request: async (request) =>
-        await this.requestChildApproval(runtime, request, signal),
-      // The gate of the child is the gate of the session: a permission that
-      // the reader gave to the parent works for the child too.
-      sessionApproved: runtime.approvedTools
-    });
-  }
-
-  private async requestChildApproval(
-    runtime: RuntimeSession,
-    request: ApprovalRequest,
-    signal: AbortSignal
-  ): Promise<ApprovalDecision> {
-    const id = 'child-' + request.id;
-    const approval: UiApproval = { id, name: request.toolName, input: request.input };
-    // The reader sees the change before he answers. A path outside of the
-    // workspace breaks the preview, the approval goes on without it.
-    try {
-      const preview = await buildPreview(
-        request.toolName,
-        request.input,
-        this.workspaceRoot()
-      );
-      if (preview) {
-        approval.preview = { path: preview.path, lines: preview.lines };
-      }
-    } catch {
-      // The preview is optional, a failure of it must not break the
-      // approval.
-    }
-    if (signal.aborted) {
-      // The turn was stopped while the preview was built, nobody answers.
-      return { approved: false, allowForSession: false };
-    }
-    return await new Promise<ApprovalDecision>((resolve) => {
-      this.childApprovals.set(id, {
-        toolName: request.toolName,
-        sessionId: runtime.id,
-        resolve
-      });
-      runtime.uiMessages.push({
-        id: 'approval-' + id,
-        role: 'assistant',
-        approval
-      });
-      this.approvalOwner.set(id, runtime.id);
-      this.postFor(runtime, { type: 'approval_request', approval });
-    });
-  }
-
-  // The card of an approval leaves the chat with its answer: a card that
-  // outlives its question reads like a dead button. Returns false when the
-  // card has no owner any more, the caller tells the panel itself then.
-  private dropApprovalCard(approvalId: string, approved: boolean): boolean {
-    const owner = this.approvalOwner.get(approvalId);
-    if (owner === undefined) {
-      return false;
-    }
-    this.approvalOwner.delete(approvalId);
-    const runtime = this.sessions.get(owner);
-    if (!runtime) {
-      return true;
-    }
-    runtime.uiMessages = runtime.uiMessages.filter(
-      (message) => message.approval?.id !== approvalId
-    );
-    this.postFor(runtime, { type: 'approval_resolved', id: approvalId, approved });
-    return true;
-  }
-
-  // Every waiting card of a chat leaves it: the stop of the turn answers
-  // the questions that nobody will answer.
-  private dropApprovalCards(runtime: RuntimeSession, approved: boolean): void {
-    const cards = runtime.uiMessages.filter((message) => message.approval);
-    for (const card of cards) {
-      this.dropApprovalCard(card.approval!.id, approved);
-    }
-  }
-
-  // The approvals of the children that wait are released when the turn is
-  // stopped, a child must not wait for an answer that never comes.
-  private releaseChildApprovals(): void {
-    for (const [id, pending] of this.childApprovals) {
-      this.childApprovals.delete(id);
-      // The card of the child leaves the chat with its answer, the same way
-      // the cards of the parent do.
-      this.dropApprovalCard(id, false);
-      pending.resolve({ approved: false, allowForSession: false });
-    }
-  }
-
-  // The events of the child: the spend goes to the counter of the goal,
-  // the rest goes into the journal of the card of the call. The event of the
-  // end of the child does not go to the host, the spend of the child is
-  // already in the result of the call of the parent.
-  private handleChildEvent(
-    runtime: RuntimeSession,
-    event: AgentEvent,
-    progress: (line: string) => void
-  ): void {
-    if (event.type === 'usage') {
-      this.handleAgentEvent(runtime, event);
-      return;
-    }
-    if (event.type === 'tool_start') {
-      // The line names the target of the action, the content of a file is
-      // not a line of the journal.
-      const target = describeInput(event.input);
-      progress(target.length > 0 ? event.name + ' ' + target : event.name);
-      return;
-    }
-    if (event.type === 'tool_end') {
-      progress(event.name + (event.isError ? ' failed' : ' done'));
-      // The change of the child must not be lost: the lines of the diff go
-      // into the journal of the call.
-      if (event.diff) {
-        for (const line of event.diff.lines) {
-          if (line.type === 'add') {
-            progress('+ ' + line.text);
-          } else if (line.type === 'remove') {
-            progress('- ' + line.text);
-          }
-        }
-      }
-      return;
-    }
-    if (event.type === 'error') {
-      progress('error: ' + event.message);
-    }
-  }
-
-  // The child runs on its own: its own history, its own system prompt, its
-  // own registry. The answer of the child is the result of the call.
-  private async spawnTask(
-    request: TaskRequest,
-    ctx: ToolContext,
-    progress: (line: string) => void
-  ): Promise<TaskOutcome> {
-    const runtime = ctx.sessionId
-      ? this.sessions.get(ctx.sessionId)
-      : this.activeSession();
-    if (!runtime) {
-      return { content: 'There is no session for the sub-agent.', isError: true };
-    }
-    const key = await getApiKey(this.context.secrets);
-    if (!key) {
-      return { content: 'No API key, the sub-agent cannot run.', isError: true };
-    }
-    const settings = getSettings();
-    const model = MODELS.find((item) => item.id === settings.model);
-    // The tools of the child, the prompt of the child names them and the
-    // child calls only them.
-    const registry = this.registryForRole(request.role);
-    // The child works in the session of its parent, it gets the same context
-    // of the turn as the parent: the goal, the list of the tasks and the
-    // state of the repository.
-    const context = await this.sessionContext(runtime);
-    const systemPrompt = [
-      await this.buildPrompt(registry),
-      ROLE_PROMPTS[request.role],
-      context
-    ]
-      .filter((part) => part.length > 0)
-      .join('\n\n');
-    const child = new Agent({
-      client: new HttpMiniMaxClient({
-        baseUrl: resolveBaseUrl(settings.baseUrl, settings.customBaseUrl),
-        apiKey: key
-      }),
-      registry,
-      approval: this.childApproval(runtime, ctx.signal),
-      model: settings.model,
-      maxTokens: model?.maxTokens ?? 65_536,
-      maxIterations: CHILD_MAX_ITERATIONS,
-      effort: this.effortFor(settings),
-      thinking: this.thinkingMode(settings),
-      mode: settings.mode,
-      systemPrompt,
-      workspaceRoot: this.workspaceRoot(),
-      depth: 1,
-      sessionId: runtime.id,
-      sessionState: {
-        get todos() {
-          return runtime.todos;
-        },
-        get goal() {
-          return runtime.goal;
-        }
-      },
-      budget: () => this.goalBudgetOk(runtime),
-      logger: this.logger,
-      onEvent: (event) => this.handleChildEvent(runtime, event, progress)
-    });
-    // The stop of the parent stops the child too, and the approvals that
-    // wait are released: a child must not wait for an answer that never
-    // comes. The listener goes away with the child.
-    const onAbort = (): void => {
-      child.abort();
-      this.releaseChildApprovals();
-    };
-    ctx.signal.addEventListener('abort', onAbort);
-    if (ctx.signal.aborted) {
-      onAbort();
-    }
-    let result: AgentRunResult;
-    try {
-      result = await child.run(request.prompt, []);
-    } catch (error) {
-      // The child was stopped or it failed, the tool reports the error and
-      // the parent continues.
-      const reason = error instanceof Error ? error.message : String(error);
-      return {
-        content: ctx.signal.aborted
-          ? 'The sub-agent was stopped.'
-          : 'The sub-agent failed: ' + reason,
-        isError: true
-      };
-    } finally {
-      ctx.signal.removeEventListener('abort', onAbort);
-    }
-    const text = finalText(result.messages);
-    if (text.length === 0) {
-      return {
-        content:
-          'The sub-agent finished without an answer, it stopped with: ' +
-          result.stopReason +
-          '.',
-        isError: true,
-        usage: result.usage
-      };
-    }
-    return { content: text, usage: result.usage };
-  }
-
-  private handleAgentEvent(runtime: RuntimeSession, event: AgentEvent): void {
+  handleAgentEvent(runtime: RuntimeSession, event: AgentEvent): void {
     if (event.type === 'assistant_start') {
       runtime.uiMessages.push({ id: this.nextId('assistant'), role: 'assistant', text: '' });
       const last = runtime.uiMessages[runtime.uiMessages.length - 1];
-      this.postFor(runtime, { type: 'assistant_start', id: last ? last.id : '' });
+      postFor(this, runtime, { type: 'assistant_start', id: last ? last.id : '' });
       return;
     }
     if (event.type === 'assistant_text') {
-      this.appendToAssistant(runtime, 'text', event.text);
-      this.postFor(runtime, { type: 'text_delta', text: event.text });
-      this.setState('streaming', runtime);
+      appendToAssistant(this, runtime, 'text', event.text);
+      postFor(this, runtime, { type: 'text_delta', text: event.text });
+      setState(this, 'streaming', runtime);
       return;
     }
     if (event.type === 'assistant_thinking') {
-      this.appendToAssistant(runtime, 'thinking', event.text);
-      this.postFor(runtime, { type: 'thinking_delta', text: event.text });
-      this.setState('thinking', runtime);
+      appendToAssistant(this, runtime, 'thinking', event.text);
+      postFor(this, runtime, { type: 'thinking_delta', text: event.text });
+      setState(this, 'thinking', runtime);
       return;
     }
     if (event.type === 'assistant_reset') {
@@ -960,17 +629,17 @@ class MiniMaxController {
           break;
         }
       }
-      this.postFor(runtime, { type: 'assistant_reset' });
+      postFor(this, runtime, { type: 'assistant_reset' });
       return;
     }
     if (event.type === 'retrying') {
       // The connection to MiniMax is lost, the request is repeated. The
       // panel shows the attempt and the reader knows the agent works.
-      this.postFor(runtime, {
+      postFor(this, runtime, {
         type: 'retry_status',
         status: { attempt: event.attempt, total: event.total, delayMs: event.delayMs }
       });
-      this.setState('thinking');
+      setState(this, 'thinking');
       return;
     }
     if (event.type === 'tool_progress') {
@@ -988,7 +657,7 @@ class MiniMaxController {
           break;
         }
       }
-      this.postFor(runtime, {
+      postFor(this, runtime, {
         type: 'tool_progress',
         id: event.id,
         line: event.line
@@ -1002,8 +671,8 @@ class MiniMaxController {
         role: 'tool',
         tool: { id: event.id, name: event.name, input: event.input, running: true }
       });
-      this.postFor(runtime, { type: 'tool_start', id: event.id, name: event.name, input: event.input });
-      this.setState('tool', runtime);
+      postFor(this, runtime, { type: 'tool_start', id: event.id, name: event.name, input: event.input });
+      setState(this, 'tool', runtime);
       return;
     }
     if (event.type === 'tool_end') {
@@ -1032,8 +701,8 @@ class MiniMaxController {
       }
       if (event.state?.kind === 'todos') {
         runtime.todos = event.state.todos;
-        this.postFor(runtime, { type: 'todos', todos: runtime.todos });
-        this.persist(runtime);
+        postFor(this, runtime, { type: 'todos', todos: runtime.todos });
+        persist(this, runtime);
         // The tasks are done, the reader wants to see what changed.
         if (
           runtime.todos.length > 0 &&
@@ -1046,14 +715,14 @@ class MiniMaxController {
         const goal = runtime.goal;
         if (goal) {
           goal.status = event.state.status;
-          this.postFor(runtime, { type: 'goal', goal: { ...goal } });
+          postFor(this, runtime, { type: 'goal', goal: { ...goal } });
           // The reason of the model stands in the card of the call: a notice
           // printed it twice and was lost on the reload of the panel, the
           // card stays in the saved chat.
-          this.persist(runtime);
+          persist(this, runtime);
         }
       }
-      this.postFor(runtime, {
+      postFor(this, runtime, {
         type: 'tool_end',
         id: event.id,
         name: event.name,
@@ -1078,7 +747,7 @@ class MiniMaxController {
           (event.usage.cacheReadTokens ?? 0) +
           (event.usage.cacheCreationTokens ?? 0);
         goal.used.requests += 1;
-        this.postFor(runtime, { type: 'goal', goal: { ...goal } });
+        postFor(this, runtime, { type: 'goal', goal: { ...goal } });
       }
       return;
     }
@@ -1100,29 +769,29 @@ class MiniMaxController {
       if (runtime.usage.length > MAX_USAGE_TURNS) {
         runtime.usage = runtime.usage.slice(-MAX_USAGE_TURNS);
       }
-      this.postFor(runtime, { type: 'usage', turns: runtime.usage });
+      postFor(this, runtime, { type: 'usage', turns: runtime.usage });
       // The last message of the step tells how long the step took, and
       // the reason of the stop is named, a silent stop confuses.
-      this.markStepTime(runtime);
+      markStepTime(this, runtime);
       const goal = runtime.goal;
       if (goal && runtime.turnStartedAt > 0) {
         goal.used.seconds += (Date.now() - runtime.turnStartedAt) / 1000;
         // The widget of the goal shows the time of the turn, the panel has
         // to get the goal with the time that was added.
-        this.postFor(runtime, { type: 'goal', goal: { ...goal } });
+        postFor(this, runtime, { type: 'goal', goal: { ...goal } });
       }
       // The action is over, the reader sees the files it changed.
       void this.postSummary(runtime);
       const notice = stopNotice(event.stopReason, getSettings().maxIterations, goal);
       if (notice) {
-        this.postFor(runtime, { type: 'notice', message: notice.message, kind: notice.kind });
+        postFor(this, runtime, { type: 'notice', message: notice.message, kind: notice.kind });
       }
-      this.dropApprovalCards(runtime, false);
-      this.setState('idle', runtime);
+      dropApprovalCards(this, runtime, false);
+      setState(this, 'idle', runtime);
       // The turn is over, the time of the turn is not running anymore.
       runtime.turnStartedAt = 0;
       // The repeats are over, the panel drops the status of the attempt.
-      this.postFor(runtime, { type: 'retry_status', status: undefined });
+      postFor(this, runtime, { type: 'retry_status', status: undefined });
       return;
     }
     if (event.type === 'error') {
@@ -1136,126 +805,47 @@ class MiniMaxController {
         goal.used.seconds += (Date.now() - runtime.turnStartedAt) / 1000;
         // The widget of the goal shows the time of the turn, the panel has
         // to get the goal with the time that was added.
-        this.postFor(runtime, { type: 'goal', goal: { ...goal } });
+        postFor(this, runtime, { type: 'goal', goal: { ...goal } });
       }
       // Every question of the turn is over: the answer that never comes
       // must not stay in the chat as a dead card, and the card must not go
       // to the disk with the chat. The drop stands before the early return
       // of the stopped turn below: a turn cancelled from the window of the
       // editor takes that branch too.
-      this.dropApprovalCards(runtime, false);
+      dropApprovalCards(this, runtime, false);
       if (isAbortMessage(event.message)) {
         // The user stopped the turn, it is not a failure of the server.
         runtime.turnStopped = true;
-        this.postFor(runtime, {
+        postFor(this, runtime, {
           type: 'notice',
           message: 'The request was stopped.',
           kind: 'info'
         });
-        this.markStepTime(runtime);
-        this.setState('idle', runtime);
+        markStepTime(this, runtime);
+        setState(this, 'idle', runtime);
         // The turn is over, the time of the turn is not running anymore.
         runtime.turnStartedAt = 0;
         return;
       }
-      this.postFor(runtime, { type: 'error', message: event.message });
-      this.setState('error', runtime);
+      postFor(this, runtime, { type: 'error', message: event.message });
+      setState(this, 'error', runtime);
       // The turn is over, the time of the turn is not running anymore.
       runtime.turnStartedAt = 0;
       // The repeats are over, the panel drops the status of the attempt.
-      this.postFor(runtime, { type: 'retry_status', status: undefined });
+      postFor(this, runtime, { type: 'retry_status', status: undefined });
     }
-  }
-
-  private appendToAssistant(
-    runtime: RuntimeSession,
-    field: 'text' | 'thinking',
-    text: string
-  ): void {
-    for (let i = runtime.uiMessages.length - 1; i >= 0; i--) {
-      const message = runtime.uiMessages[i]!;
-      if (message.role === 'assistant' && !message.approval) {
-        message[field] = (message[field] ?? '') + text;
-        return;
-      }
-    }
-    runtime.uiMessages.push({
-      id: this.nextId('assistant'),
-      role: 'assistant',
-      [field]: text
-    });
-  }
-
-  // The agents that may wait for an answer of the reader: the open chat
-  // first, then the chats in the background. The reader can answer a card
-  // of a chat that is not open anymore, an answer that only reached the open
-  // chat was lost and the other turn waited forever.
-  private agentsByPriority(): AgentSession[] {
-    const active = this.activeSession();
-    const agents: AgentSession[] = [];
-    if (active?.agent) {
-      agents.push(active.agent);
-    }
-    for (const runtime of this.sessions.values()) {
-      if (runtime !== active && runtime.agent) {
-        agents.push(runtime.agent);
-      }
-    }
-    return agents;
-  }
-
-  // The events of a turn reach the panel only while their chat is open. A
-  // chat that runs in the background keeps its messages in the host and
-  // shows them when the user comes back; posted to the panel they landed in
-  // the open chat: its text, its tasks and its goal were overwritten.
-  private postFor(runtime: RuntimeSession, message: ExtToWeb): void {
-    if (runtime.id === this.activeSessionId) {
-      this.panel.post(message);
-    }
-  }
-
-  private setState(state: AgentState, runtime?: RuntimeSession): void {
-    // The state belongs to a chat: the events of a chat that runs in the
-    // background do not write into the open one, and the chat keeps its
-    // own dot for the moment the reader opens it again.
-    const owner = runtime ?? this.activeSession();
-    if (owner) {
-      owner.state = state;
-    }
-    if (!runtime || runtime.id === this.activeSessionId) {
-      this.agentState = state;
-      this.statusBar.setState(state);
-      this.panel.post({
-        type: 'status',
-        state,
-        tokens: this.usageTotal(this.activeSession())
-      });
-      return;
-    }
-    this.statusBar.setState(state);
-  }
-
-  // The spend of the session, input and output tokens of every action.
-  private usageTotal(runtime: RuntimeSession | undefined): number {
-    if (!runtime) {
-      return 0;
-    }
-    return runtime.usage.reduce(
-      (sum, turn) => sum + turn.input + turn.output + (turn.cache ?? 0),
-      0
-    );
   }
 
   // The levels of the reasoning depth go only to the models that take
   // them, the catalog decides. The client does not know the names of the
   // models, it only sees the effort it was given.
-  private effortFor(settings: MiniMaxSettings): EffortLevel | undefined {
+  effortFor(settings: MiniMaxSettings): EffortLevel | undefined {
     const model = MODELS.find((item) => item.id === settings.model);
     return model?.supportsEffort ? settings.effort : undefined;
   }
 
   // M3.1-Flash always thinks, M3 thinks only when the user turns it on.
-  private thinkingMode(settings: MiniMaxSettings): 'adaptive' | undefined {
+  thinkingMode(settings: MiniMaxSettings): 'adaptive' | undefined {
     if (!settings.thinking) {
       return undefined;
     }
@@ -1313,7 +903,7 @@ class MiniMaxController {
     if (files.length === 0) {
       return;
     }
-    this.postFor(runtime, { type: 'summary', files });
+    postFor(this, runtime, { type: 'summary', files });
   }
 
   private async handleWebviewMessage(message: WebToExt): Promise<void> {
@@ -1323,7 +913,7 @@ class MiniMaxController {
       return;
     }
     if (message.type === 'load_older') {
-      this.loadOlder();
+      loadOlder(this, );
       return;
     }
     if (message.type === 'send') {
@@ -1331,15 +921,15 @@ class MiniMaxController {
       return;
     }
     if (message.type === 'send_queued') {
-      this.sendQueued(message.id);
+      sendQueued(this, message.id);
       return;
     }
     if (message.type === 'send_all_queued') {
-      this.sendAllQueued();
+      sendAllQueued(this, );
       return;
     }
     if (message.type === 'remove_queued') {
-      this.removeQueued(message.id);
+      removeQueued(this, message.id);
       return;
     }
     if (message.type === 'open_file') {
@@ -1352,7 +942,7 @@ class MiniMaxController {
       // The stop rejects every approval that waits, the cards of them leave
       // the chat with the answer.
       if (runtime) {
-        this.dropApprovalCards(runtime, false);
+        dropApprovalCards(this, runtime, false);
       }
       return;
     }
@@ -1365,7 +955,7 @@ class MiniMaxController {
       return;
     }
     if (message.type === 'approve') {
-      const handled = this.agentsByPriority().some(
+      const handled = agentsByPriority(this, ).some(
         (agent) => agent.approve(message.id, message.allowForSession)
       );
       if (!handled) {
@@ -1383,7 +973,7 @@ class MiniMaxController {
           pending.resolve({ approved: true, allowForSession: message.allowForSession });
         }
       }
-      if (!this.dropApprovalCard(message.id, true)) {
+      if (!dropApprovalCard(this, message.id, true)) {
         // The card has no owner, the panel of the open chat still has to
         // let it go.
         this.panel.post({ type: 'approval_resolved', id: message.id, approved: true });
@@ -1391,7 +981,7 @@ class MiniMaxController {
       return;
     }
     if (message.type === 'reject') {
-      const handled = this.agentsByPriority().some((agent) => agent.reject(message.id));
+      const handled = agentsByPriority(this, ).some((agent) => agent.reject(message.id));
       if (!handled) {
         const pending = this.childApprovals.get(message.id);
         if (pending) {
@@ -1399,21 +989,21 @@ class MiniMaxController {
           pending.resolve({ approved: false, allowForSession: false });
         }
       }
-      if (!this.dropApprovalCard(message.id, false)) {
+      if (!dropApprovalCard(this, message.id, false)) {
         this.panel.post({ type: 'approval_resolved', id: message.id, approved: false });
       }
       return;
     }
     if (message.type === 'new_session') {
-      this.startNewSession();
+      startNewSession(this, );
       return;
     }
     if (message.type === 'select_session') {
-      this.selectSession(message.id);
+      selectSession(this, message.id);
       return;
     }
     if (message.type === 'delete_session') {
-      this.deleteSession(message.id);
+      deleteSession(this, message.id);
       return;
     }
     if (message.type === 'set_goal') {
@@ -1467,7 +1057,7 @@ class MiniMaxController {
         used
       };
       this.panel.post({ type: 'goal', goal: runtime.goal });
-      this.persist(runtime);
+      persist(this, runtime);
       return;
     }
     if (message.type === 'clear_todos') {
@@ -1479,7 +1069,7 @@ class MiniMaxController {
       // section of the tasks and the reload does not bring them back.
       runtime.todos = [];
       this.panel.post({ type: 'todos', todos: [] });
-      this.persist(runtime);
+      persist(this, runtime);
       // The tasks are cancelled, the reader sees what the work changed.
       void this.postSummary(runtime);
       return;
@@ -1491,7 +1081,7 @@ class MiniMaxController {
       }
       runtime.goal = undefined;
       this.panel.post({ type: 'goal', goal: undefined });
-      this.persist(runtime);
+      persist(this, runtime);
       return;
     }
     if (message.type === 'set_model') {
@@ -1562,7 +1152,7 @@ class MiniMaxController {
   ): Promise<void> {
     let runtime = this.activeSession();
     if (!runtime) {
-      this.startNewSession();
+      startNewSession(this, );
       runtime = this.activeSession();
     }
     if (!runtime) {
@@ -1571,7 +1161,7 @@ class MiniMaxController {
     if (runtime.busy) {
       // The agent works, the request waits in the queue. The reader writes
       // several messages in a row, they go out one after another.
-      this.enqueue(runtime, text, mentions, selections);
+      enqueue(this, runtime, text, mentions, selections);
       return;
     }
     // The reader wrote a new request, the queue is not on hold anymore.
@@ -1580,7 +1170,7 @@ class MiniMaxController {
   }
 
   // One turn of the agent: the request goes out, the answer comes back.
-  private async runTurn(
+  async runTurn(
     runtime: RuntimeSession,
     text: string,
     mentions: string[],
@@ -1611,7 +1201,7 @@ class MiniMaxController {
       if (queued) {
         queued.state = 'error';
         queued.error = 'The budget of the goal is exhausted.';
-        this.postQueue(runtime);
+        postQueue(this, runtime);
       }
       return;
     }
@@ -1621,7 +1211,7 @@ class MiniMaxController {
       if (queued) {
         queued.state = 'error';
         queued.error = 'No API key, the request did not go out.';
-        this.postQueue(runtime);
+        postQueue(this, runtime);
       }
       return;
     }
@@ -1639,7 +1229,7 @@ class MiniMaxController {
       const firstLine = text.trim().split('\n')[0] ?? '';
       runtime.title = firstLine.slice(0, TITLE_LIMIT) || 'New chat';
     }
-    this.setState('thinking', runtime);
+    setState(this, 'thinking', runtime);
     runtime.turnStartedAt = Date.now();
 
     try {
@@ -1661,7 +1251,7 @@ class MiniMaxController {
       if (!runtime.errorReported) {
         const message = error instanceof Error ? error.message : String(error);
         this.panel.post({ type: 'error', message });
-        this.setState('error', runtime);
+        setState(this, 'error', runtime);
       }
     } finally {
       runtime.busy = false;
@@ -1687,149 +1277,12 @@ class MiniMaxController {
         } else {
           queued.state = 'done';
         }
-        this.postQueue(runtime);
+        postQueue(this, runtime);
       }
-      this.persist(runtime);
+      persist(this, runtime);
       void this.refreshQuota();
       // The next message of the queue goes out.
-      void this.pumpQueue(runtime);
-    }
-  }
-
-  // One message of the queue goes out now, it goes before the others.
-  private sendQueued(id: string): void {
-    const runtime = this.activeSession();
-    if (!runtime) {
-      return;
-    }
-    const index = runtime.queue.findIndex((item) => item.id === id);
-    if (index === -1) {
-      return;
-    }
-    const item = runtime.queue[index]!;
-    if (item.state === 'sending') {
-      return;
-    }
-    item.state = 'waiting';
-    item.error = undefined;
-    runtime.queue.splice(index, 1);
-    runtime.queue.unshift(item);
-    runtime.queuePaused = false;
-    this.postQueue(runtime);
-    void this.pumpQueue(runtime);
-  }
-
-  // Every message of the queue goes out, the failed ones are tried again.
-  private sendAllQueued(): void {
-    const runtime = this.activeSession();
-    if (!runtime) {
-      return;
-    }
-    runtime.queuePaused = false;
-    for (const item of runtime.queue) {
-      if (item.state === 'error') {
-        item.state = 'waiting';
-        item.error = undefined;
-      }
-    }
-    this.postQueue(runtime);
-    void this.pumpQueue(runtime);
-  }
-
-  // A message leaves the queue. A message that goes out cannot be removed.
-  private removeQueued(id: string): void {
-    const runtime = this.activeSession();
-    if (!runtime) {
-      return;
-    }
-    const index = runtime.queue.findIndex((item) => item.id === id);
-    if (index === -1) {
-      return;
-    }
-    if (runtime.queue[index]!.state === 'sending') {
-      return;
-    }
-    runtime.queue.splice(index, 1);
-    this.postQueue(runtime);
-    this.persist(runtime);
-  }
-
-  // The message waits in the queue of the chat.
-  private enqueue(
-    runtime: RuntimeSession,
-    text: string,
-    mentions: string[],
-    selections: UiSelection[]
-  ): void {
-    runtime.queue.push({
-      id: this.nextId('q'),
-      text,
-      mentions,
-      selections,
-      state: 'waiting'
-    });
-    this.trimQueue(runtime);
-    this.postQueue(runtime);
-    this.persist(runtime);
-  }
-
-  // The queue does not grow forever: the sent messages leave it.
-  private trimQueue(runtime: RuntimeSession): void {
-    while (runtime.queue.length > MAX_QUEUE_ITEMS) {
-      const index = runtime.queue.findIndex((item) => item.state === 'done');
-      if (index === -1) {
-        return;
-      }
-      runtime.queue.splice(index, 1);
-    }
-  }
-
-  private postQueue(runtime: RuntimeSession): void {
-    this.postFor(runtime, {
-      type: 'queue',
-      items: runtime.queue.map((item) => ({
-        id: item.id,
-        text: item.text,
-        state: item.state,
-        error: item.error
-      }))
-    });
-  }
-
-  // The next message of the queue goes out, one after another.
-  private async pumpQueue(runtime: RuntimeSession): Promise<void> {
-    if (runtime.busy || runtime.queuePaused) {
-      return;
-    }
-    const next = runtime.queue.find((item) => item.state === 'waiting');
-    if (!next) {
-      return;
-    }
-    next.state = 'sending';
-    this.postQueue(runtime);
-    await this.runTurn(runtime, next.text, next.mentions, next.selections, next);
-  }
-
-  // The last message of the step tells how long the step took.
-  private markStepTime(runtime: RuntimeSession): void {
-    if (runtime.turnStartedAt === 0) {
-      return;
-    }
-    const elapsed = Date.now() - runtime.turnStartedAt;
-    if (elapsed < 0) {
-      return;
-    }
-    for (let i = runtime.uiMessages.length - 1; i >= 0; i--) {
-      const message = runtime.uiMessages[i]!;
-      if (message.role === 'assistant' && !message.approval) {
-        message.elapsedMs = elapsed;
-        this.postFor(runtime, {
-          type: 'step_time',
-          id: message.id,
-          elapsedMs: elapsed
-        });
-        return;
-      }
+      void pumpQueue(this, runtime);
     }
   }
 
@@ -1880,10 +1333,10 @@ class MiniMaxController {
     runtime.todos = [];
     this.panel.post({ type: 'todos', todos: runtime.todos });
     // The panel gets a copy, the chat grows right after this line.
-    this.postHistory(runtime);
+    postHistory(this, runtime);
     // The request comes back to the input field, the agent waits.
     this.panel.post({ type: 'restore_input', text, mentions, selections });
-    this.persist(runtime);
+    persist(this, runtime);
   }
 
   // The request runs again. The messages after it go away, the history
@@ -1929,7 +1382,7 @@ class MiniMaxController {
     runtime.todos = [];
     this.panel.post({ type: 'todos', todos: runtime.todos });
     // The panel gets a copy, the chat grows right after this line.
-    this.postHistory(runtime);
+    postHistory(this, runtime);
     await this.handleSend(turn.text, turn.mentions, turn.selections);
   }
 
@@ -2206,313 +1659,22 @@ class MiniMaxController {
     await this.postSettings();
   }
 
-  private persist(runtime: RuntimeSession): void {
-    // The chat was deleted while its turn ran, the finished turn must not
-    // write it back into the store.
-    if (runtime.deleted) {
-      return;
-    }
-    runtime.updatedAt = Date.now();
-    // While the turn runs the messages of the panel and the history of the
-    // model do not match. A saved state has to be a state the agent can
-    // continue from, so the session waits for the end of the turn and only
-    // the list of the tasks is written in the meantime.
-    if (runtime.busy) {
-      this.persistTodos(runtime);
-      return;
-    }
-    const stored: StoredSession = {
-      id: runtime.id,
-      title: runtime.title,
-      updatedAt: runtime.updatedAt,
-      workspaceRoot: runtime.workspaceRoot,
-      messages: runtime.history,
-      uiMessages: runtime.uiMessages,
-      usage: runtime.usage,
-      turns: runtime.turns,
-      todos: runtime.todos,
-      goal: runtime.goal,
-      // The queue of the chat, it survives the reload of the panel.
-      queue: runtime.queue.map((item) => ({ ...item }))
-    };
-    // A full state of the host must not break the turn, the chat stays in
-    // memory and the failure goes to the log.
-    void this.store.save(stored, getSettings().historyMaxMessages).then((saved) => {
-      if (!saved) {
-        this.logger.error('the chat was not saved to the state of the host');
-      } else if (this.activeSessionId === runtime.id) {
-        // The id of the active session goes to the state of the host after
-        // the session itself. A lonely id would point to nothing. The id
-        // belongs to the project of the chat, every project keeps its own.
-        this.store.setActiveIdFor(runtime.workspaceRoot, runtime.id);
-      }
-      this.panel.post({ type: 'sessions', sessions: this.store.summaryList() });
-    });
-  }
-
   // The list of the tasks is written at once. The session keeps the last
   // complete turn, so the state that comes back after a crash is a state the
   // agent can continue from.
-  private persistTodos(runtime: RuntimeSession): void {
-    const saved = this.store.get(runtime.id);
-    const stored: StoredSession = {
-      id: runtime.id,
-      title: runtime.title,
-      updatedAt: Date.now(),
-      workspaceRoot: saved?.workspaceRoot ?? runtime.workspaceRoot,
-      messages: saved?.messages ?? [],
-      uiMessages: saved?.uiMessages ?? [],
-      usage: saved?.usage ?? [],
-      turns: saved?.turns ?? [],
-      todos: runtime.todos,
-      goal: runtime.goal,
-      // The queue of памяти хозяина истина, в состоянии хоста она лежит
-      // вместе с остальным чатом.
-      queue: runtime.queue.map((item) => ({ ...item }))
-    };
-    void this.store.save(stored, getSettings().historyMaxMessages).then((ok) => {
-      if (!ok) {
-        this.logger.error('the list of tasks was not saved to the state of the host');
-      }
-    });
-  }
-
   persistActive(): void {
     const runtime = this.activeSession();
     if (runtime) {
-      this.persist(runtime);
+      persist(this, runtime);
     }
   }
-
-  private runtimeFrom(stored: StoredSession): RuntimeSession {
-    return {
-      id: stored.id,
-      title: stored.title,
-      updatedAt: stored.updatedAt,
-      // A chat of an older version does not know its project, the project
-      // that opens it takes it.
-      workspaceRoot: stored.workspaceRoot ?? this.workspaceRoot(),
-      history: [...stored.messages],
-      uiMessages: [...(stored.uiMessages ?? [])],
-      panelOffset: undefined,
-      agent: undefined,
-      busy: false,
-      state: 'idle',
-      deleted: false,
-      errorReported: false,
-      usage: (stored.usage ?? []).map((turn) => ({
-        input: turn.input,
-        output: turn.output,
-        cache: turn.cache ?? 0
-      })),
-      turns: stored.turns ?? [],
-      todos: [...(stored.todos ?? [])],
-      goal: stored.goal
-        ? { ...stored.goal, used: { ...stored.goal.used } }
-        : undefined,
-      turnStartedAt: 0,
-      approvedTools: new Set(),
-      // A message that was going out when the panel closed waits again.
-      queue: (stored.queue ?? []).map((item) => ({
-        ...item,
-        state: item.state === 'sending' ? 'waiting' : item.state
-      })),
-      queuePaused: false,
-      turnStopped: false,
-      lastError: undefined
-    };
-  }
-
-  startNewSession(): void {
-    // The processes of the REPL are keyed by the chat, a new chat has a new
-    // id and starts with no process of its own. The processes of the other
-    // chats stay alive: starting a chat must not drop their state.
-    const current = this.activeSession();
-    if (current) {
-      this.persist(current);
-    }
-    const id = this.nextId('s');
-    this.sessions.set(id, {
-      id,
-      title: 'New chat',
-      updatedAt: Date.now(),
-      // A new chat belongs to the project that is open.
-      workspaceRoot: this.workspaceRoot(),
-      history: [],
-      uiMessages: [],
-      panelOffset: undefined,
-      agent: undefined,
-      busy: false,
-      state: 'idle',
-      deleted: false,
-      errorReported: false,
-      usage: [],
-      turns: [],
-      todos: [],
-      goal: undefined,
-      turnStartedAt: 0,
-      approvedTools: new Set(),
-      queue: [],
-      queuePaused: false,
-      turnStopped: false,
-      lastError: undefined
-    });
-    this.activeSessionId = id;
-    // The id of the new chat goes to the state of the host together with the
-    // chat itself. A lonely id would point to nothing after a restart.
-    this.setState('idle');
-    void this.sendInit();
-  }
-
-  // The chat of the project is opened again after a restart, an empty panel
-  // would hide the work of the previous session. Every project keeps its own
-  // chat: the chats of another project stay in the list, they are not shown
-  // by default.
-  restoreSession(): void {
-    const root = this.workspaceRoot();
-    // The chats of an older version do not know their project, this one
-    // takes them.
-    const list = this.store.claimUnbound(root);
-    const activeId = this.store.activeIdFor(root);
-    const active = activeId ? list.find((session) => session.id === activeId) : undefined;
-    // The chat that was open in the project, otherwise the newest chat of
-    // the project. A chat of another project is not opened here.
-    const stored =
-      active && (active.workspaceRoot === root || active.workspaceRoot === undefined)
-        ? active
-        : list.find((session) => session.workspaceRoot === root);
-    if (!stored) {
-      // The project has no chats, a new one starts.
-      this.startNewSession();
-      return;
-    }
-    const runtime = this.runtimeFrom(stored);
-    this.sessions.set(runtime.id, runtime);
-    this.activeSessionId = runtime.id;
-    this.store.setActiveIdFor(root, runtime.id);
-    this.setState('idle');
-    void this.sendInit();
-  }
-
-  private selectSession(id: string): void {
-    const stored = this.store.get(id);
-    if (!stored) {
-      return;
-    }
-    const current = this.activeSession();
-    if (current && current.id !== id) {
-      this.persist(current);
-    }
-    let runtime = this.sessions.get(id);
-    if (!runtime) {
-      runtime = this.runtimeFrom(stored);
-      this.sessions.set(id, runtime);
-    }
-    this.activeSessionId = id;
-    // The chat that is open belongs to the project of the panel, every
-    // project remembers its own.
-    this.store.setActiveIdFor(this.workspaceRoot(), id);
-    // The opened chat brings its own state: a chat that runs in the
-    // background is busy and its stop button has to stand in the field,
-    // otherwise the busy chat looks idle and cannot be stopped.
-    this.setState(runtime.state);
-    this.postHistory(runtime);
-    void this.sendInit();
-  }
-
-  private deleteSession(id: string): void {
-    const runtime = this.sessions.get(id);
-    if (runtime) {
-      // A chat that still runs stops first: the tokens of a deleted chat
-      // must not burn any further, and the finished turn must not write
-      // the chat back into the store.
-      runtime.deleted = true;
-      if (runtime.busy) {
-        runtime.agent?.stop();
-      }
-      // The cards of the chat go with it, they must not keep an owner of a
-      // chat that is gone.
-      for (const [approvalId, owner] of this.approvalOwner) {
-        if (owner === id) {
-          this.approvalOwner.delete(approvalId);
-        }
-      }
-    }
-    // The processes of the REPL of the chat go with it.
-    stopReplSession(id);
-    this.store.remove(id);
-    // The removed chat is not the open one of any project.
-    this.store.clearActiveId(id);
-    this.sessions.delete(id);
-    if (this.activeSessionId === id) {
-      this.activeSessionId = undefined;
-      // The removed chat must not stay active, its id would point to nothing
-      // after a restart.
-      this.store.setActiveIdFor(this.workspaceRoot(), undefined);
-      this.startNewSession();
-      return;
-    }
-    void this.sendInit();
-  }
-
-  // The part of the history the panel holds. The host keeps the whole
-  // history, the panel asks for the older part when the reader wants to
-  // see it. A panel that has just loaded holds nothing of the chat, the
-  // tail of the chat goes to it.
-  private panelHistory(
-    runtime: RuntimeSession | undefined,
-    reset: boolean
-  ): { messages: UiMessage[]; olderMessages: number } {
-    if (!runtime) {
-      return { messages: [], olderMessages: 0 };
-    }
-    if (!reset && runtime.panelOffset !== undefined) {
-      const start = Math.max(
-        0,
-        Math.min(runtime.panelOffset, runtime.uiMessages.length)
-      );
-      return { messages: runtime.uiMessages.slice(start), olderMessages: start };
-    }
-    const tail = historyTail(runtime.uiMessages);
-    runtime.panelOffset = tail.offset;
-    return { messages: tail.messages, olderMessages: tail.offset };
-  }
-
-  // The chat of the panel goes to it in one part: the tail of the chat,
-  // the older part waits in the host until the reader asks for it.
-  private postHistory(runtime: RuntimeSession): void {
-    const tail = historyTail(runtime.uiMessages);
-    runtime.panelOffset = tail.offset;
-    this.panel.post({
-      type: 'session_loaded',
-      messages: tail.messages,
-      olderMessages: tail.offset
-    });
-  }
-
-  // The panel asks for the older part of the chat. The host keeps it, the
-  // panel gets one more part.
-  private loadOlder(): void {
-    const runtime = this.activeSession();
-    if (!runtime) {
-      return;
-    }
-    const page = historyPage(runtime.uiMessages, runtime.panelOffset ?? 0);
-    runtime.panelOffset = page.offset;
-    this.panel.post({
-      type: 'history_older',
-      messages: page.messages,
-      olderMessages: page.offset
-    });
-  }
-
-  private async sendInit(reset = false): Promise<void> {
+  async sendInit(reset = false): Promise<void> {
     const settings = getSettings();
     const key = await getApiKey(this.context.secrets);
     const runtime = this.activeSession();
     // The history goes to the panel in parts: the panel holds the last part
     // of it, the older part waits for the request of the reader.
-    const history = this.panelHistory(runtime, reset);
+    const history = panelHistory(this, runtime, reset);
     this.panel.post({
       type: 'init',
       state: {
@@ -2530,7 +1692,7 @@ class MiniMaxController {
         mode: settings.mode,
         thinking: settings.thinking,
         state: this.agentState,
-        tokens: this.usageTotal(runtime),
+        tokens: usageTotal(this, runtime),
         usage: runtime ? [...runtime.usage] : [],
         todos: runtime ? [...runtime.todos] : [],
         goal: runtime?.goal,
@@ -2762,7 +1924,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   context.subscriptions.push(channel);
   controller = new MiniMaxController(context, channel);
   controller.register(context);
-  controller.restoreSession();
+  restoreSession(controller);
   void controller.refreshQuota();
   // The index of the project is built in the background, the first search
   // does not wait for the files of the disk.
@@ -2774,20 +1936,3 @@ export function deactivate(): void {
   controller = undefined;
 }
 
-// The answer of the child is the text of its last message.
-function finalText(messages: AnthropicMessage[]): string {
-  for (let index = messages.length - 1; index >= 0; index--) {
-    const message = messages[index]!;
-    if (message.role !== 'assistant') {
-      continue;
-    }
-    const parts = message.content.flatMap((block) =>
-      block.type === 'text' ? [block.text] : []
-    );
-    const text = parts.join('\n').trim();
-    if (text.length > 0) {
-      return text;
-    }
-  }
-  return '';
-}
