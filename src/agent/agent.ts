@@ -1,87 +1,24 @@
-import type { MiniMaxClient } from '../api/client';
 import { balanceHistory } from '../api/history';
 import { MiniMaxApiError } from '../api/errors';
 import type {
   AnthropicContentBlock,
   AnthropicMessage,
-  EffortLevel,
   StopReason,
   StreamEvent,
-  Usage
+  Usage,
 } from '../api/types';
-import type { AgentMode } from '../config/models';
-import type { Logger } from '../logger';
-import type { ToolRegistry } from '../tools/registry';
-import { buildPreview } from '../tools/preview';
-import type { ApprovalGate, DiffPreview } from '../ui/approvals';
-import type { SessionState, ToolStateUpdate } from './state';
+import {
+  addUsage,
+  forgetReadCalls,
+  MAX_IDENTICAL_CALLS,
+  previewOf,
+  signatureOf
+} from './toolRunner';
+import type { AgentOptions, AgentRunResult } from './types';
+export type { AgentEvent, AgentOptions, AgentRunResult } from './types';
+import type { ToolStateUpdate } from './state';
 
-export type AgentEvent =
-  | { type: 'assistant_start' }
-  | { type: 'assistant_text'; text: string }
-  | { type: 'assistant_thinking'; text: string }
-  // The request runs again from the start: the piece of the broken answer
-  // goes away, the new one takes its place.
-  | { type: 'assistant_reset' }
-  // The connection to MiniMax is lost, the request is repeated.
-  | { type: 'retrying'; attempt: number; total: number; delayMs: number }
-  | { type: 'tool_start'; id: string; name: string; input: Record<string, unknown> }
-  | {
-      type: 'tool_end';
-      id: string;
-      name: string;
-      content: string;
-      isError: boolean;
-      // The change of a file, it is taken before the write.
-      diff?: DiffPreview;
-      // The change of the state of the session, the host applies it.
-      state?: ToolStateUpdate;
-    }
-  | { type: 'approval_resolved'; id: string; approved: boolean }
-  | { type: 'tool_progress'; id: string; line: string }
-  | { type: 'usage'; usage: Usage }
-  | { type: 'done'; stopReason: StopReason; usage: Usage }
-  | { type: 'error'; message: string };
 
-export interface AgentRunResult {
-  messages: AnthropicMessage[];
-  stopReason: StopReason;
-  usage: Usage;
-  // The place of the request in the history, the chat rolls back to it.
-  requestIndex: number;
-}
-
-export interface AgentOptions {
-  client: MiniMaxClient;
-  registry: ToolRegistry;
-  approval: ApprovalGate;
-  model: string;
-  maxTokens: number;
-  maxIterations: number;
-  // How many times a request is repeated after the loss of the connection.
-  // Zero turns the repeats off.
-  maxRetries?: number;
-  // The first pause between the attempts. The pause grows from it. The
-  // tests use a small base, a real turn waits a second.
-  retryBaseDelayMs?: number;
-  effort?: EffortLevel;
-  thinking?: 'adaptive';
-  mode: AgentMode;
-  systemPrompt: string;
-  workspaceRoot: string;
-  // How deep the agent is. Undefined is the main agent.
-  depth?: number;
-  // The budget of the goal. The agent stops when the guard says no.
-  budget?: () => boolean;
-  // The state of the session, the tools read it.
-  sessionState?: SessionState;
-  // The id of the session, the tools know who they work for.
-  sessionId?: string;
-  logger: Logger;
-  onEvent: (event: AgentEvent) => void;
-}
-
-const MAX_IDENTICAL_CALLS = 3;
 // How many times a request is repeated when the connection is lost.
 export const DEFAULT_MAX_RETRIES = 5;
 const RETRY_BASE_DELAY_MS = 1000;
@@ -93,37 +30,9 @@ export function retryDelay(attempt: number, baseMs = RETRY_BASE_DELAY_MS): numbe
   return Math.min(baseMs * 2 ** Math.max(0, attempt), RETRY_MAX_DELAY_MS);
 }
 
-function signatureOf(name: string, input: Record<string, unknown>): string {
-  return name + ':' + JSON.stringify(input);
-}
-
-// A tool with a side effect that worked makes every answer of a reading tool
-// stale: the model reads the file it has just written. Such a call is not a
-// loop, so the counters of the reading tools go away. The counters of the
-// tools with a side effect stay: a loop of identical writes is exactly what
-// the guard is for.
-function forgetReadCalls(counts: Map<string, number>, registry: ToolRegistry): void {
-  const writePrefixes = registry
-    .list()
-    .filter((entry) => entry.sideEffect)
-    .map((entry) => entry.name + ':');
-  for (const key of [...counts.keys()]) {
-    if (!writePrefixes.some((prefix) => key.startsWith(prefix))) {
-      counts.delete(key);
-    }
-  }
-}
 
 // One action can send several requests to the API, the spend of the action
 // is the sum of all of them.
-function addUsage(total: Usage, part: Usage): Usage {
-  return {
-    inputTokens: total.inputTokens + part.inputTokens,
-    outputTokens: total.outputTokens + part.outputTokens,
-    cacheReadTokens: (total.cacheReadTokens ?? 0) + (part.cacheReadTokens ?? 0),
-    cacheCreationTokens: (total.cacheCreationTokens ?? 0) + (part.cacheCreationTokens ?? 0)
-  };
-}
 
 export class Agent {
   private readonly options: AgentOptions;
@@ -318,7 +227,7 @@ export class Agent {
 
         // The change of a file is taken before the write. After the write the
         // file on disk is already the new one and the change is gone.
-        const diff = await this.previewOf(toolUse.name, toolUse.input);
+        const diff = await previewOf(this.options.workspaceRoot, toolUse.name, toolUse.input);
 
         let content: string;
         let isError = false;
@@ -381,16 +290,6 @@ export class Agent {
 
   // The change of a file, it is taken before the write. A path outside of
   // the workspace throws inside the preview, the action still runs.
-  private async previewOf(
-    name: string,
-    input: Record<string, unknown>
-  ): Promise<DiffPreview | undefined> {
-    try {
-      return await buildPreview(name, input, this.options.workspaceRoot);
-    } catch {
-      return undefined;
-    }
-  }
 
   private async streamWithRetry(
     messages: AnthropicMessage[]
