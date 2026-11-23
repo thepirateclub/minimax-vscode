@@ -1,3 +1,92 @@
+
+/* The card of an action is a quiet note under the answer, it must not
+   compete with the text of the chat. */
+.tool-card {
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  overflow: hidden;
+  /* The chevron and the blocks stand on the left edge of the answer. The
+     hover of the row and the bar of a failure go into the margin of the
+     panel, like the rows of the lists of VS Code. */
+  margin: 0 -6px;
+}
+
+/* a failure of the panel is a notice, it is not a part of the answer */
+.message-notice {
+  border-left: 2px solid var(--err);
+  /* The bar stands in the margin of the panel, the text on the left edge,
+     like the bar of a failed action. */
+  margin-left: -6px;
+  padding: 2px 0 2px 4px;
+  color: var(--muted);
+  font-size: var(--fs-md);
+  line-height: var(--lh);
+  overflow-wrap: anywhere;
+}
+
+/* The bar of a note tells how serious it is. A note that is not a
+   failure keeps the quiet color of the text. */
+.message-notice.notice-info {
+  border-left-color: var(--muted);
+}
+
+.message-notice.notice-warn {
+  border-left-color: var(--warn);
+}
+
+.message-notice.notice-error {
+  border-left-color: var(--err);
+}
+
+/* The actions of a message: the time of the step. The row is quiet,
+   it holds the time of the last message of the turn. */
+.message-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: var(--control-h);
+}
+
+/* The time of the step stands in the right edge of the row. */
+.message-elapsed {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+/* A failed action is marked with a straight bar in the color of the failed
+   dot. A rounded border drew a bracket, it looked like a decoration, and the
+   color of the theme turned the mark gray. */
+.tool-card.tool-error {
+  border-left: 2px solid var(--err);
+  border-radius: 0;
+}
+
+/* The bar takes 2px of the gutter, the icons stay in one column with the
+   cards around. */
+.tool-card.tool-error .tool-head,
+.tool-card.tool-error .tool-body {
+  padding-left: 4px;
+}
+
+.tool-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: var(--control-h);
+  padding: 2px 6px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--fg);
+  font-size: var(--fs-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
 .tool-head:hover {
   background: var(--row-hover);
 }
@@ -186,208 +275,5 @@
 .tool-copy.copied:hover {
   opacity: 1;
   color: var(--ok);
-}
-
-/* approval */
-.approval {
-  border: 1px solid var(--vscode-focusBorder, #007fd4);
-  border-radius: var(--radius);
-  padding: 12px;
-  background: var(--surface);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.approval-title {
-  font-weight: 600;
-  font-size: var(--fs-md);
-}
-
-.approval-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.approval .tool-input {
-  max-height: 160px;
-}
-
-.approval-command {
-  color: var(--fg);
-}
-
-/* the blocks of a monospace text share one frame */
-.diff,
-.file-read,
-.term {
-  position: relative;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-}
-
-/* diff */
-.diff-path {
-  padding: 4px 8px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  font-weight: 600;
-  font-size: var(--fs-sm);
-  font-family: var(--mono);
-}
-
-.diff-body {
-  margin: 0;
-  padding: 4px 0;
-  overflow: auto;
-  max-height: 300px;
-}
-
-.diff-line {
-  padding-right: 8px;
-  white-space: pre;
-  font-family: var(--mono);
-  font-size: var(--fs-sm);
-  line-height: var(--lh);
-}
-
-.diff-add {
-  background: var(--diff-add-bg);
-  color: var(--diff-add-fg);
-}
-
-.diff-remove {
-  background: var(--diff-remove-bg);
-  color: var(--diff-remove-fg);
-}
-
-.diff-marker {
-  display: inline-block;
-  width: 2ch;
-  padding-left: 8px;
-  box-sizing: content-box;
-  font-weight: 600;
-  user-select: none;
-}
-
-.diff-add .diff-marker {
-  color: var(--diff-add-fg);
-}
-
-.diff-remove .diff-marker {
-  color: var(--diff-remove-fg);
-}
-
-/* the read of a file */
-.file-read-block + .file-read-block {
-  border-top: 1px solid var(--border);
-}
-
-.file-read-path {
-  padding: 4px 8px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  color: var(--muted);
-  font-family: var(--mono);
-  font-size: var(--fs-xs);
-}
-
-.file-read-lines {
-  max-height: 300px;
-  overflow: auto;
-  padding: 4px 0;
-}
-
-.file-read-line {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-  padding: 0 8px;
-  font-family: var(--mono);
-  font-size: var(--fs-sm);
-  line-height: var(--lh);
-}
-
-.file-read-num {
-  flex: 0 0 auto;
-  min-width: 3ch;
-  text-align: right;
-  color: var(--muted);
-  opacity: 0.6;
-  font-variant-numeric: tabular-nums;
-  user-select: none;
-}
-
-.file-read-text {
-  flex: 1 1 auto;
-  min-width: 0;
-  white-space: pre;
-}
-
-/* the output of a command */
-
-/* The command stands on its own line, a click opens a long one. */
-.term-command {
-  appearance: none;
-  display: flex;
-  gap: 8px;
-  width: 100%;
-  text-align: left;
-  /* The room on the right belongs to the copy button. */
-  padding: 4px 32px 4px 8px;
-  background: var(--surface);
-  border: none;
-  border-bottom: 1px solid var(--border);
-  border-radius: 0;
-  font-family: var(--mono);
-  font-size: var(--fs-sm);
-  line-height: var(--lh);
-  color: var(--fg);
-  cursor: pointer;
-}
-
-.term-command:hover {
-  background: var(--surface);
-  color: var(--fg);
-}
-
-.term-prompt {
-  flex: 0 0 auto;
-  color: var(--accent);
-  user-select: none;
-}
-
-.term-cmd-text {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow-wrap: anywhere;
-  /* A long command takes three lines, the rest of it opens on a click. */
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-  overflow: hidden;
-}
-
-.term-command-open .term-cmd-text {
-  -webkit-line-clamp: none;
-  overflow: visible;
-}
-
-/* the stream of the error is marked, the red text alone says nothing */
-.term-chip {
-  display: inline-block;
-  margin-right: 6px;
-  padding: 0 4px;
-  border: 1px solid currentColor;
-  border-radius: var(--radius-sm);
-  font-family: var(--vscode-font-family);
-  font-size: var(--fs-xs);
-  line-height: var(--lh-tight);
-  letter-spacing: 0.4px;
-  text-transform: uppercase;
-  opacity: 0.8;
-  vertical-align: 1px;
 }
 

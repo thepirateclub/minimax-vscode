@@ -1,0 +1,156 @@
+/* the list of tasks over the feed */
+/* The root of the widget is scoped to the chat view: the markdown of an
+   answer draws its own checklist with the class task-list, an unscoped
+   rule would put a frame around it. */
+.view > .task-list {
+  flex: 0 0 auto;
+  margin: 8px 12px 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.task-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 8px;
+  background: none;
+  border: none;
+  color: var(--fg);
+  cursor: pointer;
+  font-size: var(--fs-md);
+  text-align: left;
+}
+
+.task-head:hover {
+  background: var(--hover);
+}
+
+/* the toggle takes the row, the clear button sits at its right end */
+.task-head-row {
+  display: flex;
+  align-items: center;
+}
+
+.task-head-row > .task-head {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.task-clear {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-h);
+  height: var(--control-h);
+  margin-right: 4px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.task-clear:hover {
+  background: var(--hover);
+  color: var(--fg);
+}
+
+.task-title {
+  font-weight: 600;
+}
+
+.task-count {
+  margin-left: auto;
+  color: var(--muted);
+}
+
+.task-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 6px;
+}
+
+.task-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 2px 8px;
+  color: var(--fg);
+  font-size: var(--fs-md);
+}
+
+.task-marker {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border: 1px solid var(--muted);
+  border-radius: var(--radius-sm);
+}
+
+.task-pending .task-marker {
+  border-color: var(--muted);
+}
+
+.task-in_progress .task-marker {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.task-completed .task-marker {
+  border-color: var(--ok);
+  background: var(--ok);
+}
+
+.task-completed .task-text {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.task-text {
+  flex: 1 1 auto;
+}
+
+/* The priority of a task is an arrow of jira. The color of the arrow
+   comes from the theme of the host. */
+.task-priority {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  color: var(--muted);
+  font-size: var(--fs-xs);
+}
+
+.task-priority-low {
+  color: var(--prio-low);
+}
+
+.task-priority-medium {
+  color: var(--prio-medium);
+}
+
+.task-priority-high {
+  color: var(--prio-high);
+}
+
+.task-priority-very_high {
+  color: var(--prio-high);
+}
+
+/* the note of the model on the card of update_goal */
+.tool-note {
+  margin: 4px 0;
+  color: var(--fg);
+  font-size: var(--fs-md);
+  white-space: pre-wrap;
+}
+
+/* the list inside the card of todo_write sits on the card, not in a frame */
+.tool-body > .task-rows {
+  padding: 4px 0;
+}

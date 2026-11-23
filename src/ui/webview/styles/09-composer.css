@@ -1,151 +1,3 @@
-.term-body {
-  max-height: 300px;
-  overflow: auto;
-  padding: 6px 8px;
-  font-family: var(--mono);
-  font-size: var(--fs-sm);
-  line-height: var(--lh);
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-
-.term-line-error {
-  color: var(--err);
-}
-
-.term-line-note {
-  color: var(--muted);
-  font-style: italic;
-}
-
-/* The status of the request that is repeated after the loss of the
-   connection. It stands above the field, the reader sees it at once. */
-.composer-status {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 2px 6px;
-  font-size: var(--fs-sm);
-  color: var(--warn);
-}
-
-.composer-status-text {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* The queue of the messages of the chat. A compact strip over the field
-   of the request: every message has its state. */
-.queue-bar {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 2px 0;
-}
-
-.queue-items {
-  flex: 1 1 auto;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  max-height: 84px;
-  overflow-y: auto;
-}
-
-.queue-item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  padding: 2px 4px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--row-hover);
-  font-size: var(--fs-xs);
-}
-
-.queue-item.queue-error {
-  border-color: var(--err);
-}
-
-.queue-item.queue-done {
-  opacity: 0.6;
-}
-
-.queue-state {
-  display: inline-flex;
-  align-items: center;
-  flex: 0 0 auto;
-  color: var(--muted);
-}
-
-.queue-item.queue-sending .queue-state {
-  color: var(--accent);
-}
-
-.queue-item.queue-error .queue-state {
-  color: var(--err);
-}
-
-.queue-text {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.queue-send,
-.queue-remove {
-  appearance: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  width: 18px;
-  height: 18px;
-  padding: 2px;
-  background: transparent;
-  border: none;
-  border-radius: var(--radius-sm);
-  color: var(--muted);
-  cursor: pointer;
-}
-
-.queue-send:hover,
-.queue-remove:hover {
-  color: var(--fg);
-  background: var(--hover);
-}
-
-.queue-send:disabled,
-.queue-remove:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-
-.queue-send-all {
-  appearance: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  flex: 0 0 auto;
-  padding: 2px 8px;
-  background: transparent;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  color: var(--fg);
-  font-size: var(--fs-xs);
-  cursor: pointer;
-}
-
-.queue-send-all:hover {
-  background: var(--hover);
-}
-
 /* composer */
 .composer {
   position: relative;
@@ -378,5 +230,56 @@
 .composer-mic:hover {
   background: var(--hover);
   color: var(--fg);
+}
+
+/* A running recording is red and pulses, the reader sees that the panel
+   listens. A click stops it and sends the speech to the recognition. */
+.composer-mic.recording {
+  color: var(--err);
+  animation: mm-pulse 1.2s ease-in-out infinite;
+}
+
+.composer-mic.recording:hover {
+  color: var(--err);
+}
+
+/* the speech goes to MiniMax, the button waits for the text */
+.composer-mic.transcribing,
+.composer-mic.transcribing:hover {
+  background: transparent;
+  color: var(--accent);
+  opacity: 1;
+  cursor: progress;
+  animation: mm-pulse 0.8s ease-in-out infinite;
+}
+
+/* The send icon ends the row of the controls, it has no fill, the word
+   stays in the tooltip. */
+.composer-send {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-h);
+  height: var(--control-h);
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.composer-send:hover {
+  background: var(--hover);
+  color: var(--fg);
+}
+
+.composer-send.stop {
+  background: transparent;
+  color: var(--err);
+}
+
+.composer-send.stop:hover {
+  color: var(--err);
 }
 

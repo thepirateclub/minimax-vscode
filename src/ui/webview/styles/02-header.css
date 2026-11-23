@@ -1,0 +1,178 @@
+/* header */
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.header-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+/* The state of the agent is a dot, the word stays in the tooltip. */
+.state-dot {
+  flex: 0 0 auto;
+  width: var(--dot);
+  height: var(--dot);
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.state-dot.state-idle {
+  background: var(--ok);
+}
+
+.state-dot.state-thinking,
+.state-dot.state-streaming,
+.state-dot.state-tool {
+  background: var(--accent);
+  animation: mm-pulse 1.2s ease-in-out infinite;
+}
+
+.state-dot.state-error {
+  background: var(--err);
+}
+
+@keyframes mm-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.3;
+    transform: scale(0.8);
+  }
+}
+
+.tabs {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  /* The label of the first tab stands on the left edge of the panel, the
+     padding of the tab goes into the margin of the panel. */
+  margin-left: -8px;
+}
+
+/* The active tab is marked by a rounded bar under the label, the panel
+   divider below the tabs stays untouched. */
+.tab {
+  appearance: none;
+  position: relative;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  font-size: var(--fs-md);
+  padding: 4px 8px 6px;
+}
+
+.tab:hover {
+  color: var(--fg);
+  background: transparent;
+}
+
+.tab.active {
+  color: var(--fg);
+}
+
+.tab.active::after {
+  content: '';
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 0;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--accent);
+}
+
+.tokens {
+  flex: 0 0 auto;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.tabs .state-dot {
+  margin-left: auto;
+  margin-right: 4px;
+}
+
+/* The version of the extension sits in the corner of the tab row, it tells
+   the reader which build is running without opening the settings. */
+.version {
+  flex: 0 0 auto;
+  margin-left: 4px;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* A square button with an icon, it has no frame until the mouse points at
+   it, like the toolbar of VS Code. */
+.icon-button {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: var(--control-h);
+  height: var(--control-h);
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.icon-button:hover,
+.icon-button.open {
+  background: var(--hover);
+  color: var(--fg);
+}
+
+.warning {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--fs-sm);
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  color: var(--vscode-inputValidation-warningForeground, var(--fg));
+  background: var(--vscode-inputValidation-warningBackground, rgba(204, 167, 0, 0.1));
+  border: 1px solid var(--warn);
+}
+
+.warning-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.warning-action {
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  font-size: var(--fs-sm);
+}
+
+/* views */
+.view {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.view-hidden {
+  display: none;
+}
+

@@ -1,0 +1,247 @@
+/* suggestions */
+.suggestions {
+  position: absolute;
+  bottom: 100%;
+  left: 12px;
+  right: 12px;
+  margin-bottom: 4px;
+  max-height: 240px;
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--vscode-quickInput-background, var(--popup-bg));
+  box-shadow: var(--shadow);
+  z-index: 5;
+}
+
+.suggestion {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  color: var(--fg);
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 4px 6px;
+  font-size: var(--fs-md);
+}
+
+.suggestion:hover {
+  background: var(--row-hover);
+}
+
+.suggestion.active {
+  background: var(--selected);
+  color: var(--selected-fg);
+}
+
+.suggestion-path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--mono);
+  font-size: var(--fs-sm);
+}
+
+.suggestion-source {
+  font-size: var(--fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  opacity: 0.7;
+}
+
+.suggestion-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--muted);
+  flex: none;
+}
+
+.suggestion-dot.source-open {
+  background: var(--accent);
+}
+
+/* settings */
+.settings {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.settings-section + .settings-section {
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.settings-section h3 {
+  margin: 0;
+  font-size: var(--fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.settings-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.settings-row input {
+  flex: 1;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: var(--fs-md);
+}
+
+.field > span:first-child {
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+
+.hint {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  line-height: var(--lh-tight);
+}
+
+.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-md);
+}
+
+.checkbox input {
+  width: auto;
+  flex: none;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.settings-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.value {
+  color: var(--fg);
+}
+
+.saved {
+  font-size: var(--fs-sm);
+  color: var(--ok);
+}
+
+/* empty state */
+.empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  color: var(--muted);
+  font-size: var(--fs-md);
+  line-height: var(--lh);
+  text-align: center;
+}
+
+.empty-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  max-width: 280px;
+}
+
+/* the mark of the agent, the spark of the reasoning selector at a larger size */
+.empty-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--accent);
+}
+
+.empty-mark .icon {
+  width: 20px;
+  height: 20px;
+}
+
+.empty-title {
+  color: var(--fg);
+  font-size: var(--fs-base);
+  font-weight: 600;
+}
+
+.empty-text {
+  margin: 0;
+}
+
+.empty-hints {
+  /* The keys stand in one column and the words in another. */
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: center;
+  gap: 4px 8px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--fs-sm);
+}
+
+.empty-hints li {
+  display: contents;
+}
+
+.empty-keys {
+  display: inline-flex;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.empty-hints li > span:last-child {
+  text-align: left;
+}
+
+/* a key of the keyboard, drawn like the keybinding labels of VS Code */
+kbd {
+  display: inline-block;
+  min-width: 18px;
+  padding: 0 4px;
+  border: 1px solid var(--vscode-keybindingLabel-border, var(--border));
+  border-bottom-color: var(--vscode-keybindingLabel-bottomBorder, var(--border));
+  border-radius: var(--radius-sm);
+  background: var(--vscode-keybindingLabel-background, var(--code-bg));
+  color: var(--vscode-keybindingLabel-foreground, var(--fg));
+  font-family: var(--vscode-font-family);
+  font-size: var(--fs-xs);
+  line-height: 16px;
+  text-align: center;
+}
+

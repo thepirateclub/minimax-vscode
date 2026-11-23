@@ -1,0 +1,352 @@
+/* markdown of the answer */
+.markdown {
+  line-height: var(--lh);
+}
+
+.markdown > :first-child {
+  margin-top: 0;
+}
+
+.markdown > :last-child {
+  margin-bottom: 0;
+}
+
+.markdown p {
+  margin: 0 0 8px;
+}
+
+.markdown ul,
+.markdown ol {
+  margin: 4px 0 8px;
+  padding-left: 16px;
+}
+
+.markdown li {
+  margin: 2px 0;
+}
+
+.markdown li > p {
+  margin: 0 0 2px;
+}
+
+/* the marks of a list are a rhythm, not a signal: they stay gray */
+.markdown ul li::marker,
+.markdown ol li::marker {
+  color: var(--muted);
+}
+
+.markdown ol li::marker {
+  font-variant-numeric: tabular-nums;
+}
+
+.markdown a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* The headings take the weight, not the accent: the accent means a click. */
+.markdown h1,
+.markdown h2,
+.markdown h3,
+.markdown h4 {
+  margin: 16px 0 6px;
+  line-height: var(--lh-tight);
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.markdown h1 {
+  font-size: 1.3em;
+}
+
+.markdown h2 {
+  font-size: 1.15em;
+}
+
+.markdown h3 {
+  font-size: 1.05em;
+}
+
+.markdown h4 {
+  font-size: 1em;
+  color: var(--muted);
+}
+
+.markdown strong {
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.markdown em {
+  font-style: italic;
+}
+
+.markdown blockquote {
+  margin: 6px 0;
+  padding: 2px 12px;
+  border-left: 2px solid var(--border);
+  color: var(--muted);
+}
+
+.markdown hr {
+  margin: 12px 0;
+  border: none;
+  border-top: 1px solid var(--border);
+}
+
+/* The boxes of a checklist take the place of the markers, the list drops
+   its indent and the boxes stand on the left edge of the text. */
+.markdown .task-list {
+  padding-left: 0;
+}
+
+.markdown .task-item {
+  list-style: none;
+}
+
+.markdown .task-check {
+  margin: 0 6px 0 0;
+  vertical-align: middle;
+  accent-color: var(--accent);
+}
+
+.markdown code {
+  font-family: var(--mono);
+  font-size: 0.92em;
+  color: var(--tok-string);
+  background: var(--code-bg);
+  padding: 1px 4px;
+  border-radius: var(--radius-sm);
+}
+
+.markdown pre {
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px;
+  overflow-x: auto;
+  margin: 6px 0;
+  font-size: var(--fs-sm);
+  line-height: var(--lh);
+}
+
+.markdown pre code {
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  font-size: inherit;
+}
+
+.markdown table {
+  border-collapse: collapse;
+  margin: 6px 0;
+  font-size: var(--fs-md);
+}
+
+.markdown th,
+.markdown td {
+  border: 1px solid var(--border);
+  padding: 4px 8px;
+  text-align: left;
+}
+
+.markdown th {
+  background: var(--surface);
+  font-weight: 600;
+}
+
+.markdown tbody tr:nth-child(even) {
+  background: rgba(128, 128, 128, 0.04);
+}
+
+.markdown .code-block {
+  margin: 8px 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--code-bg);
+}
+
+.markdown .code-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 26px;
+  padding: 2px 4px 2px 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.markdown .code-lang {
+  font-family: var(--mono);
+  font-size: var(--fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--muted);
+}
+
+/* the name of a file is a link, it opens the file */
+.markdown .code-lang.code-file {
+  appearance: none;
+  border: none;
+  background: transparent;
+  padding: 0;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: var(--fs-sm);
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.markdown .code-lang.code-file:hover {
+  background: transparent;
+  text-decoration: underline;
+}
+
+.markdown .code-tools {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.markdown .code-copy,
+.markdown .code-toggle {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--control-h);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: var(--fs-xs);
+}
+
+.markdown .code-copy {
+  width: var(--control-h);
+  padding: 0;
+}
+
+/* The copy and the check share the button, the class swaps them. */
+.markdown .code-copy .icon-check,
+.markdown .code-copy.copied .icon-copy {
+  display: none;
+}
+
+.markdown .code-copy.copied .icon-check {
+  display: block;
+}
+
+.markdown .code-copy.copied {
+  color: var(--ok);
+}
+
+.markdown .code-toggle {
+  width: var(--control-h);
+  padding: 0;
+}
+
+.markdown .code-copy:hover,
+.markdown .code-toggle:hover {
+  background: var(--hover);
+  color: var(--fg);
+}
+
+/* the chevron of a code block turns right when the code is folded */
+.markdown .code-toggle .icon {
+  transition: transform var(--ease);
+}
+
+.markdown .code-block.collapsed .code-toggle .icon {
+  transform: rotate(-90deg);
+}
+
+/* A folded code block shows only its header. */
+.markdown .code-block.collapsed pre {
+  display: none;
+}
+
+.markdown .code-block.collapsed .code-head {
+  border-bottom: none;
+}
+
+.markdown .code-block pre {
+  margin: 0;
+  border: none;
+  border-radius: 0;
+}
+
+/* the tokens of the code blocks */
+.tok-comment {
+  color: var(--tok-comment);
+  font-style: italic;
+}
+
+.tok-string {
+  color: var(--tok-string);
+}
+
+.tok-number {
+  color: var(--tok-number);
+}
+
+.tok-keyword {
+  color: var(--tok-keyword);
+}
+
+.tok-type {
+  color: var(--tok-type);
+}
+
+.tok-function {
+  color: var(--tok-function);
+}
+
+.tok-variable {
+  color: var(--tok-variable);
+}
+
+.tok-operator {
+  color: var(--tok-operator);
+}
+
+.tok-attribute {
+  color: var(--tok-attribute);
+}
+
+.tok-property {
+  color: var(--tok-property);
+}
+
+.tok-tag {
+  color: var(--tok-tag);
+}
+
+.tok-add {
+  color: var(--tok-add);
+}
+
+.tok-remove {
+  color: var(--tok-remove);
+}
+
+
+/* the icon of the panel of the reasoning */
+.thinking-icon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--muted);
+}
+
+/* The glyph of the sparkles of lucide is taller than the words of the title:
+   its ink ends two pixels under the baseline of the text, the icon of the
+   actions ends on the baseline. The icon of the reasoning is lifted, so the
+   icons of the sections end on one line. */
+.thinking-icon .icon {
+  transform: translateY(-1.5px);
+}
+

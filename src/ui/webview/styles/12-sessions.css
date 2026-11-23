@@ -1,0 +1,162 @@
+/* The host sets scrollbar-color on the html in its default styles. While
+   that standard property is set, Chromium ignores the rules below and draws
+   the system bar with arrows on a track in the color of the editor. */
+html {
+  scrollbar-color: auto;
+}
+
+/* A thin bar with a gap from the edge, a wide one cut the code blocks. */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--vscode-scrollbarSlider-background, rgba(121, 121, 121, 0.4));
+  background-clip: padding-box;
+  border: 2px solid transparent;
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--vscode-scrollbarSlider-hoverBackground, rgba(100, 100, 100, 0.6));
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* the list of the saved chats */
+.session-menu {
+  position: relative;
+}
+
+.session-menu-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 20;
+  width: 250px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--popup-bg);
+  box-shadow: var(--shadow);
+}
+
+.session-new {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  color: var(--fg);
+  text-align: left;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-md);
+}
+
+.session-new:hover {
+  background: var(--row-hover);
+}
+
+/* the scope of the list: the chats of the project or the chats of every
+   project */
+.session-scope {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  text-align: left;
+  cursor: pointer;
+}
+
+.session-scope:hover {
+  background: var(--row-hover);
+  color: var(--fg);
+}
+
+.session-scope.active {
+  color: var(--accent);
+}
+
+.session-scope-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* the project of the chat, it shows in the list of every chat */
+.session-project {
+  color: var(--muted);
+  font-size: var(--fs-xs);
+}
+
+.session-empty {
+  padding: 6px 8px;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+
+.session-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-right: 4px;
+  border-radius: var(--radius-sm);
+}
+
+.session-item:hover {
+  background: var(--row-hover);
+}
+
+.session-item.active {
+  background: var(--selected);
+  color: var(--selected-fg);
+}
+
+.session-open {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 4px 8px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.session-open:hover {
+  background: transparent;
+}
+
+.session-title {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-md);
+}
+
+.session-time {
+  color: var(--muted);
+  font-size: var(--fs-xs);
+}
+
