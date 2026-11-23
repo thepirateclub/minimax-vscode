@@ -155,7 +155,11 @@
 
 /* The name of the section and the marks of it open the section. The title
    keeps its place: the preview stands in the free middle of the row, the
-   title does not move when the preview appears. */
+   title does not move when the preview appears. The plate of the name has
+   the same space on both sides: the name must not touch the edge of the
+   plate. The margin keeps the chevron on the left edge of the row: the
+   plate of the hover goes into the margin of the panel, like the cards of
+   the actions. */
 .section-toggle {
   display: grid;
   grid-template-columns: 14px 14px auto;
@@ -163,7 +167,8 @@
   column-gap: 6px;
   grid-column: 1 / 4;
   min-width: 0;
-  padding: 0;
+  margin-left: -6px;
+  padding: 0 6px;
   border: none;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -173,6 +178,16 @@
   line-height: inherit;
   text-align: left;
   cursor: pointer;
+}
+
+/* The head of a section is a quiet row, not a button of the panel. The
+   general rule of the buttons paints it with the fill of the primary button
+   on hover: the plate ended right after the name of the section, the letter
+   touched the edge of the plate and the reader saw half of a highlight. The
+   row carries the plate of the hover, the button keeps the tone of the row. */
+.section-toggle:hover {
+  color: var(--fg);
+  background: var(--hover);
 }
 
 /* The preview of a folded section: one italic line that says what the
@@ -211,9 +226,11 @@
   background: var(--row-hover);
 }
 
-.section-toggle:hover,
+/* The preview stands in the same row as the name of the section: the plate
+   of the row carries the hover, the button of the preview keeps no fill. */
 .section-preview:hover {
   color: var(--fg);
+  background: transparent;
 }
 
 /* The words of the head and the counter stand on one baseline: the counter
@@ -242,14 +259,8 @@
   justify-content: center;
 }
 
-/* The head of a section is a quiet row, not a button of the panel. The
-   general rule of the buttons paints it with the fill of the primary button
-   on hover, the row keeps the plate of the rows of the list. */
-.thinking-toggle:hover {
-  color: var(--fg);
-  background: var(--row-hover);
-}
-
+/* The chevron of the head takes the color of the name on hover, it has no
+   fill of its own. */
 .thinking-toggle:hover .chevron {
   color: var(--fg);
   background: transparent;
@@ -275,4 +286,4 @@
   border-radius: var(--radius-sm);
   max-height: 320px;
   overflow: auto;
-}
+}
