@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  buildCmdArgs,
   cmdPlatformRefusal,
   createCmdTools,
   isWindowsPlatform,
@@ -17,9 +16,18 @@ function makeContext(root: string) {
 }
 
 describe('run_cmd', () => {
-  it('runs the command through cmd /c and nothing else', () => {
-    expect(buildCmdArgs('dir')).toEqual(['/c', 'dir']);
-    expect(buildCmdArgs('echo hi && dir')).toEqual(['/c', 'echo hi && dir']);
+  it.runIf(process.platform === 'win32')('keeps the quotes of the command', async () => {
+    const tool = createCmdTools().find((entry) => entry.name === 'run_cmd');
+    // execFile escaped the quotes for CreateProcess and the shell printed
+    // the backslashes: the command has to reach the shell as it was written.
+    const quoted = await tool!.execute({ command: 'echo "a b"' }, makeContext(process.cwd()));
+    expect(quoted.content).toBe('"a b"');
+    expect(quoted.isError).toBeFalsy();
+    const nested = await tool!.execute(
+      { command: 'cmd /c echo nested' },
+      makeContext(process.cwd())
+    );
+    expect(nested.content).toBe('nested');
   });
 
   it('knows the platform of the tool', () => {

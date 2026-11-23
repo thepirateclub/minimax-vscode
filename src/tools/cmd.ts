@@ -1,4 +1,4 @@
-import { execFile } from 'node:child_process';
+import { exec, type ExecException } from 'node:child_process';
 import { resolveWorkspacePath } from '../paths';
 import { gitToolFor } from './terminal';
 import type { ToolEntry } from './types';
@@ -18,11 +18,6 @@ export function isWindowsPlatform(platform: string): boolean {
 
 export function cmdPlatformRefusal(platform: string): string | undefined {
   return isWindowsPlatform(platform) ? undefined : CMD_PLATFORM_REFUSAL;
-}
-
-// Команда идёт только через cmd /c, другой оболочки у инструмента нет.
-export function buildCmdArgs(command: string): string[] {
-  return ['/c', command];
 }
 
 export function resolveCmdTimeout(value: unknown): number {
@@ -99,9 +94,13 @@ export function createCmdTools(): ToolEntry[] {
         };
       }
       return await new Promise((resolvePromise) => {
-        execFile(
-          'cmd',
-          buildCmdArgs(command),
+        // exec runs the command through `cmd.exe /d /s /c`, so the quoting
+        // rules of the shell itself apply. execFile passes the command as
+        // one argument and Node escapes the quotes for CreateProcess: the
+        // shell receives backslashes and prints them, a command with quotes
+        // came back corrupted (echo "a b" gave \"a b\").
+        exec(
+          command,
           {
             cwd,
             timeout,
@@ -109,7 +108,7 @@ export function createCmdTools(): ToolEntry[] {
             signal: ctx.signal,
             windowsHide: true
           },
-          (error, stdout, stderr) => {
+          (error: ExecException | null, stdout: string, stderr: string) => {
             const parts: string[] = [];
             if (stdout.trim().length > 0) {
               parts.push(stdout.trim());
