@@ -10,7 +10,8 @@ export const REPL_MIN_TIMEOUT_MS = 1_000;
 export const REPL_MAX_TIMEOUT_MS = 60_000;
 export const REPL_MAX_OUTPUT_CHARS = 30_000;
 
-// Больше шести живых процессов проект не держит: старые уходят.
+// A chat keeps two interpreters at most, the machine does not hold a process
+// per chat that was ever opened.
 export const MAX_REPL_PROCESSES = 6;
 
 export type ReplLanguage = 'node' | 'python';
@@ -27,6 +28,8 @@ export interface ReplPayload {
   error?: string;
 }
 
+// Интерпретаторы ищутся по списку: на Windows python лежит в 'python', на
+// Linux часто только 'python3'.
 export const INTERPRETERS: Record<ReplLanguage, string[]> = {
   node: ['node'],
   python: ['python', 'python3']
