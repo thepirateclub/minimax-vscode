@@ -1,0 +1,14 @@
+{
+ "module": "child",
+ "names": [
+  "registryForRole",
+  "handleChildEvent",
+  "spawnTask"
+ ],
+ "imports": [
+  "import type { RuntimeSession } from './runtime';",
+  "import type { AgentEvent, AgentRunResult } from '../agent/agent';",
+  "import type { TaskOutcome, TaskRequest, TaskRole } from '../tools/task';",
+  "import type { ToolContext } from '../tools/types';"
+ ]
+}

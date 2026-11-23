@@ -1,0 +1,14 @@
+{
+ "module": "channel",
+ "names": [
+  "postFor",
+  "setState",
+  "appendToAssistant",
+  "markStepTime",
+  "usageTotal"
+ ],
+ "imports": [
+  "import type { AgentState, ExtToWeb } from '../ui/protocol';",
+  "import type { RuntimeSession } from './runtime';"
+ ]
+}

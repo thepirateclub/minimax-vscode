@@ -1,0 +1,16 @@
+{
+ "module": "setup",
+ "names": [
+  "buildPrompt",
+  "gitContext",
+  "sessionContext",
+  "goalBudgetOk",
+  "ensureAgent",
+  "effortFor",
+  "thinkingMode"
+ ],
+ "imports": [
+  "import type { RuntimeSession } from './runtime';",
+  "import type { ToolRegistry } from '../tools/registry';"
+ ]
+}

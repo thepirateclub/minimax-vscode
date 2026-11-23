@@ -1,0 +1,10 @@
+{
+ "module": "events",
+ "names": [
+  "handleAgentEvent"
+ ],
+ "imports": [
+  "import type { RuntimeSession } from './runtime';",
+  "import type { AgentEvent } from '../agent/agent';"
+ ]
+}

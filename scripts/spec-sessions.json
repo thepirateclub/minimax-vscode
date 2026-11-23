@@ -1,0 +1,19 @@
+{
+ "module": "sessions",
+ "names": [
+  "persist",
+  "persistTodos",
+  "runtimeFrom",
+  "startNewSession",
+  "restoreSession",
+  "selectSession",
+  "deleteSession",
+  "panelHistory",
+  "postHistory",
+  "loadOlder"
+ ],
+ "imports": [
+  "import type { RuntimeSession } from './runtime';",
+  "import type { StoredSession } from '../storage/sessions';"
+ ]
+}

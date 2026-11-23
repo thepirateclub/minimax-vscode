@@ -24,3 +24,4 @@ dist/preview/**
 .tmp-*/**
 .worktrees/**
 analysis/**
+scripts/**

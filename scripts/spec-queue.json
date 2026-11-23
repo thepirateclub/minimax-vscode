@@ -1,0 +1,19 @@
+{
+ "module": "queue",
+ "names": [
+  "sendQueued",
+  "sendAllQueued",
+  "removeQueued",
+  "enqueue",
+  "trimQueue",
+  "postQueue",
+  "pumpQueue"
+ ],
+ "imports": [
+  "import type { RuntimeSession } from './runtime';",
+  "import type { QueuedMessage, UiSelection } from '../ui/protocol';"
+ ],
+ "removeConstants": [
+  "const MAX_QUEUE_ITEMS = 30;"
+ ]
+}

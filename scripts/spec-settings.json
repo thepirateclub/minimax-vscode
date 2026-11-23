@@ -1,0 +1,22 @@
+{
+ "module": "settings",
+ "names": [
+  "postSettings",
+  "saveSettings",
+  "storeApiKey",
+  "applySettings",
+  "updateSetting",
+  "pickFiles",
+  "addApiKey",
+  "clearApiKey",
+  "setEndpoint",
+  "warnAboutTheBaseUrl",
+  "selectModel",
+  "selectMode",
+  "selectEffort"
+ ],
+ "imports": [
+  "import type { MiniMaxSettings } from '../config/settings';",
+  "import type { UiSettingsValues } from '../ui/protocol';"
+ ]
+}

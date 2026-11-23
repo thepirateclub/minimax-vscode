@@ -1,0 +1,17 @@
+{
+ "module": "approvals",
+ "names": [
+  "childApproval",
+  "requestChildApproval",
+  "dropApprovalCard",
+  "dropApprovalCards",
+  "releaseChildApprovals",
+  "agentsByPriority"
+ ],
+ "imports": [
+  "import { ApprovalGate, type ApprovalDecision, type ApprovalRequest } from '../ui/approvals';",
+  "import { buildPreview } from '../tools/preview';",
+  "import type { UiApproval } from '../ui/protocol';",
+  "import type { RuntimeSession } from './runtime';"
+ ]
+}

@@ -1,0 +1,9 @@
+{
+ "module": "messages",
+ "names": [
+  "handleWebviewMessage"
+ ],
+ "imports": [
+  "import type { WebToExt } from '../ui/protocol';"
+ ]
+}

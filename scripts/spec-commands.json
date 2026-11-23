@@ -1,0 +1,14 @@
+{
+ "module": "commands",
+ "names": [
+  "showLogs",
+  "showUsage",
+  "generateCommitMessage",
+  "refreshQuota",
+  "undoLastChange",
+  "refreshContext",
+  "prepareIndex",
+  "reindex"
+ ],
+ "imports": []
+}

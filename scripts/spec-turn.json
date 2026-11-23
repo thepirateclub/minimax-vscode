@@ -1,0 +1,16 @@
+{
+ "module": "turn",
+ "names": [
+  "handleSend",
+  "runTurn",
+  "rewindTo",
+  "retryTurn",
+  "cutHistoryBefore",
+  "buildPromptText"
+ ],
+ "imports": [
+  "import type { RuntimeSession } from './runtime';",
+  "import type { UiSelection } from '../ui/protocol';",
+  "import type { TurnAnchor } from '../agent/turns';"
+ ]
+}

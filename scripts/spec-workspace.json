@@ -1,0 +1,18 @@
+{
+ "module": "workspace",
+ "names": [
+  "searchFor",
+  "applySemanticProvider",
+  "sendSuggestions",
+  "collectSuggestions",
+  "openFilePaths",
+  "workspaceFiles",
+  "addSelectionToChat",
+  "addFileToChat",
+  "openFile",
+  "postSummary"
+ ],
+ "imports": [
+  "import type { UiSuggestion } from '../ui/protocol';"
+ ]
+}
