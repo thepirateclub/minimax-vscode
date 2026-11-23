@@ -2279,6 +2279,45 @@ describe('extension activation', () => {
     expect(ofType('status')).toHaveLength(0);
   });
 
+  it('the opened busy chat shows its state and the stop ends its turn', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.secrets.set('minimax.apiKey', 'test-key');
+    state.responses.push(
+      writeSse('toolu_1', 'note.txt', 'written by the agent'),
+      TEXT_SSE
+    );
+    await boot();
+    const first = ofType('init')[0]!.state.activeSessionId;
+
+    state.receive?.({ type: 'send', text: 'write a note', mentions: [], selections: [] });
+    await waitForState(() => {
+      expect(ofType('approval_request').length).toBe(1);
+    });
+
+    // The reader opens another chat and comes back to the busy one.
+    state.receive?.({ type: 'new_session' });
+    await waitForState(() => {
+      expect(ofType('init').length).toBeGreaterThan(1);
+    });
+    state.receive?.({ type: 'select_session', id: first! });
+    // The opened chat brought its busy state, the stop button stands in
+    // the field.
+    await waitForState(() => {
+      expect(ofType('status').at(-1)?.state).toBe('thinking');
+    });
+
+    state.receive?.({ type: 'stop' });
+    // The turn was stopped, the chat is idle again and the answer of the
+    // server is not waited for.
+    await waitForState(() => {
+      expect(ofType('status').at(-1)?.state).toBe('idle');
+    });
+    await waitForState(() => {
+      expect(state.responses.length).toBe(0);
+    });
+  });
+
   it('a deleted chat stops its turn and does not come back', async () => {
     const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
     state.config.set('root', root);

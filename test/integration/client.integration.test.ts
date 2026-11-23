@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { HttpMiniMaxClient } from '../../src/api/client';
 import { MiniMaxApiError } from '../../src/api/errors';
+import type { EffortLevel } from '../../src/api/types';
 import { startFakeServer, type FakeServer } from './fake-server';
 
 let server: FakeServer | undefined;
@@ -10,13 +11,14 @@ afterEach(async () => {
   server = undefined;
 });
 
-async function collect(client: HttpMiniMaxClient, model: string) {
+async function collect(client: HttpMiniMaxClient, model: string, effort?: EffortLevel) {
   const events = [];
   for await (const event of client.stream({
     model,
     maxTokens: 32000,
     system: 'sys',
-    messages: [{ role: 'user', content: [{ type: 'text', text: 'hi' }] }]
+    messages: [{ role: 'user', content: [{ type: 'text', text: 'hi' }] }],
+    effort
   })) {
     events.push(event);
   }
@@ -27,7 +29,7 @@ describe('HttpMiniMaxClient', () => {
   it('sends a bearer token and the anthropic shape', async () => {
     server = await startFakeServer();
     const client = new HttpMiniMaxClient({ baseUrl: server.url + '/anthropic', apiKey: 'test-key' });
-    const events = await collect(client, 'MiniMax-M3.1-Flash');
+    const events = await collect(client, 'MiniMax-M3.1-Flash', 'max');
     const request = server.requests[0];
     expect(request?.headers['authorization']).toBe('Bearer test-key');
     expect(request?.headers['x-api-key']).toBeUndefined();
@@ -44,7 +46,7 @@ describe('HttpMiniMaxClient', () => {
     expect(stop?.stopReason).toBe('end_turn');
   });
 
-  it('omits effort for models that do not support it', async () => {
+  it('omits effort when the caller sends none', async () => {
     server = await startFakeServer();
     const client = new HttpMiniMaxClient({ baseUrl: server.url, apiKey: 'k' });
     await collect(client, 'MiniMax-M3');

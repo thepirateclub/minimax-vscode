@@ -86,6 +86,9 @@ interface RuntimeSession {
   uiMessages: UiMessage[];
   agent: AgentSession | undefined;
   busy: boolean;
+  // The state of the dot: every chat keeps its own, the panel shows the
+  // one of the chat that is open.
+  state: AgentState;
   // The chat was deleted while its turn was still running: the turn ends,
   // but nothing of it goes back into the store.
   deleted: boolean;
@@ -408,7 +411,7 @@ class MiniMaxController {
             }),
             model: settings.model,
             maxTokens: model?.maxTokens ?? 65_536,
-            effort: settings.effort,
+            effort: this.effortFor(settings),
             thinking: this.thinkingMode(settings),
             context: {
               files: changes.files,
@@ -490,7 +493,7 @@ class MiniMaxController {
     return buildSystemPrompt({
       workspaceRoot: root,
       os: process.platform,
-      shell: process.platform === 'win32' ? 'powershell' : 'bash',
+      shell: process.platform === 'win32' ? 'powershell' : 'sh',
       mode: settings.mode,
       tools,
       rulesText: settings.rulesEnabled ? renderSnapshot(snapshot) : '',
@@ -579,7 +582,7 @@ class MiniMaxController {
       model: settings.model,
       maxTokens: model?.maxTokens ?? 65_536,
       maxIterations: settings.maxIterations,
-      effort: settings.effort,
+      effort: this.effortFor(settings),
       mode: settings.mode,
       thinking: this.thinkingMode(settings),
       contextWindow: model?.contextWindow,
@@ -773,7 +776,7 @@ class MiniMaxController {
       model: settings.model,
       maxTokens: model?.maxTokens ?? 65_536,
       maxIterations: CHILD_MAX_ITERATIONS,
-      effort: settings.effort,
+      effort: this.effortFor(settings),
       thinking: this.thinkingMode(settings),
       mode: settings.mode,
       systemPrompt,
@@ -1072,10 +1075,13 @@ class MiniMaxController {
   }
 
   private setState(state: AgentState, runtime?: RuntimeSession): void {
-    // The events of a chat that runs in the background do not write into
-    // the open one: the dot of the panel describes the active chat only.
-    // The status bar of the window follows every chat, the reader sees
-    // that the agent is busy somewhere.
+    // The state belongs to a chat: the events of a chat that runs in the
+    // background do not write into the open one, and the chat keeps its
+    // own dot for the moment the reader opens it again.
+    const owner = runtime ?? this.activeSession();
+    if (owner) {
+      owner.state = state;
+    }
     if (!runtime || runtime.id === this.activeSessionId) {
       this.agentState = state;
       this.statusBar.setState(state);
@@ -1098,6 +1104,14 @@ class MiniMaxController {
       (sum, turn) => sum + turn.input + turn.output + (turn.cache ?? 0),
       0
     );
+  }
+
+  // The levels of the reasoning depth go only to the models that take
+  // them, the catalog decides. The client does not know the names of the
+  // models, it only sees the effort it was given.
+  private effortFor(settings: MiniMaxSettings): EffortLevel | undefined {
+    const model = MODELS.find((item) => item.id === settings.model);
+    return model?.supportsEffort ? settings.effort : undefined;
   }
 
   // M3.1-Flash always thinks, M3 thinks only when the user turns it on.
@@ -1899,6 +1913,7 @@ class MiniMaxController {
       uiMessages: [...(stored.uiMessages ?? [])],
       agent: undefined,
       busy: false,
+      state: 'idle',
       deleted: false,
       errorReported: false,
       usage: (stored.usage ?? []).map((turn) => ({
@@ -1930,6 +1945,7 @@ class MiniMaxController {
       uiMessages: [],
       agent: undefined,
       busy: false,
+      state: 'idle',
       deleted: false,
       errorReported: false,
       usage: [],
@@ -1980,6 +1996,10 @@ class MiniMaxController {
     }
     this.activeSessionId = id;
     this.store.setActiveId(id);
+    // The opened chat brings its own state: a chat that runs in the
+    // background is busy and its stop button has to stand in the field,
+    // otherwise the busy chat looks idle and cannot be stopped.
+    this.setState(runtime.state);
     this.panel.post({ type: 'session_loaded', messages: runtime.uiMessages });
     void this.sendInit();
   }

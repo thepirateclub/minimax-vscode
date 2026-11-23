@@ -16,7 +16,8 @@ export interface SessionOptions {
   model: string;
   maxTokens: number;
   maxIterations: number;
-  effort: EffortLevel;
+  // The effort is set only for the models that take the depth levels.
+  effort?: EffortLevel;
   thinking?: 'adaptive';
   // The context window of the model, the history is cut to fit into it.
   contextWindow?: number;

@@ -17,8 +17,11 @@ export function buildRequestBody(request: ChatRequest): Record<string, unknown> 
   if (request.tools && request.tools.length > 0) {
     body['tools'] = request.tools;
   }
-  if (request.model === 'MiniMax-M3.1-Flash') {
-    body['output_config'] = { effort: request.effort ?? 'max' };
+  // The caller sends the effort only for the models that take the levels
+  // of the depth, the catalog decides. The client knows nothing about the
+  // names of the models.
+  if (request.effort !== undefined) {
+    body['output_config'] = { effort: request.effort };
   } else if (request.thinking === 'adaptive') {
     body['thinking'] = { type: 'adaptive' };
   }

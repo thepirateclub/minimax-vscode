@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { HttpMiniMaxClient } from '../../src/api/client';
+import { buildRequestBody, HttpMiniMaxClient } from '../../src/api/client';
 import type { ChatRequest, StreamEvent } from '../../src/api/types';
 
 const REQUEST: ChatRequest = {
@@ -67,6 +67,30 @@ function clientOf(body: Body): HttpMiniMaxClient {
     fetchImpl: async () => body.response
   });
 }
+
+describe('the body of the request', () => {
+  it('carries the effort when the caller sends it', () => {
+    const body = buildRequestBody({ ...REQUEST, effort: 'high' });
+    expect(body['output_config']).toEqual({ effort: 'high' });
+    expect(body['thinking']).toBeUndefined();
+  });
+
+  it('carries no effort when the model takes none', () => {
+    const body = buildRequestBody({ ...REQUEST, effort: undefined });
+    expect(body['output_config']).toBeUndefined();
+    expect(body['thinking']).toBeUndefined();
+  });
+
+  it('carries the adaptive thinking for the model without the depth', () => {
+    const body = buildRequestBody({
+      ...REQUEST,
+      model: 'MiniMax-M3',
+      thinking: 'adaptive'
+    });
+    expect(body['thinking']).toEqual({ type: 'adaptive' });
+    expect(body['output_config']).toBeUndefined();
+  });
+});
 
 describe('the client of MiniMax', () => {
   it('cancels the request when the stream is abandoned', async () => {

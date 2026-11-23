@@ -141,7 +141,7 @@ export async function generateCommitMessage(options: {
   client: MiniMaxClient;
   model: string;
   maxTokens: number;
-  effort: EffortLevel;
+  effort?: EffortLevel;
   thinking?: 'adaptive';
   context: CommitContext;
   signal?: AbortSignal;
