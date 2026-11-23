@@ -10,7 +10,8 @@ import {
   isValidContainerImage,
   isValidContainerName,
   parseCommandArg,
-  pickContainerRuntime
+  pickContainerRuntime,
+  splitCommandLine
 } from '../../src/tools/containers';
 
 describe('containers', () => {
@@ -45,6 +46,20 @@ describe('containers', () => {
     expect(parseCommandArg(['ls', '-l'])).toEqual(['ls', '-l']);
     expect(parseCommandArg('ls -l')).toEqual(['ls', '-l']);
     expect(parseCommandArg(undefined)).toEqual([]);
+  });
+
+  it('splits a command line by the spaces outside the quotes', () => {
+    expect(splitCommandLine('sh -c \'echo a b\'')).toEqual(['sh', '-c', 'echo a b']);
+    expect(splitCommandLine('"C:\\Program Files\\tool.exe" --flag')).toEqual([
+      'C:\\Program Files\\tool.exe',
+      '--flag'
+    ]);
+    expect(splitCommandLine('  a   b  ')).toEqual(['a', 'b']);
+    expect(splitCommandLine('')).toEqual([]);
+  });
+
+  it('parses a single string of the command with quotes', () => {
+    expect(parseCommandArg('sh -c \'echo a b\'')).toEqual(['sh', '-c', 'echo a b']);
   });
 
   it('refuses a name that looks like an option', () => {

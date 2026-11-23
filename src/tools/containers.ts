@@ -49,15 +49,50 @@ export function isValidContainerImage(image: string): boolean {
   return image.length > 0 && !image.startsWith('-');
 }
 
-// Команда приходит массивом: строку делить по пробелам небезопасно, кавычки
-// и пробелы внутри аргумента теряются.
+// A command line is split by the spaces that stand outside the quotes. A
+// plain split by spaces broke a path with a space and a quoted phrase into
+// pieces, the container received other arguments than the model meant.
+export function splitCommandLine(text: string): string[] {
+  const parts: string[] = [];
+  let current = '';
+  let quote = '';
+  for (const ch of text) {
+    if (quote.length > 0) {
+      if (ch === quote) {
+        quote = '';
+      } else {
+        current += ch;
+      }
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      quote = ch;
+      continue;
+    }
+    if (/\s/.test(ch)) {
+      if (current.length > 0) {
+        parts.push(current);
+        current = '';
+      }
+      continue;
+    }
+    current += ch;
+  }
+  if (current.length > 0) {
+    parts.push(current);
+  }
+  return parts;
+}
+
+// The command comes as an array; a single string is accepted too, the model
+// sends it sometimes. The string goes through the quote-aware split.
 export function parseCommandArg(value: unknown): string[] {
   if (Array.isArray(value)) {
     return value.filter((item): item is string => typeof item === 'string');
   }
   if (typeof value === 'string') {
     const trimmed = value.trim();
-    return trimmed.length > 0 ? trimmed.split(/\s+/) : [];
+    return trimmed.length > 0 ? splitCommandLine(trimmed) : [];
   }
   return [];
 }

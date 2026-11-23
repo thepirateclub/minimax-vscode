@@ -109,9 +109,6 @@ export function findTaskCandidates(
   if (labelled.length > 0) {
     return labelled;
   }
-  if (exact.length > 0) {
-    return exact;
-  }
   return tasks.filter((task) => task.text.toLowerCase().startsWith(query));
 }
 
