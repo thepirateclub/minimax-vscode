@@ -1,5 +1,9 @@
 import { readFileSync } from 'node:fs';
-import { readImports, usedNames, splitIts, writeFile } from './test-split-lib.mjs';
+import { assertNotSplit, readImports, usedNames, splitIts, writeFile } from './test-split-lib.mjs';
+
+// The split of the agent is already done: a second run would write the
+// cases of the monolith again and leave the second file empty.
+assertNotSplit(['test/helpers/agentFixture.ts', 'test/unit/agent-tools.test.ts']);
 
 const path = 'test/unit/agent.test.ts';
 const lines = readFileSync(path, 'utf8').split(/\r?\n/);

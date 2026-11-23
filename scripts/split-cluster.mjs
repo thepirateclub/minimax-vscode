@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
 
 const specPath = process.argv[2];
 const spec = JSON.parse(readFileSync(specPath, 'utf8'));
@@ -40,8 +40,19 @@ function findBraceClose(text, open) {
   return -1;
 }
 
-const registryPath = 'scripts/moved.json';
-const registry = existsSync(registryPath) ? JSON.parse(readFileSync(registryPath, 'utf8')) : {};
+// The members that are already out of the host. The list comes from the
+// specs themselves: a separate file with the same list would rot.
+const specDir = 'scripts';
+const registry = {};
+for (const file of readdirSync(specDir)) {
+  if (!file.startsWith('spec-') || !file.endsWith('.json')) {
+    continue;
+  }
+  const other = JSON.parse(readFileSync(specDir + '/' + file, 'utf8'));
+  for (const name of other.names ?? []) {
+    registry[name] = './host/' + other.module;
+  }
+}
 const movedNames = new Set(Object.keys(registry));
 for (const name of spec.names) movedNames.add(name);
 
@@ -120,8 +131,6 @@ importLines.splice(lastImport + 1, 0, importLine);
 updated = importLines.join('\n').replace(/\n{3,}/g, '\n\n');
 writeFileSync(path, toCrlf(updated));
 
-for (const name of spec.names) registry[name] = './host/' + spec.module;
-writeFileSync(registryPath, JSON.stringify(registry, null, 1));
 console.log(JSON.stringify({
   module: spec.module,
   functions: spec.names,

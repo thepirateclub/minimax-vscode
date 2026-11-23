@@ -1,5 +1,13 @@
 import { readFileSync } from 'node:fs';
-import { splitIts, writeFile } from './test-split-lib.mjs';
+import { assertNotSplit, splitIts, writeFile } from './test-split-lib.mjs';
+
+// The split of the activation is already done: a second run would write the
+// cases of the first file into the other files and lose most of them.
+const alreadySplit = ['test/helpers/vscodeMock.ts', 'test/helpers/extensionHarness.ts'];
+for (let index = 2; index <= 15; index++) {
+  alreadySplit.push('test/unit/extension-activate-' + index + '.test.ts');
+}
+assertNotSplit(alreadySplit);
 
 const path = 'test/unit/extension-activate.test.ts';
 const lines = readFileSync(path, 'utf8').split(/\r?\n/);

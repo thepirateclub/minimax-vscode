@@ -1,5 +1,9 @@
 import { readFileSync } from 'node:fs';
-import { readImports, usedNames, writeFile } from './test-split-lib.mjs';
+import { assertNotSplit, readImports, usedNames, writeFile } from './test-split-lib.mjs';
+
+// The split of the card is already done: a second run would write the
+// describes of the monolith again and leave the second file empty.
+assertNotSplit(['test/helpers/toolCardFixture.ts', 'test/unit/tool-card-body.test.ts']);
 
 const path = 'test/unit/tool-card.test.ts';
 const lines = readFileSync(path, 'utf8').split(/\r?\n/);

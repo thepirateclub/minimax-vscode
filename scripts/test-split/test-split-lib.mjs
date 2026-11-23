@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 
 // A test file is split into a helper with the shared parts and a few files
 // with the cases. The names of the imports are checked, an unused import
@@ -87,6 +87,23 @@ export function splitIts(body) {
     throw new Error('a case is not closed');
   }
   return blocks;
+}
+
+// A driver of the split must not overwrite the files of a split that is
+// already done. The cases of the monolith are gone from the source file,
+// so a second run would write empty files and the tests would be lost
+// without a word.
+export function assertNotSplit(paths) {
+  const existing = paths.filter((path) => existsSync(path));
+  if (existing.length === 0) {
+    return;
+  }
+  console.error('the split is already done, these files exist:');
+  for (const path of existing) {
+    console.error('  ' + path);
+  }
+  console.error('delete them by hand if the split has to run again');
+  process.exit(1);
 }
 
 export function writeFile(path, lines) {

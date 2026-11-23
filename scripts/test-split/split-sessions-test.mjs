@@ -1,5 +1,9 @@
 import { readFileSync } from 'node:fs';
-import { readImports, usedNames, writeFile } from './test-split-lib.mjs';
+import { assertNotSplit, readImports, usedNames, writeFile } from './test-split-lib.mjs';
+
+// The split of the sessions is already done: a second run would leave the
+// file of the class empty.
+assertNotSplit(['test/helpers/sessionsFixture.ts', 'test/unit/sessions-store-class.test.ts']);
 
 const path = 'test/unit/sessions-store.test.ts';
 const lines = readFileSync(path, 'utf8').split(/\r?\n/);

@@ -1,6 +1,11 @@
-import json, sqlite3
+import json, os, sqlite3
 
-db = r"C:\Users\StarFallPC\AppData\Roaming\Code\User\globalStorage\state.vscdb"
+# The state of the editor lives in the profile of the user, the path comes
+# from the system: the script has to run on any machine.
+db = os.path.join(
+    os.environ.get('APPDATA', ''),
+    'Code', 'User', 'globalStorage', 'state.vscdb'
+)
 con = sqlite3.connect("file:" + db + "?mode=ro", uri=True)
 row = con.execute("SELECT value FROM ItemTable WHERE key = ?", ('local.minimax-agent',)).fetchone()
 blob = json.loads(row[0]) if row else {}
