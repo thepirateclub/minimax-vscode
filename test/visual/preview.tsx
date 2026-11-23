@@ -9,7 +9,8 @@ import { MODELS } from '../../src/config/models';
 // The version comes from the manifest, the stand shows the same badge as the
 // panel and never falls behind the build.
 import manifest from '../../package.json';
-import type { ExtToWeb, UiSettings, UiState } from '../../src/ui/protocol';
+import type { ExtToWeb, UiState } from '../../src/ui/protocol';
+import { SETTINGS } from '../helpers/settingsFixture';
 import {
   MESSAGES,
   PREVIEW_MESSAGES,
@@ -124,32 +125,6 @@ const STATE: UiState = {
           used: { tokens: 184_320, requests: 12, seconds: 754 }
         }
       : undefined
-};
-
-const SETTINGS: UiSettings = {
-  baseUrl: 'auto',
-  customBaseUrl: '',
-  model: MODELS[0]!.id,
-  effort: 'max',
-  mode: 'code',
-  thinking: false,
-  maxIterations: 25,
-  maxRetries: 5,
-  fontSize: 13,
-  showToolSteps: true,
-  historyMaxMessages: 200,
-  contextThreshold: 50,
-  semanticSearch: false,
-  autoApprove: ['read_file'],
-  rulesEnabled: true,
-  enableWebSearch: false,
-  collapseTools: false,
-  collapseCode: false,
-  speechLanguage: 'ru',
-  microphone: '',
-  hasApiKey: true,
-  models: MODELS,
-  tools: ['read_file', 'write_file', 'edit_file', 'list_files', 'search_code', 'run_terminal']
 };
 
 function post(message: ExtToWeb): void {
