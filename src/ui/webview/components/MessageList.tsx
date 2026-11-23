@@ -5,7 +5,7 @@ import { collectFileSources, type CodeSource } from '../codeBlock';
 import { commandHints, type CommandHint } from '../commandHistory';
 import { failedRequests } from '../failedRequests';
 import { IconRetry, IconRewind } from '../icons';
-import { contentChanged, isAtBottom, measure, shouldFollow } from '../listScroll';
+import { feedAction, isAtBottom, measure } from '../listScroll';
 import { formatDuration } from '../../format';
 import { writeToClipboard } from '../clipboard';
 import { renderMarkdown } from '../markdown';
@@ -13,6 +13,8 @@ import { STRINGS } from '../strings';
 import { ApprovalCard } from './ApprovalCard';
 import { ThinkingBlock } from './ThinkingBlock';
 import { ToolCard } from './ToolCard';
+import { ToolSteps } from './ToolSteps';
+import { groupToolSteps, type FeedItem } from '../toolSteps';
 
 // The panel keeps the dom small, the older messages are loaded on demand.
 const PAGE = 120;
@@ -80,6 +82,7 @@ const MessageRow = memo(function MessageRow({
   collapseTools,
   collapseCode,
   canRetry,
+  repeatedThinking,
   onApprove,
   onReject,
   onOpenFile,
@@ -94,6 +97,8 @@ const MessageRow = memo(function MessageRow({
   collapseCode: boolean;
   // The turn of the request failed, the request can be repeated.
   canRetry: boolean;
+  // The reasoning follows another reasoning, the row stands apart from it.
+  repeatedThinking: boolean;
   onApprove: (id: string, allowForSession: boolean) => void;
   onReject: (id: string) => void;
   onOpenFile: (path: string, line?: number) => void;
@@ -143,7 +148,12 @@ const MessageRow = memo(function MessageRow({
       ) : null}
       {message.role === 'assistant' ? (
         <div className="assistant-body">
-          {message.thinking ? <ThinkingBlock text={message.thinking} /> : null}
+          {message.thinking ? (
+            <ThinkingBlock
+              text={message.thinking}
+              repeated={repeatedThinking}
+            />
+          ) : null}
           {message.text ? (
             <div
               className="markdown"
@@ -181,30 +191,65 @@ const MessageRow = memo(function MessageRow({
   );
 });
 
+// The reasoning follows another reasoning without anything between them:
+// the row stands apart from the row before it.
+function isRepeatedThinking(previous: FeedItem | undefined): boolean {
+  if (!previous || previous.kind !== 'message') {
+    return false;
+  }
+  const message = previous.message;
+  if (message.role !== 'assistant' || !message.thinking) {
+    return false;
+  }
+  return (message.text?.length ?? 0) === 0;
+}
+
 export function MessageList({
   messages,
+  olderMessages,
+  onLoadOlder,
   collapseTools,
   collapseCode,
+  showToolSteps,
   onApprove,
   onReject,
   onOpenFile,
   onRetry,
-  onRewind
+  onRewind,
+  followEnd,
+  onFollowEnd
 }: {
   messages: UiMessage[];
+  // How many messages of the chat wait in the host. The panel asks for
+  // them when the reader wants to see the older part of the chat.
+  olderMessages: number;
+  // The panel asks the host for the older part of the chat.
+  onLoadOlder: () => void;
   // The cards of the actions fold to their title.
   collapseTools: boolean;
   // The code blocks of the answers fold to their header.
   collapseCode: boolean;
+  // The steps of the tools are shown in the feed.
+  showToolSteps: boolean;
   onApprove: (id: string, allowForSession: boolean) => void;
   onReject: (id: string) => void;
   onOpenFile: (path: string, line?: number) => void;
   onRetry: (id: string) => void;
   onRewind: (id: string) => void;
+  // The feed goes to the end of the history: the chat was replaced or
+  // the request runs again. The feed follows the new turn, whatever place
+  // the reader had.
+  followEnd: boolean;
+  // The reader took the place of the feed, the feed does not pull itself
+  // down any more.
+  onFollowEnd: () => void;
 }) {
   const listRef = useRef<HTMLDivElement>(null);
   const atBottomRef = useRef(true);
   const lastState = useRef(measure([]));
+  // The height of the list before the older messages came from the host.
+  // The place of the reader stays where it was.
+  const pendingScroll = useRef<number | undefined>(undefined);
   const [visible, setVisible] = useState(PAGE);
   const [atBottom, setAtBottom] = useState(true);
   const [pending, setPending] = useState(0);
@@ -231,23 +276,34 @@ export function MessageList({
     const next = measure(messages);
     const previous = lastState.current;
     lastState.current = next;
-    if (next.count < previous.count) {
-      // Another chat was opened, the list shows its end.
+    const before = pendingScroll.current;
+    if (before !== undefined) {
+      // The older messages came from the host: the place of the reader
+      // stays where it was, the list does not jump to the end.
+      pendingScroll.current = undefined;
+      window.requestAnimationFrame(() => {
+        const after = root.scrollHeight;
+        if (after > before) {
+          root.scrollTop += after - before;
+        }
+      });
+      return;
+    }
+    const action = feedAction(previous, next, atBottomRef.current, followEnd);
+    if (action === 'keep') {
+      return;
+    }
+    if (action === 'bottom') {
+      // The feed goes to the end of the history: another chat was opened, or
+      // the request runs again and the reader waits for the new turn.
       root.scrollTop = root.scrollHeight;
       atBottomRef.current = true;
       setAtBottom(true);
       setPending(0);
       return;
     }
-    if (!contentChanged(previous, next)) {
-      return;
-    }
-    if (shouldFollow(previous, next, atBottomRef.current)) {
-      root.scrollTop = root.scrollHeight;
-      return;
-    }
     setPending((value) => value + 1);
-  }, [messages]);
+  }, [messages, followEnd]);
 
   const handleScroll = useCallback((): void => {
     const root = listRef.current;
@@ -259,21 +315,35 @@ export function MessageList({
     setAtBottom(bottom);
     if (bottom) {
       setPending(0);
+      return;
     }
-  }, []);
+    if (followEnd) {
+      // The reader scrolled up: he took the place of the feed, the feed
+      // does not pull itself down any more.
+      onFollowEnd();
+    }
+  }, [followEnd, onFollowEnd]);
 
   const loadEarlier = useCallback((): void => {
     const root = listRef.current;
     const before = root?.scrollHeight ?? 0;
-    setVisible((value) => value + PAGE);
-    // The place of the reader stays where it was.
-    window.requestAnimationFrame(() => {
-      const after = root?.scrollHeight ?? 0;
-      if (root && after > before) {
-        root.scrollTop += after - before;
-      }
-    });
-  }, []);
+    if (messages.length > visible) {
+      // The panel holds these messages, it draws them by itself.
+      setVisible((value) => value + PAGE);
+      // The place of the reader stays where it was.
+      window.requestAnimationFrame(() => {
+        const after = root?.scrollHeight ?? 0;
+        if (root && after > before) {
+          root.scrollTop += after - before;
+        }
+      });
+      return;
+    }
+    // The chat is longer than the panel holds: the older part of it waits
+    // in the host, the panel asks for it.
+    pendingScroll.current = before;
+    onLoadOlder();
+  }, [messages.length, visible, onLoadOlder]);
 
   // The files the agent has read, a snippet of one of them gets the name
   // of the file in its header.
@@ -282,34 +352,59 @@ export function MessageList({
   const failed = failedRequests(messages);
   // The command that ran before every message of the chat.
   const commands = commandHints(messages);
+  // The command of a message by its id: the steps of the tools break the
+  // order of the feed, the index of the message is not its place anymore.
+  const commandsById = new Map<string, CommandHint | undefined>();
+  messages.forEach((message, index) => {
+    commandsById.set(message.id, commands[index]);
+  });
 
   const shown = messages.length > visible ? messages.slice(-visible) : messages;
   const hidden = messages.length - shown.length;
+  // The messages the panel does not draw yet: the ones it holds and the
+  // ones the host keeps.
+  const pendingCount = hidden + olderMessages;
+  // The feed of the chat, the steps of the actions and the messages of the
+  // model in the order they came.
+  const feed = groupToolSteps(shown);
 
   return (
     <div className="messages-wrap">
       <div className="messages" ref={listRef} onScroll={handleScroll}>
-        {hidden > 0 ? (
+        {pendingCount > 0 ? (
           <button className="load-earlier" onClick={loadEarlier}>
-            {STRINGS.showEarlier} ({hidden})
+            {STRINGS.showEarlier} ({pendingCount})
           </button>
         ) : null}
-        {shown.map((message, offset) => (
-          <MessageRow
-            key={message.id}
-            message={message}
-            sources={sources}
-            command={commands[messages.length - shown.length + offset]}
-            collapseTools={collapseTools}
-            collapseCode={collapseCode}
-            canRetry={failed.has(message.id)}
-            onApprove={onApprove}
-            onReject={onReject}
-            onOpenFile={onOpenFile}
-            onRetry={onRetry}
-            onRewind={onRewind}
-          />
-        ))}
+        {feed.map((item, index) =>
+          item.kind === 'steps' ? (
+            // The setting hides the steps of the tools, the reader then sees
+            // the text of the model only.
+            showToolSteps ? (
+              <ToolSteps
+                key={item.step.id}
+                step={item.step}
+                collapsed={collapseTools}
+              />
+            ) : null
+          ) : (
+            <MessageRow
+              key={item.message.id}
+              message={item.message}
+              sources={sources}
+              command={commandsById.get(item.message.id)}
+              collapseTools={collapseTools}
+              collapseCode={collapseCode}
+              canRetry={failed.has(item.message.id)}
+              repeatedThinking={isRepeatedThinking(feed[index - 1])}
+              onApprove={onApprove}
+              onReject={onReject}
+              onOpenFile={onOpenFile}
+              onRetry={onRetry}
+              onRewind={onRewind}
+            />
+          )
+        )}
       </div>
       {!atBottom ? (
         <button className="jump-latest" onClick={scrollToBottom}>

@@ -11,13 +11,35 @@ import type { ExtToWeb, WebToExt } from '../../src/ui/protocol';
 // loaded machine needs more than the default second for a turn of the
 // extension to reach the panel.
 async function waitForState(check: () => void | Promise<void>): Promise<void> {
-  await vi.waitFor(check, { timeout: 5000 });
+  await vi.waitFor(check, { timeout: 10_000 });
+}
+
+// The turn of the model builds the prompt, reads the tree of the project
+// and waits for the answer. Under the load of the whole suite the first turn
+// takes longer than the second that vi.waitFor gives by default.
+const rawWaitFor = vi.waitFor;
+vi.waitFor = ((
+  callback: Parameters<typeof rawWaitFor>[0],
+  options?: Parameters<typeof rawWaitFor>[1]
+) =>
+  rawWaitFor(callback, {
+    timeout: 10_000,
+    ...(typeof options === 'number' ? { timeout: options } : options)
+  })) as unknown as typeof vi.waitFor;
+
+// The log of the network of one controller: the addresses, the headers
+// and the bodies of the requests.
+interface FetchLog {
+  fetched: string[];
+  headers: Array<Record<string, string>>;
+  bodies: string[];
 }
 
 const state = vi.hoisted(() => ({
   commands: new Map<string, (...args: unknown[]) => unknown>(),
   viewProviders: new Map<string, { resolveWebviewView: (view: unknown) => void }>(),
   config: new Map<string, unknown>(),
+  workspaceConfig: new Map<string, unknown>(),
   secrets: new Map<string, string>(),
   globalState: new Map<string, unknown>(),
   posted: [] as ExtToWeb[],
@@ -35,6 +57,9 @@ const state = vi.hoisted(() => ({
   themeListener: undefined as undefined | (() => void),
   opened: [] as string[],
   shown: [] as string[],
+  // The answer of the server waits until the test lets it come. The
+  // response 'HOLD' holds the turn of the model.
+  holdResponse: undefined as undefined | (() => void),
   quickPick: undefined as undefined | { title: string; items: unknown[] },
   progressCancel: undefined as undefined | (() => void)
 }));
@@ -43,6 +68,15 @@ vi.mock('vscode', () => {
   const configuration = {
     get: (key: string, fallback?: unknown) =>
       state.config.has(key) ? state.config.get(key) : fallback,
+    // The editor tells where the value of a setting comes from: the user, the
+    // workspace or the folder. The extension reads the value of the user for
+    // the settings that hold the address of the API.
+    inspect: (key: string) => ({
+      key,
+      defaultValue: undefined,
+      globalValue: state.config.get(key),
+      workspaceValue: state.workspaceConfig.get(key)
+    }),
     update: async (key: string, value: unknown) => {
       state.config.set(key, value);
     }
@@ -192,6 +226,18 @@ vi.mock('vscode', () => {
 
 const MESSAGES_URL = 'https://api.minimax.io/anthropic/v1/messages';
 
+// The test of the address of the API marks its request with this text. The
+// answer is given by the mark, so a leftover request of another test cannot
+// take it away from the test that waits for it.
+const PROBE_MARK = 'endpoint-probe';
+const PROBE_SSE = [
+  'event: message_start\ndata: {"type":"message_start","message":{"usage":{"input_tokens":3}}}\n\n',
+  'event: content_block_start\ndata: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}\n\n',
+  'event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"probe answer"}}\n\n',
+  'event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":2}}\n\n',
+  'event: message_stop\ndata: {"type":"message_stop"}\n\n'
+].join('');
+
 // The workspace of a test can be a repository, the state of it goes into
 // the prompt of the model.
 const runGit = promisify(execFile);
@@ -320,6 +366,10 @@ function makeContext(): ExtensionContext {
 }
 
 function makeView(): unknown {
+  // The panel of this controller writes into the list of this test. The
+  // panel of the controller of the previous test keeps the list it was
+  // built with, its late messages do not fall into this test.
+  const posted = state.posted;
   return {
     webview: {
       options: {},
@@ -330,7 +380,7 @@ function makeView(): unknown {
         // The webview gets a copy of the message, the host keeps the object
         // and can change it later. A test that looks at the panel has to see
         // the message as it was posted.
-        state.posted.push(structuredClone(message));
+        posted.push(structuredClone(message));
         return Promise.resolve(true);
       },
       onDidReceiveMessage: (handler: (message: WebToExt) => void) => {
@@ -340,6 +390,51 @@ function makeView(): unknown {
     },
     onDidDispose: () => ({ dispose: () => undefined })
   };
+}
+
+// The stub of the network. Every boot of the extension gets its own: the
+// controller of the previous test keeps the stub it was built with, a late
+// request of it cannot take the answer of the next test.
+function stubFetch(queue: string[], log: FetchLog): void {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      const href = String(url);
+      log.fetched.push(href);
+      log.headers.push((init?.headers ?? {}) as Record<string, string>);
+      const body = typeof init?.body === 'string' ? init.body : '';
+      if (body) {
+        log.bodies.push(body);
+      }
+      if (body.includes(PROBE_MARK)) {
+        return new Response(PROBE_SSE, {
+          status: 200,
+          headers: { 'content-type': 'text/event-stream' }
+        });
+      }
+      if (href.includes('/v1/token_plan/remains')) {
+        return new Response(QUOTA_JSON, {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      const payload = queue.shift() ?? TEXT_SSE;
+      if (payload === 'HOLD') {
+        // The turn of the model waits for the test.
+        await new Promise<void>((resolve) => {
+          state.holdResponse = resolve;
+        });
+        return new Response(TEXT_SSE, {
+          status: 200,
+          headers: { 'content-type': 'text/event-stream' }
+        });
+      }
+      return new Response(payload, {
+        status: 200,
+        headers: { 'content-type': 'text/event-stream' }
+      });
+    })
+  );
 }
 
 async function boot(): Promise<void> {
@@ -371,13 +466,17 @@ describe('extension activation', () => {
     state.commands.clear();
     state.viewProviders.clear();
     state.config.clear();
+    state.workspaceConfig.clear();
     state.secrets.clear();
     state.globalState.clear();
-    state.posted.length = 0;
-    state.fetched.length = 0;
-    state.headers.length = 0;
-    state.bodies.length = 0;
-    state.responses.length = 0;
+    state.posted = [];
+    // Every test has its own answers and its own log of the network. The
+    // controller of the previous test keeps the stub it was built with, a
+    // late request of it cannot take the answer of this test.
+    state.fetched = [];
+    state.headers = [];
+    state.bodies = [];
+    state.responses = [];
     state.editor = undefined;
     state.documents.length = 0;
     state.files.length = 0;
@@ -388,29 +487,12 @@ describe('extension activation', () => {
     state.themeListener = undefined;
     state.opened.length = 0;
     state.shown.length = 0;
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
-        const href = String(url);
-        state.fetched.push(href);
-        state.headers.push((init?.headers ?? {}) as Record<string, string>);
-        const body = typeof init?.body === 'string' ? init.body : '';
-        if (body) {
-          state.bodies.push(body);
-        }
-        if (href.includes('/v1/token_plan/remains')) {
-          return new Response(QUOTA_JSON, {
-            status: 200,
-            headers: { 'content-type': 'application/json' }
-          });
-        }
-        const payload = state.responses.shift() ?? TEXT_SSE;
-        return new Response(payload, {
-          status: 200,
-          headers: { 'content-type': 'text/event-stream' }
-        });
-      })
-    );
+    state.holdResponse = undefined;
+    stubFetch(state.responses, {
+      fetched: state.fetched,
+      headers: state.headers,
+      bodies: state.bodies
+    });
   });
 
   it('registers every command and the panel', async () => {
@@ -517,6 +599,53 @@ describe('extension activation', () => {
     const index = state.fetched.indexOf(MESSAGES_URL);
     expect(state.headers[index]?.['Authorization']).toBe('Bearer test-key');
     expect(state.headers[index]?.['anthropic-version']).toBe('2023-06-01');
+  });
+
+  it('does not take the address of the API from the workspace', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    // A repository that the user opens tries to move the API to its own host
+    // with the key of the user.
+    state.workspaceConfig.set('customBaseUrl', 'https://attacker.example/anthropic');
+    state.secrets.set('minimax.apiKey', 'test-key');
+    state.responses.push(TEXT_SSE);
+    await boot();
+
+    state.posted.length = 0;
+    state.receive?.({ type: 'send', text: PROBE_MARK, mentions: [], selections: [] });
+    await vi.waitFor(() => {
+      expect(ofType('text_delta').map((message) => message.text).join('')).toBe(
+        'probe answer'
+      );
+    });
+    await vi.waitFor(() => {
+      expect(ofType('status').pop()?.state).toBe('idle');
+    });
+    expect(state.fetched).toContain(MESSAGES_URL);
+    expect(state.fetched.some((url) => url.includes('attacker.example'))).toBe(false);
+    const index = state.fetched.indexOf(MESSAGES_URL);
+    expect(state.headers[index]?.['Authorization']).toBe('Bearer test-key');
+  });
+
+  it('takes the address of the API from the user', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.config.set('customBaseUrl', 'https://proxy.example/anthropic');
+    state.secrets.set('minimax.apiKey', 'test-key');
+    state.responses.push(TEXT_SSE);
+    await boot();
+
+    state.posted.length = 0;
+    state.receive?.({ type: 'send', text: PROBE_MARK, mentions: [], selections: [] });
+    await vi.waitFor(() => {
+      expect(ofType('text_delta').map((message) => message.text).join('')).toBe(
+        'probe answer'
+      );
+    });
+    await vi.waitFor(() => {
+      expect(ofType('status').pop()?.state).toBe('idle');
+    });
+    expect(state.fetched).toContain('https://proxy.example/anthropic/v1/messages');
   });
 
   it('asks for an approval before a write and applies it after the answer', async () => {
@@ -675,6 +804,7 @@ describe('extension activation', () => {
         mode: 'plan',
         thinking: true,
         maxIterations: 12,
+        maxRetries: 3,
         fontSize: 15,
         historyMaxMessages: 40,
         contextThreshold: 60,
@@ -684,6 +814,7 @@ describe('extension activation', () => {
         enableWebSearch: false,
         collapseTools: true,
         collapseCode: true,
+        showToolSteps: true,
         speechLanguage: 'ru',
         microphone: 'Mic 1'
       }
@@ -703,6 +834,7 @@ describe('extension activation', () => {
     expect(state.config.get('rulesEnabled')).toBe(false);
     expect(state.config.get('collapseTools')).toBe(true);
     expect(state.config.get('collapseCode')).toBe(true);
+    expect(state.config.get('showToolSteps')).toBe(true);
     expect(state.config.get('speechLanguage')).toBe('ru');
     expect(state.config.get('microphone')).toBe('Mic 1');
   });
@@ -966,6 +1098,187 @@ describe('extension activation', () => {
     expect(init.state.sessions.map((item) => item.id)).toContain('s-old');
   });
 
+  it('starts a new chat when the project has no chats', async () => {
+    const rootA = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    const rootB = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', rootA);
+    state.secrets.set('minimax.apiKey', 'test-key');
+    state.responses.push(TEXT_SSE);
+    await boot();
+    const chatA = ofType('init')[0]!.state.activeSessionId;
+    expect(chatA).toBeDefined();
+    state.posted.length = 0;
+    state.receive?.({ type: 'send', text: 'question of A', mentions: [], selections: [] });
+    await vi.waitFor(() => {
+      expect(ofType('text_delta').length).toBeGreaterThan(0);
+    });
+    await vi.waitFor(() => {
+      expect(ofType('status').pop()?.state).toBe('idle');
+    });
+
+    // The project B opens: it has no chats of its own.
+    state.config.set('root', rootB);
+    state.posted.length = 0;
+    await boot();
+    const init = ofType('init')[0]!;
+    expect(init.state.workspaceRoot).toBe(rootB);
+    expect(init.state.activeSessionId).toBeDefined();
+    // The chat of the other project is not opened here.
+    expect(init.state.activeSessionId).not.toBe(chatA);
+    expect(init.state.messages).toHaveLength(0);
+    // It stays in the list, the switch of every chat shows it.
+    expect(init.state.sessions.map((item) => item.id)).toContain(chatA);
+    const summary = init.state.sessions.find((item) => item.id === chatA);
+    expect(summary?.workspaceRoot).toBe(rootA);
+  });
+
+  it('opens the chat that was active in the project', async () => {
+    const rootA = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    const rootB = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.secrets.set('minimax.apiKey', 'test-key');
+
+    // The chat of the project A.
+    state.config.set('root', rootA);
+    state.responses.push(TEXT_SSE);
+    await boot();
+    state.receive?.({ type: 'send', text: 'question of A', mentions: [], selections: [] });
+    await vi.waitFor(() => {
+      expect(ofType('text_delta').length).toBeGreaterThan(0);
+    });
+    await vi.waitFor(() => {
+      expect(ofType('status').pop()?.state).toBe('idle');
+    });
+    const chatA = ofType('init')[0]!.state.activeSessionId;
+
+    // The chat of the project B.
+    state.config.set('root', rootB);
+    state.posted.length = 0;
+    state.responses.push(TEXT_SSE);
+    await boot();
+    state.receive?.({ type: 'send', text: 'question of B', mentions: [], selections: [] });
+    await vi.waitFor(() => {
+      expect(ofType('text_delta').length).toBeGreaterThan(0);
+    });
+    await vi.waitFor(() => {
+      expect(ofType('status').pop()?.state).toBe('idle');
+    });
+    const chatB = ofType('init')[0]!.state.activeSessionId;
+    expect(chatB).not.toBe(chatA);
+
+    // The project A opens again: its own chat is open.
+    state.config.set('root', rootA);
+    state.posted.length = 0;
+    await boot();
+    const init = ofType('init')[0]!;
+    expect(init.state.activeSessionId).toBe(chatA);
+    expect(init.state.messages[0]?.text).toBe('question of A');
+  });
+
+  it('keeps the message in the queue while the agent works', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.secrets.set('minimax.apiKey', 'test-key');
+    state.responses.push('HOLD', TEXT_SSE);
+    await boot();
+
+    state.receive?.({ type: 'send', text: 'first question', mentions: [], selections: [] });
+    await vi.waitFor(() => {
+      expect(ofType('user_message').length).toBe(1);
+    });
+
+    // The agent works, the next message waits in the queue.
+    state.receive?.({ type: 'send', text: 'second question', mentions: [], selections: [] });
+    await vi.waitFor(() => {
+      expect(ofType('queue').length).toBeGreaterThan(0);
+    });
+    const queue = ofType('queue').pop()!;
+    expect(queue.items).toHaveLength(1);
+    expect(queue.items[0]?.text).toBe('second question');
+    expect(queue.items[0]?.state).toBe('waiting');
+    // The request of the queue did not go out yet.
+    expect(ofType('user_message')).toHaveLength(1);
+
+    // The turn is over, the message of the queue goes out.
+    await vi.waitFor(() => {
+      expect(state.holdResponse).toBeDefined();
+    });
+    state.holdResponse?.();
+    await vi.waitFor(() => {
+      expect(ofType('user_message').length).toBe(2);
+    });
+    expect(ofType('user_message')[1]?.text).toBe('second question');
+    await vi.waitFor(() => {
+      const last = ofType('queue').pop()!;
+      expect(last.items[0]?.state).toBe('done');
+    });
+  });
+
+  it('removes a message from the queue', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.secrets.set('minimax.apiKey', 'test-key');
+    state.responses.push('HOLD');
+    await boot();
+
+    state.receive?.({ type: 'send', text: 'first question', mentions: [], selections: [] });
+    await vi.waitFor(() => {
+      expect(ofType('user_message').length).toBe(1);
+    });
+    state.receive?.({ type: 'send', text: 'second question', mentions: [], selections: [] });
+    await vi.waitFor(() => {
+      expect(ofType('queue').length).toBeGreaterThan(0);
+    });
+    const item = ofType('queue').pop()!.items[0]!;
+
+    state.receive?.({ type: 'remove_queued', id: item.id });
+    await vi.waitFor(() => {
+      expect(ofType('queue').pop()!.items).toHaveLength(0);
+    });
+
+    // The message of the queue does not go out.
+    await vi.waitFor(() => {
+      expect(state.holdResponse).toBeDefined();
+    });
+    state.holdResponse?.();
+    await vi.waitFor(() => {
+      expect(ofType('status').pop()?.state).toBe('idle');
+    });
+    expect(ofType('user_message')).toHaveLength(1);
+  });
+
+  it('sends every message of the queue', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.secrets.set('minimax.apiKey', 'test-key');
+    state.responses.push('HOLD', TEXT_SSE, TEXT_SSE);
+    await boot();
+
+    state.receive?.({ type: 'send', text: 'first question', mentions: [], selections: [] });
+    await vi.waitFor(() => {
+      expect(ofType('user_message').length).toBe(1);
+    });
+    state.receive?.({ type: 'send', text: 'second question', mentions: [], selections: [] });
+    state.receive?.({ type: 'send', text: 'third question', mentions: [], selections: [] });
+    await vi.waitFor(() => {
+      expect(ofType('queue').pop()!.items).toHaveLength(2);
+    });
+
+    state.receive?.({ type: 'send_all_queued' });
+    await vi.waitFor(() => {
+      expect(state.holdResponse).toBeDefined();
+    });
+    state.holdResponse?.();
+    // Both messages of the queue go out, one after another.
+    await vi.waitFor(() => {
+      expect(ofType('user_message').length).toBe(3);
+    });
+    expect(ofType('user_message').map((message) => message.text)).toEqual([
+      'first question',
+      'second question',
+      'third question'
+    ]);
+  });
+
   it('tells the panel which version is running', async () => {
     const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
     state.config.set('root', root);
@@ -1049,6 +1362,45 @@ describe('extension activation', () => {
       }>;
       expect(stored[0]?.uiMessages.length).toBe(400);
     });
+  });
+
+  it('gives the older part of the chat to the panel on demand', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.secrets.set('minimax.apiKey', 'test-key');
+    const messages = Array.from({ length: 200 }, (_, index) => ({
+      id: 'm' + index,
+      role: 'assistant' as const,
+      text: 'line ' + index
+    }));
+    state.globalState.set('minimax.sessions', [
+      {
+        id: 's-long',
+        title: 'Long chat',
+        updatedAt: 5,
+        messages: [],
+        uiMessages: messages,
+        usage: []
+      }
+    ]);
+    state.globalState.set('minimax.activeSession', 's-long');
+    await boot();
+
+    const init = ofType('init')[0]!;
+    // The panel gets the tail of the chat, the older part waits in the
+    // host: a big chat in one message is slow to transfer and to draw.
+    expect(init.state.messages).toHaveLength(120);
+    expect(init.state.olderMessages).toBe(80);
+
+    state.posted.length = 0;
+    state.receive?.({ type: 'load_older' });
+    await vi.waitFor(() => {
+      expect(ofType('history_older').length).toBe(1);
+    });
+    const page = ofType('history_older')[0]!;
+    expect(page.messages).toHaveLength(80);
+    expect(page.messages[0]?.id).toBe('m0');
+    expect(page.olderMessages).toBe(0);
   });
 
   it('never keeps an active session that the state of the host does not know', async () => {

@@ -51,7 +51,13 @@ export class StreamDecoder {
   private outputTokens = 0;
   private cacheReadTokens = 0;
   private cacheCreationTokens = 0;
-  private finished = false;
+  private done = false;
+
+  // The answer ended with the event of the server. A stream that stops in the
+  // middle is a broken connection, the client repeats the request.
+  get finished(): boolean {
+    return this.done;
+  }
 
   push(chunk: string): StreamEvent[] {
     this.buffer += chunk;
@@ -79,8 +85,8 @@ export class StreamDecoder {
         }
       }
     }
-    if (!this.finished) {
-      this.finished = true;
+    if (!this.done) {
+      this.done = true;
       out.push({
         type: 'message_stop',
         stopReason: this.stopReason,
@@ -160,13 +166,25 @@ export class StreamDecoder {
     }
 
     if (type === 'message_stop') {
-      this.finished = true;
+      this.done = true;
       return [
         {
           type: 'message_stop',
           stopReason: this.stopReason,
           usage: this.usage(),
           blocks: this.buildBlocks()
+        }
+      ];
+    }
+
+    if (type === 'error') {
+      // The server tells that it failed. The event used to fall through and
+      // the turn looked like a finished answer with no text.
+      const failure = payload['error'] as { message?: string } | undefined;
+      return [
+        {
+          type: 'stream_error',
+          message: failure?.message ?? 'MiniMax reported an error in the middle of the answer.'
         }
       ];
     }

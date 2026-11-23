@@ -2,7 +2,7 @@
   "name": "minimax-agent",
   "displayName": "MiniMax Agent",
   "description": "Coding agent for VS Code powered by MiniMax models",
-  "version": "0.13.4",
+  "version": "0.15.6",
   "publisher": "local",
   "license": "MIT",
   "engines": {
@@ -129,12 +129,14 @@
             "global",
             "china"
           ],
+          "scope": "application",
           "description": "API region. auto uses the global endpoint."
         },
         "minimax.customBaseUrl": {
           "type": "string",
           "default": "",
-          "description": "Custom base URL. Overrides the region preset when set."
+          "scope": "application",
+          "description": "Custom base URL. Overrides the region preset when set. Only https is accepted, the API key goes to this address."
         },
         "minimax.model": {
           "type": "string",
@@ -182,16 +184,67 @@
           "default": false,
           "description": "Collapses the code blocks of the answers. The header with the file name stays, the code opens on a click."
         },
+        "minimax.showToolSteps": {
+          "type": "boolean",
+          "default": true,
+          "description": "Shows the steps of the tools in the chat. The actions of one step stand under a header, the step is folded by default."
+        },
         "minimax.speechLanguage": {
           "type": "string",
           "default": "",
-          "enum": ["", "ru", "en", "uk", "de", "fr", "es", "it", "pt", "pl", "tr", "ar", "zh", "yue", "ja", "ko", "th", "vi", "id", "ms", "fil"],
-          "enumDescriptions": ["Auto: the model picks the dominant language", "Russian", "English", "Ukrainian", "German", "French", "Spanish", "Italian", "Portuguese", "Polish", "Turkish", "Arabic", "Chinese", "Cantonese", "Japanese", "Korean", "Thai", "Vietnamese", "Indonesian", "Malay", "Filipino"],
+          "enum": [
+            "",
+            "ru",
+            "en",
+            "uk",
+            "de",
+            "fr",
+            "es",
+            "it",
+            "pt",
+            "pl",
+            "tr",
+            "ar",
+            "zh",
+            "yue",
+            "ja",
+            "ko",
+            "th",
+            "vi",
+            "id",
+            "ms",
+            "fil"
+          ],
+          "enumDescriptions": [
+            "Auto: the model picks the dominant language",
+            "Russian",
+            "English",
+            "Ukrainian",
+            "German",
+            "French",
+            "Spanish",
+            "Italian",
+            "Portuguese",
+            "Polish",
+            "Turkish",
+            "Arabic",
+            "Chinese",
+            "Cantonese",
+            "Japanese",
+            "Korean",
+            "Thai",
+            "Vietnamese",
+            "Indonesian",
+            "Malay",
+            "Filipino"
+          ],
           "description": "The language of the voice input. A pinned language is more stable on short phrases and jargon."
         },
         "minimax.speechVocabulary": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "default": [],
           "description": "Foreign words of the voice input: names, brands, terms. A bare term (PreSonus) replaces a word that sounds like it, a pair (радиатор=Revelator) replaces the heard word exactly. The recognition writes such words in the letters of the spoken language."
         },
@@ -203,6 +256,7 @@
         "minimax.ffmpegPath": {
           "type": "string",
           "default": "ffmpeg",
+          "scope": "application",
           "description": "The ffmpeg that records the voice input. The webview of VS Code has no access to the microphone."
         },
         "minimax.fontSize": {
@@ -237,12 +291,21 @@
           "minimum": 1,
           "maximum": 200
         },
+        "minimax.maxRetries": {
+          "type": "number",
+          "default": 5,
+          "minimum": 0,
+          "maximum": 20,
+          "scope": "application",
+          "description": "How many times a request is repeated when the connection to MiniMax is lost. Zero turns the repeats off."
+        },
         "minimax.autoApprove": {
           "type": "array",
           "items": {
             "type": "string"
           },
           "default": [],
+          "scope": "application",
           "description": "Tool names approved without confirmation for the whole session."
         },
         "minimax.enableWebSearch": {

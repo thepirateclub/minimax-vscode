@@ -41,11 +41,11 @@ const TOOL_LINES: Array<{ name: string; line: string }> = [
   },
   {
     name: 'git_diff',
-    line: '- git_diff(staged?, ref?, paths?, context_lines?) - the changes as a diff'
+    line: '- git_diff(staged?, ref?, ref2?, stat?, name_only?, paths?, context_lines?, directory?) - the changes as a diff, ref and ref2 compare two commits, stat gives the summary, name_only gives the names of the files'
   },
   {
     name: 'git_log',
-    line: '- git_log(limit?, paths?, grep?) - the commits of the repository'
+    line: '- git_log(limit?, paths?, grep?, format?, oneline?) - the commits of the repository, the format picks the shape of a line: oneline, short, medium or full'
   },
   {
     name: 'git_show',
@@ -91,8 +91,56 @@ const TOOL_LINES: Array<{ name: string; line: string }> = [
       '- git_worktree_remove(path, force?) - remove a worktree'
   },
   {
+    name: 'git_merge',
+    line: '- git_merge(branch, no_ff?, no_commit?, message?) - merge a branch or a commit into the current branch'
+  },
+  {
+    name: 'git_tag',
+    line: '- git_tag(name, message?, ref?, force?) - create a tag on a commit, a mark of a release'
+  },
+  {
     name: 'run_terminal',
     line: '- run_terminal(command, cwd?, timeout_ms?) - run a shell command in the workspace root'
+  },
+  {
+    name: 'run_cmd',
+    line: '- run_cmd(command, cwd?, timeout_ms?) - run a command of the windows shell (cmd /c) in the workspace root'
+  },
+  {
+    name: 'repl_node',
+    line: '- repl_node(code, timeout_ms?, reset?) - run a piece of javascript in a node process that lives between the calls'
+  },
+  {
+    name: 'repl_python',
+    line: '- repl_python(code, timeout_ms?, reset?) - run a piece of python in an interpreter that lives between the calls'
+  },
+  {
+    name: 'container_list',
+    line: '- container_list() - the containers and the images of podman or docker'
+  },
+  {
+    name: 'container_logs',
+    line: '- container_logs(container, tail?) - the logs of a container'
+  },
+  {
+    name: 'container_run',
+    line: '- container_run(image, name?, command?) - run a container'
+  },
+  {
+    name: 'container_stop',
+    line: '- container_stop(container) - stop a container'
+  },
+  {
+    name: 'container_exec',
+    line: '- container_exec(container, command) - run a command inside a running container'
+  },
+  {
+    name: 'tasks_read',
+    line: '- tasks_read(file?) - read the file of the tasks of the project'
+  },
+  {
+    name: 'tasks_update',
+    line: '- tasks_update(action, task?, title?, id?, file?) - change the file of the tasks of the project: add, complete, close, update or remove a task'
   },
   {
     name: 'todo_write',
@@ -163,7 +211,8 @@ export function buildSystemPrompt(context: PromptContext): string {
     plan
       ? '- Answer with a concrete plan: name the files you would change and the exact edits, step by step. The user applies the plan after switching to code mode.'
       : '- Make the smallest change that solves the task. Prefer edit_file over write_file when only part of a file changes.',
-    '- Never run a git command in the terminal, the git tools do the same work and read the output of git in the code: git_status, git_diff, git_log, git_show, git_branch, git_blame, git_stage, git_commit, git_branch_create, git_checkout, git_worktree_list, git_worktree_add, git_worktree_remove.',
+    '- Never run a git command in the terminal, the git tools do the same work and read the output of git in the code: git_status, git_diff, git_log, git_show, git_branch, git_blame, git_stage, git_commit, git_branch_create, git_checkout, git_merge, git_tag, git_worktree_list, git_worktree_add, git_worktree_remove.',
+    '- When the work has more than one step, keep the tasks of the project in its file with tasks_update: add a task when the plan starts and mark it as done with the action complete when it is done. Update the status of the tasks as the work goes, not at the end of it. Use todo_write as well, it is the list of the session that the reader sees over the chat.',
     '- After a tool returns, use its output. Never guess the content of a file you have not read.',
     '- Report what you changed and what you verified. State plainly when something failed.',
     '- Answer in the language of the user request.',

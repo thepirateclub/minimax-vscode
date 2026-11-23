@@ -13,6 +13,7 @@ function toValues(settings: UiSettings): UiSettingsValues {
     mode: settings.mode,
     thinking: settings.thinking,
     maxIterations: settings.maxIterations,
+    maxRetries: settings.maxRetries,
     fontSize: settings.fontSize,
     historyMaxMessages: settings.historyMaxMessages,
     contextThreshold: settings.contextThreshold,
@@ -22,6 +23,7 @@ function toValues(settings: UiSettings): UiSettingsValues {
     enableWebSearch: settings.enableWebSearch,
     collapseTools: settings.collapseTools,
     collapseCode: settings.collapseCode,
+    showToolSteps: settings.showToolSteps,
     speechLanguage: settings.speechLanguage,
     microphone: settings.microphone
   };
@@ -234,6 +236,18 @@ export function SettingsView({
           />
         </label>
         <label className="field">
+          <span>{STRINGS.maxRetries}</span>
+          <input
+            type="number"
+            min={0}
+            max={20}
+            step={1}
+            value={values.maxRetries}
+            onChange={(event) => patch({ maxRetries: Number(event.target.value) })}
+          />
+          <span className="hint">{STRINGS.maxRetriesHint}</span>
+        </label>
+        <label className="field">
           <span>{STRINGS.historyMaxMessages}</span>
           <input
             type="number"
@@ -291,6 +305,15 @@ export function SettingsView({
           <span>{STRINGS.collapseCode}</span>
         </label>
         <p className="hint">{STRINGS.collapseCodeHint}</p>
+        <label className="checkbox">
+          <input
+            type="checkbox"
+            checked={values.showToolSteps}
+            onChange={(event) => patch({ showToolSteps: event.target.checked })}
+          />
+          <span>{STRINGS.showToolSteps}</span>
+        </label>
+        <p className="hint">{STRINGS.showToolStepsHint}</p>
       </section>
 
       <section className="settings-section">

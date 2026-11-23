@@ -1,5 +1,6 @@
 import { readFile, readdir, stat } from 'node:fs/promises';
 import { join, relative, sep } from 'node:path';
+import { resolveWorkspacePath } from '../paths';
 import { IGNORED_DIRS, isIgnoredName, isTextFile, TEXT_EXTENSIONS } from '../search/files';
 import { findInTree } from '../search/find';
 import type { ProjectSearch, SearchMode } from '../search/project';
@@ -53,7 +54,9 @@ async function pathKind(
     return undefined;
   }
   try {
-    const info = await stat(join(root, path));
+    // The path of the model must stay inside the workspace, the join of the
+    // paths normalizes the .. and the folder would be outside of it.
+    const info = await stat(resolveWorkspacePath(root, path));
     return info.isFile() ? 'file' : 'folder';
   } catch {
     return 'missing';
@@ -75,7 +78,19 @@ export function createExploreTools(options: ExploreOptions = {}): ToolEntry[] {
       }
     },
     async execute(input, ctx) {
-      const start = join(ctx.workspaceRoot, String(input['path'] ?? '.'));
+      // The path of the model must stay inside the workspace, the join of the
+      // paths normalizes the .. and the listing would walk out of it.
+      let start: string;
+      try {
+        start = resolveWorkspacePath(ctx.workspaceRoot, String(input['path'] ?? '.'));
+      } catch (error) {
+        return {
+          content:
+            'list_files failed: ' +
+            (error instanceof Error ? error.message : String(error)),
+          isError: true
+        };
+      }
       const depth = Math.min(5, Math.max(1, Number(input['depth'] ?? 2)));
       const lines: string[] = [];
       const walk = async (dir: string, level: number): Promise<void> => {
@@ -161,6 +176,20 @@ export function createExploreTools(options: ExploreOptions = {}): ToolEntry[] {
       );
       const mode = String(input['mode'] ?? 'auto') as SearchMode;
       const sub = input['path'] === undefined ? undefined : String(input['path']);
+      // The path of the model must stay inside the workspace, the join of the
+      // paths normalizes the .. and the search would read the files outside
+      // of it.
+      let searchRoot: string;
+      try {
+        searchRoot = resolveWorkspacePath(ctx.workspaceRoot, sub ?? '.');
+      } catch (error) {
+        return {
+          content:
+            'search_code failed: ' +
+            (error instanceof Error ? error.message : String(error)),
+          isError: true
+        };
+      }
 
       // A path that is not on the disk is named right away, the model asked
       // for a place that does not exist.
@@ -219,7 +248,7 @@ export function createExploreTools(options: ExploreOptions = {}): ToolEntry[] {
         return { content: lines.join('\n'), isError: false };
       }
 
-      const root = join(ctx.workspaceRoot, String(input['path'] ?? '.'));
+      const root = searchRoot;
       const results: string[] = [];
       const walk = async (dir: string): Promise<void> => {
         if (results.length >= limit) {

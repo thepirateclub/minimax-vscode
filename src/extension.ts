@@ -21,19 +21,26 @@ import type { GoalState, TodoItem } from './agent/state';
 import { budgetOver } from './agent/goalBudget';
 import { isAbortMessage, stopNotice } from './agent/stopReason';
 import { cutHistory, findRequestIndex, turnOfMessage, type TurnAnchor } from './agent/turns';
-import { AGENT_MODES, MODELS, resolveBaseUrl } from './config/models';
+import {
+  AGENT_MODES,
+  checkBaseUrl,
+  isOfficialBaseUrlHost,
+  MODELS,
+  resolveBaseUrl
+} from './config/models';
 import {
   clearApiKey as clearStoredApiKey,
   getApiKey,
   setApiKey
 } from './config/secrets';
 import { getSettings, onSettingsChanged, type MiniMaxSettings } from './config/settings';
+import { readChangedFiles } from './git/changes';
 import { collectStagedChanges, gitRepositories, setCommitMessage } from './git/scm';
 import { readRepositoryState, summarizeState } from './git/status';
 import { createLogger, type Logger } from './logger';
 import { ProjectSearch } from './search/project';
 import { InMemoryBackupStore } from './storage/backups';
-import { SessionStore, type StoredSession } from './storage/sessions';
+import { projectLabel, SessionStore, type StoredSession } from './storage/sessions';
 import { UsageLedger } from './storage/usage';
 import { createExploreTools, isTextFile } from './tools/explore';
 import { createFileTools, resolveWorkspacePath } from './tools/fs';
@@ -43,6 +50,10 @@ import { ToolRegistry } from './tools/registry';
 import { createGitTools } from './tools/git';
 import { createTerminalTools } from './tools/terminal';
 import { createTodoTools } from './tools/todo';
+import { createTaskFileTools } from './tools/tasks';
+import { createReplTools, resetReplProcesses } from './tools/repl';
+import { createContainerTools } from './tools/containers';
+import { createCmdTools } from './tools/cmd';
 import {
   CHILD_MAX_ITERATIONS,
   createTaskTools,
@@ -58,6 +69,7 @@ import {
   type ApprovalRequest
 } from './ui/approvals';
 import { fileErrorMessage } from './ui/fileError';
+import { historyPage, historyTail } from './ui/historyPage';
 import { AgentPanelProvider } from './ui/panel';
 import { themeKind } from './ui/theme';
 import { VoiceController } from './voice/controller';
@@ -65,6 +77,7 @@ import { Recorder } from './voice/recorder';
 import type {
   AgentState,
   ExtToWeb,
+  QueuedMessage,
   UiApproval,
   UiMessage,
   UiSelection,
@@ -82,8 +95,13 @@ interface RuntimeSession {
   id: string;
   title: string;
   updatedAt: number;
+  // The project of the chat: the root of the workspace it belongs to.
+  workspaceRoot: string;
   history: AnthropicMessage[];
   uiMessages: UiMessage[];
+  // Where the history of the panel starts in the messages of the session.
+  // The older messages wait in the host until the panel asks for them.
+  panelOffset: number | undefined;
   agent: AgentSession | undefined;
   busy: boolean;
   // The state of the dot: every chat keeps its own, the panel shows the
@@ -109,9 +127,21 @@ interface RuntimeSession {
   // child belongs to the chat of this session, it must not leak into
   // another chat.
   approvedTools: Set<string>;
+  // The messages the reader wrote while the agent worked. They go out one
+  // after another when the turn is over.
+  queue: QueuedMessage[];
+  // The queue waits until the reader asks for it: the user stopped the
+  // turn, the messages stay in the queue.
+  queuePaused: boolean;
+  // The user stopped the turn of this moment.
+  turnStopped: boolean;
+  // The reason of the last failure of the turn.
+  lastError: string | undefined;
 }
 
 const TITLE_LIMIT = 60;
+// How many messages wait in the queue of a chat.
+const MAX_QUEUE_ITEMS = 30;
 // How many actions the spend graph keeps in the header.
 const MAX_USAGE_TURNS = 24;
 
@@ -204,7 +234,11 @@ class MiniMaxController {
       ...createExploreTools({ search: (root) => this.searchFor(root) }),
       ...createGitTools(),
       ...createTerminalTools(),
+      ...createCmdTools(),
       ...createTodoTools(),
+      ...createTaskFileTools(),
+      ...createReplTools(),
+      ...createContainerTools(),
       ...createGoalTools(),
       ...createTaskTools({
         spawn: async (request, ctx, progress) =>
@@ -286,6 +320,7 @@ class MiniMaxController {
         settingsTimer = setTimeout(() => {
           settingsTimer = undefined;
           this.applySettings();
+          this.warnAboutTheBaseUrl();
           void this.sendInit();
         }, 100);
       })
@@ -586,6 +621,7 @@ class MiniMaxController {
       model: settings.model,
       maxTokens: model?.maxTokens ?? 65_536,
       maxIterations: settings.maxIterations,
+      maxRetries: settings.maxRetries,
       effort: this.effortFor(settings),
       mode: settings.mode,
       thinking: this.thinkingMode(settings),
@@ -906,6 +942,30 @@ class MiniMaxController {
       this.setState('thinking', runtime);
       return;
     }
+    if (event.type === 'assistant_reset') {
+      // The answer broke in the middle: the piece that came is not the
+      // answer. The request runs again and the new text takes its place.
+      for (let index = runtime.uiMessages.length - 1; index >= 0; index--) {
+        const message = runtime.uiMessages[index]!;
+        if (message.role === 'assistant' && !message.approval) {
+          message.text = '';
+          message.thinking = '';
+          break;
+        }
+      }
+      this.postFor(runtime, { type: 'assistant_reset' });
+      return;
+    }
+    if (event.type === 'retrying') {
+      // The connection to MiniMax is lost, the request is repeated. The
+      // panel shows the attempt and the reader knows the agent works.
+      this.postFor(runtime, {
+        type: 'retry_status',
+        status: { attempt: event.attempt, total: event.total, delayMs: event.delayMs }
+      });
+      this.setState('thinking');
+      return;
+    }
     if (event.type === 'tool_progress') {
       // The journal of the action: the lines that the tool writes while it
       // runs. They stay in the card of the action. The same id of a tool
@@ -967,6 +1027,13 @@ class MiniMaxController {
         runtime.todos = event.state.todos;
         this.postFor(runtime, { type: 'todos', todos: runtime.todos });
         this.persist(runtime);
+        // The tasks are done, the reader wants to see what changed.
+        if (
+          runtime.todos.length > 0 &&
+          runtime.todos.every((item) => item.status === 'completed')
+        ) {
+          void this.postSummary(runtime);
+        }
       }
       if (event.state?.kind === 'goal') {
         const goal = runtime.goal;
@@ -1037,6 +1104,8 @@ class MiniMaxController {
         // to get the goal with the time that was added.
         this.postFor(runtime, { type: 'goal', goal: { ...goal } });
       }
+      // The action is over, the reader sees the files it changed.
+      void this.postSummary(runtime);
       const notice = stopNotice(event.stopReason, getSettings().maxIterations, goal);
       if (notice) {
         this.postFor(runtime, { type: 'notice', message: notice.message, kind: notice.kind });
@@ -1045,10 +1114,13 @@ class MiniMaxController {
       this.setState('idle', runtime);
       // The turn is over, the time of the turn is not running anymore.
       runtime.turnStartedAt = 0;
+      // The repeats are over, the panel drops the status of the attempt.
+      this.postFor(runtime, { type: 'retry_status', status: undefined });
       return;
     }
     if (event.type === 'error') {
       runtime.errorReported = true;
+      runtime.lastError = event.message;
       // A turn that ended with an error has no event `done`, its time is
       // added here, otherwise the limit of the time is evaded by failing
       // turns.
@@ -1067,6 +1139,7 @@ class MiniMaxController {
       this.dropApprovalCards(runtime, false);
       if (isAbortMessage(event.message)) {
         // The user stopped the turn, it is not a failure of the server.
+        runtime.turnStopped = true;
         this.postFor(runtime, {
           type: 'notice',
           message: 'The request was stopped.',
@@ -1082,6 +1155,8 @@ class MiniMaxController {
       this.setState('error', runtime);
       // The turn is over, the time of the turn is not running anymore.
       runtime.turnStartedAt = 0;
+      // The repeats are over, the panel drops the status of the attempt.
+      this.postFor(runtime, { type: 'retry_status', status: undefined });
     }
   }
 
@@ -1224,13 +1299,40 @@ class MiniMaxController {
     }
   }
 
+  // The files of the working tree after the action. The panel shows them
+  // under the feed, the reader opens a file with a click.
+  private async postSummary(runtime: RuntimeSession): Promise<void> {
+    const files = await readChangedFiles(this.workspaceRoot());
+    if (files.length === 0) {
+      return;
+    }
+    this.postFor(runtime, { type: 'summary', files });
+  }
+
   private async handleWebviewMessage(message: WebToExt): Promise<void> {
     if (message.type === 'ready') {
-      await this.sendInit();
+      // The panel has just loaded, it holds nothing of the chat yet.
+      await this.sendInit(true);
+      return;
+    }
+    if (message.type === 'load_older') {
+      this.loadOlder();
       return;
     }
     if (message.type === 'send') {
       await this.handleSend(message.text, message.mentions, message.selections);
+      return;
+    }
+    if (message.type === 'send_queued') {
+      this.sendQueued(message.id);
+      return;
+    }
+    if (message.type === 'send_all_queued') {
+      this.sendAllQueued();
+      return;
+    }
+    if (message.type === 'remove_queued') {
+      this.removeQueued(message.id);
       return;
     }
     if (message.type === 'open_file') {
@@ -1371,6 +1473,8 @@ class MiniMaxController {
       runtime.todos = [];
       this.panel.post({ type: 'todos', todos: [] });
       this.persist(runtime);
+      // The tasks are cancelled, the reader sees what the work changed.
+      void this.postSummary(runtime);
       return;
     }
     if (message.type === 'clear_goal') {
@@ -1458,15 +1562,27 @@ class MiniMaxController {
       return;
     }
     if (runtime.busy) {
-      this.panel.post({
-        type: 'error',
-        message: 'The agent is busy. Stop the current turn before sending a new request.'
-      });
+      // The agent works, the request waits in the queue. The reader writes
+      // several messages in a row, they go out one after another.
+      this.enqueue(runtime, text, mentions, selections);
       return;
     }
+    // The reader wrote a new request, the queue is not on hold anymore.
+    runtime.queuePaused = false;
+    await this.runTurn(runtime, text, mentions, selections);
+  }
+
+  // One turn of the agent: the request goes out, the answer comes back.
+  private async runTurn(
+    runtime: RuntimeSession,
+    text: string,
+    mentions: string[],
+    selections: UiSelection[],
+    queued?: QueuedMessage
+  ): Promise<void> {
     // The turn is taken at once: the building of the agent takes a moment
     // and a second send in that window would start two turns on one
-    // history.
+    // history. The queue of the reader waits behind this flag.
     runtime.busy = true;
     // The budget of the goal is over, the request does not go out. The user
     // raises the limit and the work continues.
@@ -1485,15 +1601,27 @@ class MiniMaxController {
       // The request does not go out, it comes back to the input field, the
       // user does not lose it.
       this.panel.post({ type: 'restore_input', text, mentions, selections });
+      if (queued) {
+        queued.state = 'error';
+        queued.error = 'The budget of the goal is exhausted.';
+        this.postQueue(runtime);
+      }
       return;
     }
     const agent = await this.ensureAgent(runtime);
     if (!agent) {
       runtime.busy = false;
+      if (queued) {
+        queued.state = 'error';
+        queued.error = 'No API key, the request did not go out.';
+        this.postQueue(runtime);
+      }
       return;
     }
 
     runtime.errorReported = false;
+    runtime.turnStopped = false;
+    runtime.lastError = undefined;
     // The place of the request in the history of the model, the anchor
     // of the turn takes it when the turn is over.
     let requestPlace = -1;
@@ -1504,7 +1632,7 @@ class MiniMaxController {
       const firstLine = text.trim().split('\n')[0] ?? '';
       runtime.title = firstLine.slice(0, TITLE_LIMIT) || 'New chat';
     }
-    this.setState('thinking');
+    this.setState('thinking', runtime);
     runtime.turnStartedAt = Date.now();
 
     try {
@@ -1526,7 +1654,7 @@ class MiniMaxController {
       if (!runtime.errorReported) {
         const message = error instanceof Error ? error.message : String(error);
         this.panel.post({ type: 'error', message });
-        this.setState('error');
+        this.setState('error', runtime);
       }
     } finally {
       runtime.busy = false;
@@ -1539,9 +1667,140 @@ class MiniMaxController {
         mentions,
         selections
       });
+      if (queued) {
+        if (runtime.turnStopped) {
+          // The user stopped the turn, the message waits for the next
+          // command. The queue is on hold until the reader asks for it.
+          queued.state = 'waiting';
+          queued.error = undefined;
+          runtime.queuePaused = true;
+        } else if (runtime.errorReported) {
+          queued.state = 'error';
+          queued.error = runtime.lastError;
+        } else {
+          queued.state = 'done';
+        }
+        this.postQueue(runtime);
+      }
       this.persist(runtime);
       void this.refreshQuota();
+      // The next message of the queue goes out.
+      void this.pumpQueue(runtime);
     }
+  }
+
+  // One message of the queue goes out now, it goes before the others.
+  private sendQueued(id: string): void {
+    const runtime = this.activeSession();
+    if (!runtime) {
+      return;
+    }
+    const index = runtime.queue.findIndex((item) => item.id === id);
+    if (index === -1) {
+      return;
+    }
+    const item = runtime.queue[index]!;
+    if (item.state === 'sending') {
+      return;
+    }
+    item.state = 'waiting';
+    item.error = undefined;
+    runtime.queue.splice(index, 1);
+    runtime.queue.unshift(item);
+    runtime.queuePaused = false;
+    this.postQueue(runtime);
+    void this.pumpQueue(runtime);
+  }
+
+  // Every message of the queue goes out, the failed ones are tried again.
+  private sendAllQueued(): void {
+    const runtime = this.activeSession();
+    if (!runtime) {
+      return;
+    }
+    runtime.queuePaused = false;
+    for (const item of runtime.queue) {
+      if (item.state === 'error') {
+        item.state = 'waiting';
+        item.error = undefined;
+      }
+    }
+    this.postQueue(runtime);
+    void this.pumpQueue(runtime);
+  }
+
+  // A message leaves the queue. A message that goes out cannot be removed.
+  private removeQueued(id: string): void {
+    const runtime = this.activeSession();
+    if (!runtime) {
+      return;
+    }
+    const index = runtime.queue.findIndex((item) => item.id === id);
+    if (index === -1) {
+      return;
+    }
+    if (runtime.queue[index]!.state === 'sending') {
+      return;
+    }
+    runtime.queue.splice(index, 1);
+    this.postQueue(runtime);
+    this.persist(runtime);
+  }
+
+  // The message waits in the queue of the chat.
+  private enqueue(
+    runtime: RuntimeSession,
+    text: string,
+    mentions: string[],
+    selections: UiSelection[]
+  ): void {
+    runtime.queue.push({
+      id: this.nextId('q'),
+      text,
+      mentions,
+      selections,
+      state: 'waiting'
+    });
+    this.trimQueue(runtime);
+    this.postQueue(runtime);
+    this.persist(runtime);
+  }
+
+  // The queue does not grow forever: the sent messages leave it.
+  private trimQueue(runtime: RuntimeSession): void {
+    while (runtime.queue.length > MAX_QUEUE_ITEMS) {
+      const index = runtime.queue.findIndex((item) => item.state === 'done');
+      if (index === -1) {
+        return;
+      }
+      runtime.queue.splice(index, 1);
+    }
+  }
+
+  private postQueue(runtime: RuntimeSession): void {
+    this.postFor(runtime, {
+      type: 'queue',
+      items: runtime.queue.map((item) => ({
+        id: item.id,
+        text: item.text,
+        state: item.state,
+        error: item.error
+      }))
+    });
+  }
+
+  // The next message of the queue goes out, one after another.
+  private async pumpQueue(runtime: RuntimeSession): Promise<void> {
+    if (runtime.busy || runtime.queuePaused) {
+      return;
+    }
+    const next = runtime.queue.find((item) => item.state === 'waiting');
+    if (!next) {
+      return;
+    }
+    next.state = 'sending';
+    this.postQueue(runtime);
+    await this.runTurn(runtime, next.text, next.mentions, next.selections, next);
   }
 
   // The last message of the step tells how long the step took.
@@ -1614,7 +1873,7 @@ class MiniMaxController {
     runtime.todos = [];
     this.panel.post({ type: 'todos', todos: runtime.todos });
     // The panel gets a copy, the chat grows right after this line.
-    this.panel.post({ type: 'session_loaded', messages: [...runtime.uiMessages] });
+    this.postHistory(runtime);
     // The request comes back to the input field, the agent waits.
     this.panel.post({ type: 'restore_input', text, mentions, selections });
     this.persist(runtime);
@@ -1663,7 +1922,7 @@ class MiniMaxController {
     runtime.todos = [];
     this.panel.post({ type: 'todos', todos: runtime.todos });
     // The panel gets a copy, the chat grows right after this line.
-    this.panel.post({ type: 'session_loaded', messages: [...runtime.uiMessages] });
+    this.postHistory(runtime);
     await this.handleSend(turn.text, turn.mentions, turn.selections);
   }
 
@@ -1855,6 +2114,8 @@ class MiniMaxController {
       enableWebSearch: settings.enableWebSearch,
       collapseTools: settings.collapseTools,
       collapseCode: settings.collapseCode,
+      showToolSteps: settings.showToolSteps,
+      maxRetries: settings.maxRetries,
       speechLanguage: settings.speechLanguage,
       microphone: settings.microphone,
       hasApiKey: Boolean(key),
@@ -1865,14 +2126,28 @@ class MiniMaxController {
 
   private async saveSettings(values: UiSettingsValues): Promise<void> {
     const config = vscode.workspace.getConfiguration('minimax');
+    // The address of the API holds the key of the user, a wrong address is
+    // refused and the rest of the settings is saved.
+    let customBaseUrl = values.customBaseUrl;
+    if (typeof customBaseUrl === 'string' && customBaseUrl.trim().length > 0) {
+      const check = checkBaseUrl(customBaseUrl);
+      if (!check.ok) {
+        this.panel.post({
+          type: 'error',
+          message: 'The custom base URL is not accepted: ' + check.reason + '.'
+        });
+        customBaseUrl = '';
+      }
+    }
     const updates: Array<[string, unknown]> = [
       ['baseUrl', values.baseUrl],
-      ['customBaseUrl', values.customBaseUrl],
+      ['customBaseUrl', customBaseUrl],
       ['model', values.model],
       ['effort', values.effort],
       ['mode', values.mode],
       ['thinking', values.thinking],
       ['maxIterations', values.maxIterations],
+      ['maxRetries', values.maxRetries],
       ['fontSize', values.fontSize],
       ['historyMaxMessages', values.historyMaxMessages],
       ['contextThreshold', values.contextThreshold],
@@ -1882,6 +2157,7 @@ class MiniMaxController {
       ['enableWebSearch', values.enableWebSearch],
       ['collapseTools', values.collapseTools],
       ['collapseCode', values.collapseCode],
+      ['showToolSteps', values.showToolSteps],
       ['speechLanguage', values.speechLanguage],
       ['microphone', values.microphone]
     ];
@@ -1923,12 +2199,15 @@ class MiniMaxController {
       id: runtime.id,
       title: runtime.title,
       updatedAt: runtime.updatedAt,
+      workspaceRoot: runtime.workspaceRoot,
       messages: runtime.history,
       uiMessages: runtime.uiMessages,
       usage: runtime.usage,
       turns: runtime.turns,
       todos: runtime.todos,
-      goal: runtime.goal
+      goal: runtime.goal,
+      // The queue of the chat, it survives the reload of the panel.
+      queue: runtime.queue.map((item) => ({ ...item }))
     };
     // A full state of the host must not break the turn, the chat stays in
     // memory and the failure goes to the log.
@@ -1937,8 +2216,9 @@ class MiniMaxController {
         this.logger.error('the chat was not saved to the state of the host');
       } else if (this.activeSessionId === runtime.id) {
         // The id of the active session goes to the state of the host after
-        // the session itself. A lonely id would point to nothing.
-        this.store.setActiveId(runtime.id);
+        // the session itself. A lonely id would point to nothing. The id
+        // belongs to the project of the chat, every project keeps its own.
+        this.store.setActiveIdFor(runtime.workspaceRoot, runtime.id);
       }
       this.panel.post({ type: 'sessions', sessions: this.store.summaryList() });
     });
@@ -1953,12 +2233,16 @@ class MiniMaxController {
       id: runtime.id,
       title: runtime.title,
       updatedAt: Date.now(),
+      workspaceRoot: saved?.workspaceRoot ?? runtime.workspaceRoot,
       messages: saved?.messages ?? [],
       uiMessages: saved?.uiMessages ?? [],
       usage: saved?.usage ?? [],
       turns: saved?.turns ?? [],
       todos: runtime.todos,
-      goal: runtime.goal
+      goal: runtime.goal,
+      // The queue of памяти хозяина истина, в состоянии хоста она лежит
+      // вместе с остальным чатом.
+      queue: runtime.queue.map((item) => ({ ...item }))
     };
     void this.store.save(stored, getSettings().historyMaxMessages).then((ok) => {
       if (!ok) {
@@ -1979,8 +2263,12 @@ class MiniMaxController {
       id: stored.id,
       title: stored.title,
       updatedAt: stored.updatedAt,
+      // A chat of an older version does not know its project, the project
+      // that opens it takes it.
+      workspaceRoot: stored.workspaceRoot ?? this.workspaceRoot(),
       history: [...stored.messages],
       uiMessages: [...(stored.uiMessages ?? [])],
+      panelOffset: undefined,
       agent: undefined,
       busy: false,
       state: 'idle',
@@ -1997,22 +2285,36 @@ class MiniMaxController {
         ? { ...stored.goal, used: { ...stored.goal.used } }
         : undefined,
       turnStartedAt: 0,
-      approvedTools: new Set()
+      approvedTools: new Set(),
+      // A message that was going out when the panel closed waits again.
+      queue: (stored.queue ?? []).map((item) => ({
+        ...item,
+        state: item.state === 'sending' ? 'waiting' : item.state
+      })),
+      queuePaused: false,
+      turnStopped: false,
+      lastError: undefined
     };
   }
 
   startNewSession(): void {
+    // The processes of the repl belong to the chat, a new chat starts
+    // with clean ones.
+    resetReplProcesses();
     const current = this.activeSession();
     if (current) {
       this.persist(current);
     }
-    const id = 's-' + Date.now().toString(36);
+    const id = this.nextId('s');
     this.sessions.set(id, {
       id,
       title: 'New chat',
       updatedAt: Date.now(),
+      // A new chat belongs to the project that is open.
+      workspaceRoot: this.workspaceRoot(),
       history: [],
       uiMessages: [],
+      panelOffset: undefined,
       agent: undefined,
       busy: false,
       state: 'idle',
@@ -2023,7 +2325,11 @@ class MiniMaxController {
       todos: [],
       goal: undefined,
       turnStartedAt: 0,
-      approvedTools: new Set()
+      approvedTools: new Set(),
+      queue: [],
+      queuePaused: false,
+      turnStopped: false,
+      lastError: undefined
     });
     this.activeSessionId = id;
     // The id of the new chat goes to the state of the host together with the
@@ -2032,20 +2338,32 @@ class MiniMaxController {
     void this.sendInit();
   }
 
-  // The last chat is opened again after a restart, an empty panel would hide
-  // the work of the previous session.
+  // The chat of the project is opened again after a restart, an empty panel
+  // would hide the work of the previous session. Every project keeps its own
+  // chat: the chats of another project stay in the list, they are not shown
+  // by default.
   restoreSession(): void {
-    const activeId = this.store.activeId();
-    const active = activeId ? this.store.get(activeId) : undefined;
-    const stored = active ?? this.store.list()[0];
+    const root = this.workspaceRoot();
+    // The chats of an older version do not know their project, this one
+    // takes them.
+    const list = this.store.claimUnbound(root);
+    const activeId = this.store.activeIdFor(root);
+    const active = activeId ? list.find((session) => session.id === activeId) : undefined;
+    // The chat that was open in the project, otherwise the newest chat of
+    // the project. A chat of another project is not opened here.
+    const stored =
+      active && (active.workspaceRoot === root || active.workspaceRoot === undefined)
+        ? active
+        : list.find((session) => session.workspaceRoot === root);
     if (!stored) {
+      // The project has no chats, a new one starts.
       this.startNewSession();
       return;
     }
     const runtime = this.runtimeFrom(stored);
     this.sessions.set(runtime.id, runtime);
     this.activeSessionId = runtime.id;
-    this.store.setActiveId(runtime.id);
+    this.store.setActiveIdFor(root, runtime.id);
     this.setState('idle');
     void this.sendInit();
   }
@@ -2065,12 +2383,14 @@ class MiniMaxController {
       this.sessions.set(id, runtime);
     }
     this.activeSessionId = id;
-    this.store.setActiveId(id);
+    // The chat that is open belongs to the project of the panel, every
+    // project remembers its own.
+    this.store.setActiveIdFor(this.workspaceRoot(), id);
     // The opened chat brings its own state: a chat that runs in the
     // background is busy and its stop button has to stand in the field,
     // otherwise the busy chat looks idle and cannot be stopped.
     this.setState(runtime.state);
-    this.panel.post({ type: 'session_loaded', messages: runtime.uiMessages });
+    this.postHistory(runtime);
     void this.sendInit();
   }
 
@@ -2093,28 +2413,89 @@ class MiniMaxController {
       }
     }
     this.store.remove(id);
+    // The removed chat is not the open one of any project.
+    this.store.clearActiveId(id);
     this.sessions.delete(id);
     if (this.activeSessionId === id) {
       this.activeSessionId = undefined;
       // The removed chat must not stay active, its id would point to nothing
       // after a restart.
-      this.store.setActiveId(undefined);
+      this.store.setActiveIdFor(this.workspaceRoot(), undefined);
       this.startNewSession();
       return;
     }
     void this.sendInit();
   }
 
-  private async sendInit(): Promise<void> {
+  // The part of the history the panel holds. The host keeps the whole
+  // history, the panel asks for the older part when the reader wants to
+  // see it. A panel that has just loaded holds nothing of the chat, the
+  // tail of the chat goes to it.
+  private panelHistory(
+    runtime: RuntimeSession | undefined,
+    reset: boolean
+  ): { messages: UiMessage[]; olderMessages: number } {
+    if (!runtime) {
+      return { messages: [], olderMessages: 0 };
+    }
+    if (!reset && runtime.panelOffset !== undefined) {
+      const start = Math.max(
+        0,
+        Math.min(runtime.panelOffset, runtime.uiMessages.length)
+      );
+      return { messages: runtime.uiMessages.slice(start), olderMessages: start };
+    }
+    const tail = historyTail(runtime.uiMessages);
+    runtime.panelOffset = tail.offset;
+    return { messages: tail.messages, olderMessages: tail.offset };
+  }
+
+  // The chat of the panel goes to it in one part: the tail of the chat,
+  // the older part waits in the host until the reader asks for it.
+  private postHistory(runtime: RuntimeSession): void {
+    const tail = historyTail(runtime.uiMessages);
+    runtime.panelOffset = tail.offset;
+    this.panel.post({
+      type: 'session_loaded',
+      messages: tail.messages,
+      olderMessages: tail.offset
+    });
+  }
+
+  // The panel asks for the older part of the chat. The host keeps it, the
+  // panel gets one more part.
+  private loadOlder(): void {
+    const runtime = this.activeSession();
+    if (!runtime) {
+      return;
+    }
+    const page = historyPage(runtime.uiMessages, runtime.panelOffset ?? 0);
+    runtime.panelOffset = page.offset;
+    this.panel.post({
+      type: 'history_older',
+      messages: page.messages,
+      olderMessages: page.offset
+    });
+  }
+
+  private async sendInit(reset = false): Promise<void> {
     const settings = getSettings();
     const key = await getApiKey(this.context.secrets);
     const runtime = this.activeSession();
+    // The history goes to the panel in parts: the panel holds the last part
+    // of it, the older part waits for the request of the reader.
+    const history = this.panelHistory(runtime, reset);
     this.panel.post({
       type: 'init',
       state: {
         sessions: this.store.summaryList(),
         activeSessionId: this.activeSessionId,
-        messages: runtime ? [...runtime.uiMessages] : [],
+        // The project of the panel: the list of the chats belongs to it.
+        workspaceRoot: this.workspaceRoot(),
+        workspaceLabel: projectLabel(this.workspaceRoot()),
+        messages: history.messages,
+        // How many messages of the chat wait in the host.
+        olderMessages: history.olderMessages,
         model: settings.model,
         models: MODELS,
         effort: settings.effort,
@@ -2125,11 +2506,24 @@ class MiniMaxController {
         usage: runtime ? [...runtime.usage] : [],
         todos: runtime ? [...runtime.todos] : [],
         goal: runtime?.goal,
+        // The queue of the chat survives the reload of the panel.
+        queue: runtime
+          ? runtime.queue.map((item) => ({
+              id: item.id,
+              text: item.text,
+              state: item.state,
+              error: item.error
+            }))
+          : [],
         hasApiKey: Boolean(key),
         theme: themeKind(),
         fontSize: settings.fontSize,
         collapseTools: settings.collapseTools,
         collapseCode: settings.collapseCode,
+        showToolSteps: settings.showToolSteps,
+        // The summary of the files lives in the panel only, the host
+        // sends it again after the next action.
+        summary: [],
         // The version comes from the manifest, the webview does not know it.
         version: this.context.extension?.packageJSON?.version ?? ''
       }
@@ -2243,12 +2637,53 @@ class MiniMaxController {
       if (!url || url.trim().length === 0) {
         return;
       }
-      await config.update('customBaseUrl', url.trim(), vscode.ConfigurationTarget.Global);
+      const trimmed = url.trim();
+      const check = checkBaseUrl(trimmed);
+      if (!check.ok) {
+        void vscode.window.showErrorMessage(
+          'MiniMax: the endpoint is not accepted, ' + check.reason + '.'
+        );
+        return;
+      }
+      // The key of the user goes to this host, the address of MiniMax is the
+      // usual one and another host is asked about.
+      if (!isOfficialBaseUrlHost(check.host ?? '')) {
+        const answer = await vscode.window.showWarningMessage(
+          'MiniMax: the API key will go to ' +
+            check.host +
+            '. It is not the address of MiniMax.',
+          { modal: true },
+          'Use it'
+        );
+        if (answer !== 'Use it') {
+          return;
+        }
+      }
+      await config.update('customBaseUrl', trimmed, vscode.ConfigurationTarget.Global);
       await config.update('baseUrl', 'auto', vscode.ConfigurationTarget.Global);
     } else {
       await config.update('baseUrl', choice.value, vscode.ConfigurationTarget.Global);
     }
     await this.sendInit();
+  }
+
+  // The address of the API can be wrong in the settings of the user, the
+  // official endpoint is used then and the user is told about it.
+  private warnAboutTheBaseUrl(): void {
+    const custom = getSettings().customBaseUrl.trim();
+    if (custom.length === 0) {
+      return;
+    }
+    const check = checkBaseUrl(custom);
+    if (check.ok) {
+      return;
+    }
+    this.logger.error('the custom base URL is not accepted: ' + check.reason);
+    void vscode.window.showWarningMessage(
+      'MiniMax: the custom base URL is not accepted, ' +
+        check.reason +
+        '. The official endpoint is used.'
+    );
   }
 
   private async selectModel(): Promise<void> {

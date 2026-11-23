@@ -97,6 +97,10 @@ body {
   --ok: var(--vscode-testing-iconPassed, #3fb950);
   --err: var(--vscode-testing-iconFailed, #f14c4c);
   --warn: var(--vscode-inputValidation-warningBorder, #cca700);
+  /* the arrows of the priority of a task, the colors of the theme */
+  --prio-low: var(--vscode-charts-blue, #4daafc);
+  --prio-medium: var(--vscode-charts-yellow, #cca700);
+  --prio-high: var(--vscode-charts-red, #f14c4c);
   --hover: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.16));
   --row-hover: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.12));
   --selected: var(--vscode-list-activeSelectionBackground, rgba(128, 128, 128, 0.24));
@@ -507,14 +511,30 @@ input:focus {
   flex: 1 1 auto;
 }
 
+/* The priority of a task is an arrow of jira. The color of the arrow
+   comes from the theme of the host. */
 .task-priority {
   flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
   color: var(--muted);
   font-size: var(--fs-xs);
 }
 
-.task-high .task-priority {
-  color: var(--warn);
+.task-priority-low {
+  color: var(--prio-low);
+}
+
+.task-priority-medium {
+  color: var(--prio-medium);
+}
+
+.task-priority-high {
+  color: var(--prio-high);
+}
+
+.task-priority-very_high {
+  color: var(--prio-high);
 }
 
 /* the note of the model on the card of update_goal */
@@ -899,21 +919,136 @@ input:focus {
 /* thinking */
 .thinking-toggle {
   appearance: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  background: transparent;
-  border: none;
-  color: var(--muted);
-  cursor: pointer;
-  font-size: var(--fs-sm);
-  padding: 0;
 }
 
-.thinking-toggle:hover,
+/* The head of a folding section. The chevron, the icon and the title
+   stand on the left, the preview of the section takes the free middle of the
+   row, the counter stands on the right edge. The rows of the chat read as
+   one column: the icon of the reasoning used to stand 12 pixels left of the
+   icon of the actions and the counter hung in the margin. The row has one
+   height for every section: 18 pixels of the line and 2 pixels of the
+   padding above and below. */
+.section-head {
+  display: grid;
+  grid-template-columns: 14px 14px auto minmax(0, 1fr) auto;
+  align-items: baseline;
+  column-gap: 6px;
+  width: 100%;
+  min-height: var(--control-h);
+  padding: 2px 0;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  line-height: 18px;
+  text-align: left;
+}
+
+/* The name of the section and the marks of it open the section. The title
+   keeps its place: the preview stands in the free middle of the row, the
+   title does not move when the preview appears. */
+.section-toggle {
+  display: grid;
+  grid-template-columns: 14px 14px auto;
+  align-items: baseline;
+  column-gap: 6px;
+  grid-column: 1 / 4;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* The preview of a folded section: one italic line that says what the
+   section holds. It stands in the middle of the head, the ellipsis cuts it
+   when the line does not fit, and a click on it opens the section. */
+.section-preview {
+  grid-column: 4;
+  display: block;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: var(--fs-sm);
+  font-style: italic;
+  line-height: 18px;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* The text of the preview is one line: the ellipsis cuts it when the row
+   does not have room for it. */
+.section-preview-text {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The row of the head is one surface: the name of the section and the
+   preview of it open the section, the whole row answers the mouse. */
+.section-head:hover {
+  background: var(--row-hover);
+}
+
+.section-toggle:hover,
+.section-preview:hover {
+  color: var(--fg);
+}
+
+/* The words of the head and the counter stand on one baseline: the counter
+   is a number of a smaller font, it hung above the title without it. */
+.section-title {
+  align-self: baseline;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The chevron and the icon are marks, not words: they stand in the middle
+   of the row, not on the baseline of the title. */
+.section-toggle .chevron {
+  align-self: center;
+}
+
+.section-toggle .section-icon {
+  align-self: center;
+}
+
+.section-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* The head of a section is a quiet row, not a button of the panel. The
+   general rule of the buttons paints it with the fill of the primary button
+   on hover, the row keeps the plate of the rows of the list. */
+.thinking-toggle:hover {
+  color: var(--fg);
+  background: var(--row-hover);
+}
+
 .thinking-toggle:hover .chevron {
   color: var(--fg);
   background: transparent;
+}
+
+/* Two thoughts in a row are two steps of the reasoning. A thin line
+   between them keeps them apart: without it they melted into one block. */
+.thinking-repeated {
+  border-top: 1px solid var(--border);
+  padding-top: 6px;
 }
 
 .thinking-body {
@@ -1430,6 +1565,134 @@ input:focus {
 .term-line-note {
   color: var(--muted);
   font-style: italic;
+}
+
+/* The status of the request that is repeated after the loss of the
+   connection. It stands above the field, the reader sees it at once. */
+.composer-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 2px 6px;
+  font-size: var(--fs-sm);
+  color: var(--warn);
+}
+
+.composer-status-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The queue of the messages of the chat. A compact strip over the field
+   of the request: every message has its state. */
+.queue-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+}
+
+.queue-items {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 84px;
+  overflow-y: auto;
+}
+
+.queue-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 2px 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--row-hover);
+  font-size: var(--fs-xs);
+}
+
+.queue-item.queue-error {
+  border-color: var(--err);
+}
+
+.queue-item.queue-done {
+  opacity: 0.6;
+}
+
+.queue-state {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  color: var(--muted);
+}
+
+.queue-item.queue-sending .queue-state {
+  color: var(--accent);
+}
+
+.queue-item.queue-error .queue-state {
+  color: var(--err);
+}
+
+.queue-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.queue-send,
+.queue-remove {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  padding: 2px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.queue-send:hover,
+.queue-remove:hover {
+  color: var(--fg);
+  background: var(--hover);
+}
+
+.queue-send:disabled,
+.queue-remove:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.queue-send-all {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--fg);
+  font-size: var(--fs-xs);
+  cursor: pointer;
+}
+
+.queue-send-all:hover {
+  background: var(--hover);
 }
 
 /* composer */
@@ -2232,6 +2495,43 @@ html {
   background: var(--row-hover);
 }
 
+/* the scope of the list: the chats of the project or the chats of every
+   project */
+.session-scope {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  text-align: left;
+  cursor: pointer;
+}
+
+.session-scope:hover {
+  background: var(--row-hover);
+  color: var(--fg);
+}
+
+.session-scope.active {
+  color: var(--accent);
+}
+
+.session-scope-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* the project of the chat, it shows in the list of every chat */
+.session-project {
+  color: var(--muted);
+  font-size: var(--fs-xs);
+}
+
 .session-empty {
   padding: 6px 8px;
   color: var(--muted);
@@ -2621,4 +2921,159 @@ html {
 
 .tok-remove {
   color: var(--tok-remove);
+}
+
+
+/* the icon of the panel of the reasoning */
+.thinking-icon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--muted);
+}
+
+/* The glyph of the sparkles of lucide is taller than the words of the title:
+   its ink ends two pixels under the baseline of the text, the icon of the
+   actions ends on the baseline. The icon of the reasoning is lifted, so the
+   icons of the sections end on one line. */
+.thinking-icon .icon {
+  transform: translateY(-1.5px);
+}
+
+/* the actions of one step of the agent, the step is folded by default.
+   The head of the step stands on the left edge of the answer, the cards of
+   the step keep their own chevron on the same edge. */
+.tool-steps {
+  margin: 2px 0 0;
+}
+
+.tool-steps-icon {
+  color: var(--muted);
+}
+
+/* The counter of the group stands on the right edge of the head, on the
+   baseline of the title. */
+.tool-steps-count {
+  grid-column: 5;
+  align-self: baseline;
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.tool-steps-body {
+  padding: 2px 0 4px;
+}
+
+.tool-steps-failed .tool-steps-head {
+  color: var(--err);
+}
+
+/* the files that the last action changed */
+.summary-bar {
+  flex: 0 0 auto;
+  margin: 4px 12px 0;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--fg);
+  font-size: var(--fs-sm);
+}
+
+.summary-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.summary-icon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--muted);
+}
+
+.summary-title {
+  flex: 1 1 auto;
+}
+
+.summary-count {
+  color: var(--muted);
+  font-size: var(--fs-xs);
+}
+
+.summary-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.summary-clear:hover {
+  color: var(--fg);
+}
+
+.summary-files {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  max-height: 160px;
+  overflow: auto;
+}
+
+.summary-file {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 2px 0;
+  border: none;
+  background: none;
+  color: var(--fg);
+  font-size: var(--fs-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.summary-file:hover {
+  background: var(--row-hover);
+}
+
+.summary-badge {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-sm);
+  color: var(--bg);
+  background: var(--muted);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  line-height: 14px;
+  text-align: center;
+}
+
+.summary-badge-added {
+  background: var(--ok);
+}
+
+.summary-badge-modified {
+  background: var(--muted);
+}
+
+.summary-badge-deleted {
+  background: var(--err);
+}
+
+.summary-badge-renamed {
+  background: var(--warn);
+}
+
+.summary-name {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

@@ -1,6 +1,6 @@
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { ProjectSearch } from '../../src/search/project';
 import { createExploreTools } from '../../src/tools/explore';
@@ -132,6 +132,32 @@ describe('explore tools', () => {
     expect(strict.content).toContain('No matches');
     const loose = await tool!.execute({ query: 'hp', ignore_case: true }, makeContext(root));
     expect(loose.content).toContain('const HP');
+  });
+
+  it('refuses a path outside the workspace in list_files', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-'));
+    const outside = await mkdtemp(join(tmpdir(), 'mm-outside-'));
+    await writeFile(join(outside, 'creds.txt'), 'TOKEN=abc123\n', 'utf8');
+    const tool = createExploreTools().find((t) => t.name === 'list_files');
+    const result = await tool!.execute(
+      { path: join('..', basename(outside)) },
+      makeContext(root)
+    );
+    expect(result.isError).toBe(true);
+    expect(result.content).not.toContain('creds.txt');
+  });
+
+  it('refuses a path outside the workspace in search_code', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-'));
+    const outside = await mkdtemp(join(tmpdir(), 'mm-outside-'));
+    await writeFile(join(outside, 'creds.txt'), 'TOKEN=abc123\n', 'utf8');
+    const tool = createExploreTools().find((t) => t.name === 'search_code');
+    const result = await tool!.execute(
+      { query: 'TOKEN', path: join('..', basename(outside)) },
+      makeContext(root)
+    );
+    expect(result.isError).toBe(true);
+    expect(result.content).not.toContain('TOKEN=abc123');
   });
 
   it('reports a path that does not exist', async () => {

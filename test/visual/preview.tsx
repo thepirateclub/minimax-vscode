@@ -10,7 +10,17 @@ import { MODELS } from '../../src/config/models';
 // panel and never falls behind the build.
 import manifest from '../../package.json';
 import type { ExtToWeb, UiSettings, UiState } from '../../src/ui/protocol';
-import { MESSAGES, USAGE, sessions } from './fixture';
+import {
+  MESSAGES,
+  PREVIEW_MESSAGES,
+  RETRY_MESSAGES,
+  RETRY_PAGE,
+  RETRY_TAIL,
+  SECTIONS,
+  SECTIONS_STEPS,
+  USAGE,
+  sessions
+} from './fixture';
 import dark from './themes/dark.json';
 import light from './themes/light.json';
 
@@ -43,13 +53,40 @@ document.head.appendChild(styleElement);
 const STATE: UiState = {
   sessions: sessions(Date.now()),
   activeSessionId: 's1',
-  messages: params.get('empty') === '1' ? [] : MESSAGES,
+  // The project of the stand: the list of the chats belongs to it.
+  workspaceRoot: 'C:/projects/minimax-vscode',
+  workspaceLabel: 'minimax-vscode',
+  // The queue of the chat, the stand shows it above the field.
+  queue: params.get('queue') === '1'
+    ? [
+        { id: 'q1', text: 'Read the parser and tell me what it does', state: 'done' as const },
+        { id: 'q2', text: 'Then add the tests for it', state: 'waiting' as const }
+      ]
+    : [],
+  olderMessages: params.get('retry') === '1' ? RETRY_MESSAGES.length - RETRY_PAGE : 0,
+  // ?sections=1 shows the chat with the folding sections: the heads of the
+  // sections have to stand on one grid. ?steps=1 shows the steps of the work:
+  // the group of the actions ends at the thought of the model.
+  messages:
+    params.get('empty') === '1'
+      ? []
+      : params.get('retry') === '1'
+        ? RETRY_TAIL
+        : params.get('preview') === '1'
+          ? PREVIEW_MESSAGES
+          : params.get('sections') === '1'
+          ? SECTIONS
+          : params.get('steps') === '1'
+            ? SECTIONS_STEPS
+            : MESSAGES,
   model: MODELS[0]!.id,
   models: MODELS,
   effort: 'max',
   mode: 'code',
   thinking: false,
-  state: busy ? 'streaming' : 'idle',
+  // The chat of the steps of the work holds a running action, the panel
+  // works and the status over the field stands.
+  state: busy || params.get('steps') === '1' ? 'streaming' : 'idle',
   tokens: 184_320,
   usage: USAGE,
   hasApiKey: params.get('nokey') !== '1',
@@ -57,6 +94,16 @@ const STATE: UiState = {
   fontSize: 13,
   collapseTools: params.get('collapse') === '1',
   collapseCode: params.get('collapse') === '1',
+  showToolSteps: params.get('steps') !== '0',
+  // The files of the last action, the panel shows them under the feed.
+  summary:
+    params.get('summary') === '1'
+      ? [
+          { path: 'src/ui/webview/components/SummaryBar.tsx', status: 'added' as const },
+          { path: 'src/ui/webview/styles.css', status: 'modified' as const },
+          { path: 'src/old/file.ts', status: 'deleted' as const }
+        ]
+      : [],
   version: manifest.version,
   // The widgets over the feed: ?goal=1 shows the goal and the tasks.
   todos:
@@ -87,7 +134,9 @@ const SETTINGS: UiSettings = {
   mode: 'code',
   thinking: false,
   maxIterations: 25,
+  maxRetries: 5,
   fontSize: 13,
+  showToolSteps: true,
   historyMaxMessages: 200,
   contextThreshold: 50,
   semanticSearch: false,
@@ -134,6 +183,34 @@ const vscode = {
     // The host drops the tasks, the stand does the same.
     if (message.type === 'clear_todos') {
       post({ type: 'todos', todos: [] });
+    }
+    // The host runs the request again: the messages of the failed turn go
+    // away, the request comes back and the answer of the model follows.
+    if (message.type === 'retry') {
+      const id = (message as { type: 'retry'; id: string }).id;
+      const index = RETRY_MESSAGES.findIndex((item) => item.id === id);
+      if (index === -1) {
+        // The chat of the stand does not hold this request.
+        return;
+      }
+      const text = RETRY_MESSAGES[index]?.text ?? '';
+      // The host cuts the history before the request and sends the tail of
+      // it: the panel holds the same number of messages as before, the
+      // history under the reader is another one.
+      const cut = RETRY_MESSAGES.slice(0, index);
+      post({
+        type: 'session_loaded',
+        messages: cut.slice(-RETRY_PAGE),
+        olderMessages: Math.max(0, cut.length - RETRY_PAGE)
+      });
+      post({ type: 'user_message', id: id + '-again', text });
+      post({ type: 'assistant_start', id: id + '-answer' });
+      window.setTimeout(() => {
+        post({
+          type: 'text_delta',
+          text: 'The tests run now. The failure was in the helper of the round of the token count.'
+        });
+      }, 150);
     }
     if (message.type === 'request_settings') {
       post({ type: 'settings', settings: SETTINGS });

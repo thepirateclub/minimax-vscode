@@ -161,6 +161,158 @@ export const MESSAGES: UiMessage[] = [
   }
 ];
 
+
+// The chat of the folding sections: an answer, a step of the actions and three
+// turns of the reasoning one after another. The stand shows it under
+// ?sections=1, it is the case where the heads of the sections drifted apart.
+export const SECTIONS: UiMessage[] = [
+  { id: 's-u1', role: 'user', text: 'Перенеси хранилище на SQLite и проверь, как устроен сервер.' },
+  {
+    id: 's-a1',
+    role: 'assistant',
+    text: 'Принято: v1 остаётся рабочей веткой, main не трогаю. Теперь перевожу хранилище на SQLite.'
+  },
+  ...Array.from({ length: 11 }, (_, i) => ({
+    id: 's-t' + i,
+    role: 'tool' as const,
+    tool: {
+      id: 's-t' + i,
+      name: 'read_file',
+      input: { path: 'src/storage/sessions.ts' },
+      content: 'export function read(): Session[] { return []; }',
+      durationMs: 4
+    }
+  })),
+  { id: 's-th1', role: 'assistant', thinking: 'First turn of the reasoning.' },
+  { id: 's-th2', role: 'assistant', thinking: 'Second turn of the reasoning.' },
+  { id: 's-th3', role: 'assistant', thinking: 'Third turn of the reasoning.' }
+];
+
+// The chat of the steps of the work: actions, a thought, actions again.
+// The stand shows it under ?steps=1, the group of the actions has to end at
+// the thought of the model.
+export const SECTIONS_STEPS: UiMessage[] = [
+  { id: 'w-u1', role: 'user', text: 'Перенеси хранилище на SQLite и проверь, как устроен сервер.' },
+  {
+    id: 'w-a1',
+    role: 'assistant',
+    text: 'Принято: v1 остаётся рабочей веткой, main не трогаю. Сначала посмотрю, как устроен сервер.'
+  },
+  ...Array.from({ length: 3 }, (_, i) => ({
+    id: 'w-t' + i,
+    role: 'tool' as const,
+    tool: {
+      id: 'w-t' + i,
+      name: 'read_file',
+      input: { path: 'src/storage/sessions.ts' },
+      content: 'export function read(): Session[] { return []; }',
+      durationMs: 4
+    }
+  })),
+  { id: 'w-th1', role: 'assistant', thinking: 'The server keeps the chats in the state of the editor.' },
+  ...Array.from({ length: 2 }, (_, i) => ({
+    id: 'w-u' + i,
+    role: 'tool' as const,
+    tool: {
+      id: 'w-u' + i,
+      name: 'search_code',
+      input: { query: 'sessions' },
+      content: 'src/storage/sessions.ts:12',
+      durationMs: 18
+    }
+  })),
+  {
+    id: 'w-run',
+    role: 'tool',
+    tool: {
+      id: 'w-run',
+      name: 'git_diff',
+      input: { staged: false },
+      content: 'diff --git a/src/storage/sessions.ts b/src/storage/sessions.ts',
+      running: true
+    }
+  },
+  { id: 'w-th2', role: 'assistant', thinking: 'The change touches the storage of the chats.' }
+];
+
+// The chat of the repeat of a request: one turn in the middle of the chat
+// failed, so the panel shows the button of the repeat at that request. The
+// chat is long enough to scroll and the reader has to scroll up to the old
+// failure to press the button.
+export const RETRY_MESSAGES: UiMessage[] = Array.from({ length: 100 }, (_, i) => {
+  const turn: UiMessage[] = [
+    {
+      id: 'r-u' + i,
+      role: 'user',
+      text: 'Request ' + (i + 1) + ': check the module and tell me what is wrong in it.'
+    },
+    {
+      id: 'r-a' + i,
+      role: 'assistant',
+      text:
+        'Answer ' +
+        (i + 1) +
+        ': the module reads the file and returns the result. ' +
+        'The check of the details of the work. '.repeat(6)
+    }
+  ];
+  if (i === 70) {
+    turn.push({
+      id: 'r-err',
+      role: 'notice',
+      kind: 'error' as const,
+      text: 'The request failed: 500 Internal Server Error'
+    });
+  }
+  return turn;
+}).flat();
+
+// The panel holds the tail of the chat, the older part waits in the host.
+// The repeat of a request brings another tail of the same size, so the
+// panel does not see the change by the number of the messages.
+export const RETRY_PAGE = 120;
+export const RETRY_TAIL: UiMessage[] = RETRY_MESSAGES.slice(-RETRY_PAGE);
+
+// The chat of the previews of the sections: a long reasoning and a group of
+// actions. The folded sections show one line of them, the reader opens the
+// section by a click.
+export const PREVIEW_MESSAGES: UiMessage[] = [
+  {
+    id: 'p-u1',
+    role: 'user',
+    text: 'Перенеси хранилище на SQLite и проверь, как устроен сервер.'
+  },
+  {
+    id: 'p-a1',
+    role: 'assistant',
+    thinking:
+      'The user wants the storage on SQLite. I look at the server first: the chats live in the state of the editor and the store writes them down. Then I read the module of the sessions and the way the panel shows them. The change touches the storage of the chats and the server that keeps them.',
+    text: 'Принято: v1 остаётся рабочей веткой, main не трогаю. Теперь переношу хранилище.'
+  },
+  {
+    id: 'p-t1',
+    role: 'tool',
+    tool: {
+      id: 'p-t1',
+      name: 'read_file',
+      input: { path: 'src/storage/sessions.ts' },
+      content: 'export function read(): Session[] { return []; }',
+      durationMs: 4
+    }
+  },
+  {
+    id: 'p-t2',
+    role: 'tool',
+    tool: {
+      id: 'p-t2',
+      name: 'read_file',
+      input: { path: 'src/tools/git.ts' },
+      content: 'export function status(): string { return ""; }',
+      durationMs: 3
+    }
+  }
+];
+
 export function sessions(now: number): UiSessionSummary[] {
   return [
     { id: 's1', title: 'Rounding of the token counter', updatedAt: now },

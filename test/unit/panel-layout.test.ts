@@ -7,6 +7,7 @@ import { Header } from '../../src/ui/webview/components/Header';
 import { UsageGraph } from '../../src/ui/webview/components/UsageGraph';
 import { MODELS } from '../../src/config/models';
 import { STRINGS } from '../../src/ui/webview/strings';
+import type { UiQueuedMessage } from '../../src/ui/protocol';
 import type { ReactElement } from 'react';
 
 // The layout of the panel is drawn with css, the markup cannot express it,
@@ -28,7 +29,12 @@ function rule(selector: string): string {
 
 const noop = (): void => undefined;
 
-function renderComposer(busy: boolean, goalMode = false): string {
+function renderComposer(
+  busy: boolean,
+  goalMode = false,
+  retryStatus?: { attempt: number; total: number; delayMs: number },
+  queue?: UiQueuedMessage[]
+): string {
   return renderToStaticMarkup(
     createElement(Composer, {
       busy,
@@ -54,7 +60,9 @@ function renderComposer(busy: boolean, goalMode = false): string {
       onRemoveSelection: noop,
       onSuggest: noop,
       goalMode,
-      onGoalMode: noop
+      onGoalMode: noop,
+      retryStatus,
+      queue
     }) as ReactElement
   );
 }
@@ -70,6 +78,8 @@ function renderHeader(version: string): string {
       hasApiKey: true,
       sessions: [],
       activeSessionId: undefined,
+      workspaceRoot: 'C:/projects/minimax-vscode',
+      workspaceLabel: 'minimax-vscode',
       onSelectSession: noop,
       onDeleteSession: noop,
       onNewChat: noop,
@@ -178,6 +188,37 @@ describe('panel layout', () => {
     expect(rule('.composer-goal.active')).toMatch(/color:\s*var\(--accent\)/);
   });
 
+  it('shows the attempt while the connection is lost', () => {
+    const markup = renderComposer(true, false, { attempt: 2, total: 5, delayMs: 2000 });
+    expect(markup).toContain('composer-status');
+    expect(markup).toContain(STRINGS.retryConnecting);
+    // The reader knows how many attempts are left.
+    expect(markup).toContain('2');
+    expect(markup).toContain('5');
+    // Without a lost connection the bar is not there.
+    expect(renderComposer(true)).not.toContain('composer-status');
+  });
+
+  it('puts the queue over the field of the request', () => {
+    const markup = renderComposer(true, false, undefined, [
+      { id: 'q1', text: 'a message of the queue', state: 'waiting' }
+    ]);
+    const queueAt = markup.indexOf('queue-bar');
+    const inputAt = markup.indexOf('composer-input-wrap');
+    expect(queueAt).toBeGreaterThan(-1);
+    // The queue stands over the field, the reader sees it at once.
+    expect(queueAt).toBeLessThan(inputAt);
+    expect(markup).toContain('a message of the queue');
+  });
+
+  it('keeps the send button while the agent works', () => {
+    const markup = renderComposer(true);
+    // The turn can be stopped and the next request can be written, it
+    // waits in the queue.
+    expect(markup).toContain('composer-send stop');
+    expect(markup.match(/composer-send/g)?.length ?? 0).toBe(2);
+  });
+
   it('stretches the graph but keeps the width of the steps', () => {
     const graph = rule('.usage-graph');
     expect(graph).toMatch(/flex:\s*1/);
@@ -192,6 +233,34 @@ describe('panel layout', () => {
     const height = /min-height:\s*(\d+)px/.exec(style);
     expect(height).not.toBeNull();
     expect(Number(height?.[1] ?? 0)).toBeGreaterThanOrEqual(64);
+  });
+
+  it('puts the heads of the folding sections on one grid', () => {
+    // The chevron, the icon, the title and the counter of every section of
+    // the chat stand on one grid, the rows of the panel drifted apart
+    // before: the icon of the reasoning stood 12 pixels left of the icon of
+    // the actions and the counter hung in the margin.
+    const head = rule('.section-head');
+    expect(head).toMatch(/display:\s*grid/);
+    // The chevron, the icon and the title stand on the left, the preview of
+    // the section takes the free middle of the row, the counter on the right.
+    expect(head).toMatch(
+      /grid-template-columns:\s*14px 14px auto minmax\(0, 1fr\) auto/
+    );
+    expect(head).toMatch(/column-gap:\s*6px/);
+    // The words of the head and the counter stand on one baseline.
+    expect(rule('.section-title')).toMatch(/align-self:\s*baseline/);
+    expect(rule('.tool-steps-count')).toMatch(/align-self:\s*baseline/);
+    // The chevron and the icon stand in the middle of the row.
+    expect(rule('.section-toggle .chevron')).toMatch(/align-self:\s*center/);
+    // The group of the actions does not hang in the margin of the panel.
+    expect(rule('.tool-steps')).toMatch(/margin:\s*2px 0 0/);
+  });
+
+  it('keeps the two thoughts in a row apart', () => {
+    // Two thoughts in a row are two steps of the reasoning, a thin line
+    // between them keeps them from melting into one block.
+    expect(rule('.thinking-repeated')).toMatch(/border-top:\s*1px solid var\(--border\)/);
   });
 
   it('draws one column per action of the session', () => {

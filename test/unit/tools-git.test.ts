@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -110,6 +111,46 @@ describe('the git tools', () => {
     const result = await tool('git_checkout').execute({ ref: branch }, makeContext(root));
     expect(result.isError).toBeFalsy();
     expect((await git(root, 'rev-parse', '--abbrev-ref', 'HEAD')).trim()).toBe(branch);
+  });
+
+  it('does not let the ref of the diff be an option of git', async () => {
+    const root = await makeRepo();
+    // The option --output writes a file, the model must not reach it.
+    const escape = join(root, '..', 'escaped-diff.txt');
+    const result = await tool('git_diff').execute(
+      { ref: '--output=' + escape },
+      makeContext(root)
+    );
+    expect(result.isError).toBe(true);
+    expect(existsSync(escape)).toBe(false);
+  });
+
+  it('does not let the ref of the show be an option of git', async () => {
+    const root = await makeRepo();
+    const escape = join(root, '..', 'escaped-show.txt');
+    const result = await tool('git_show').execute(
+      { ref: '--output=' + escape },
+      makeContext(root)
+    );
+    expect(result.isError).toBe(true);
+    expect(existsSync(escape)).toBe(false);
+  });
+
+  it('compares the tree with a commit when the ref is given', async () => {
+    const root = await makeRepo();
+    await writeFile(join(root, 'app.ts'), 'const a = 2;\n', 'utf8');
+    // The separator before the ref must not turn the ref into a path, the
+    // diff of the commit has to come back.
+    const result = await tool('git_diff').execute({ ref: 'HEAD' }, makeContext(root));
+    expect(result.isError).toBeFalsy();
+    expect(result.content).toContain('const a = 2;');
+  });
+
+  it('shows a commit by its ref', async () => {
+    const root = await makeRepo();
+    const result = await tool('git_show').execute({ ref: 'HEAD' }, makeContext(root));
+    expect(result.isError).toBeFalsy();
+    expect(result.content).toContain('feat: first commit');
   });
 
   it('refuses a path outside the workspace', async () => {

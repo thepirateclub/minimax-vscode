@@ -1,22 +1,16 @@
 import { mkdir, readFile as readFileAsync, writeFile as writeFileAsync } from 'node:fs/promises';
-import { dirname, isAbsolute, relative, resolve } from 'node:path';
+import { dirname } from 'node:path';
+import { resolveWorkspacePath } from '../paths';
 import type { BackupStore } from '../storage/backups';
 import type { ToolEntry } from './types';
+
+export { resolveWorkspacePath };
 
 const MAX_READ_LINES = 2000;
 const MAX_READ_CHARS = 200_000;
 const MAX_WRITE_CHARS = 200_000;
 // One call reads several files, the list is bounded so a single request stays sane.
 const MAX_READ_FILES = 12;
-
-export function resolveWorkspacePath(root: string, candidate: string): string {
-  const target = isAbsolute(candidate) ? candidate : resolve(root, candidate);
-  const rel = relative(resolve(root), target);
-  if (rel.startsWith('..') || isAbsolute(rel)) {
-    throw new Error('path escapes the workspace root: ' + candidate);
-  }
-  return target;
-}
 
 function countOccurrences(haystack: string, needle: string): number {
   if (needle.length === 0) {

@@ -33,6 +33,27 @@ describe('highlight', () => {
     expect(html).toContain('<span class="tok-number">1</span>');
   });
 
+  it('marks a negative number of json', () => {
+    // The scanner of a number has to take the sign. A scanner that stands
+    // on the sign turns the lexer into an endless loop, and the frozen
+    // webview freezes the window of the editor with it.
+    const html = highlight('{"a": -1}', 'json');
+    expect(html).toContain('<span class="tok-number">-1</span>');
+  });
+
+  it('marks a negative number of a json comment', () => {
+    // The answer of the model quotes a file with a range of lines, the
+    // range holds a minus and a digit.
+    const html = highlight('// package.json:8-10', 'json');
+    expect(html).toContain('tok-number');
+  });
+
+  it('does not spin on a sign that stands alone', () => {
+    expect(highlight('-', 'json')).toContain('-');
+    expect(highlight('+-', 'json')).toContain('+');
+    expect(highlight('-e', 'json')).toContain('-');
+  });
+
   it('marks a comment and a docstring of python', () => {
     expect(highlight('# note', 'py')).toContain('tok-comment');
     expect(highlight('"""doc"""', 'py')).toContain('tok-string');

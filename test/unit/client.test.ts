@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildRequestBody, HttpMiniMaxClient } from '../../src/api/client';
+import { MiniMaxApiError } from '../../src/api/errors';
 import type { ChatRequest, StreamEvent } from '../../src/api/types';
 
 const REQUEST: ChatRequest = {
@@ -60,12 +61,29 @@ function bodyOf(chunks: string[], broken?: Error): Body {
   };
 }
 
-function clientOf(body: Body): HttpMiniMaxClient {
+function clientOf(body: Body, idleTimeoutMs?: number): HttpMiniMaxClient {
   return new HttpMiniMaxClient({
     baseUrl: 'https://api.test',
     apiKey: 'test-key',
-    fetchImpl: async () => body.response
+    fetchImpl: async () => body.response,
+    idleTimeoutMs
   });
+}
+
+// A body that never sends anything and never closes: the connection hangs.
+function silentBody(): Body {
+  const stream = new ReadableStream<Uint8Array>({
+    pull() {
+      // Nothing comes, the connection stays open.
+    }
+  });
+  return {
+    response: new Response(stream, {
+      status: 200,
+      headers: { 'content-type': 'text/event-stream' }
+    }),
+    cancelled: () => false
+  };
 }
 
 describe('the body of the request', () => {
@@ -140,5 +158,54 @@ describe('the client of MiniMax', () => {
     // The error of the stream reaches the caller, the cancel of the reader
     // does not replace it.
     await expect(read()).rejects.toThrow('the connection broke');
+  });
+
+  it('reports a stream that ended before the answer ended', async () => {
+    const body = bodyOf([BLOCK_START, TEXT_FIRST]);
+    const client = clientOf(body);
+    const read = async (): Promise<void> => {
+      for await (const event of client.stream(REQUEST)) {
+        void event;
+      }
+    };
+    // The stream ended without the event of the server. An empty answer
+    // would be a lie, the request goes out again.
+    const failure = await read().catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(MiniMaxApiError);
+    expect((failure as MiniMaxApiError).retryable).toBe(true);
+    expect((failure as Error).message).toContain(
+      'The connection to MiniMax was closed before the answer ended.'
+    );
+  });
+
+  it('gives up on a stream that stays silent', async () => {
+    // The connection hangs: no data and no close. Without the watchdog the
+    // read waits forever and the request is never repeated.
+    const client = clientOf(silentBody(), 50);
+    const read = async (): Promise<void> => {
+      for await (const event of client.stream(REQUEST)) {
+        void event;
+      }
+    };
+    const failure = await read().catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(MiniMaxApiError);
+    expect((failure as MiniMaxApiError).retryable).toBe(true);
+    expect((failure as Error).message).toContain('stopped sending data');
+  });
+
+  it('reports the error of the server in the middle of the answer', async () => {
+    const errorEvent =
+      'event: error\n' + 'data: {"type":"error","error":{"message":"overloaded"}}\n\n';
+    const body = bodyOf([BLOCK_START, TEXT_FIRST, errorEvent]);
+    const client = clientOf(body);
+    const read = async (): Promise<void> => {
+      for await (const event of client.stream(REQUEST)) {
+        void event;
+      }
+    };
+    const failure = await read().catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(MiniMaxApiError);
+    expect((failure as MiniMaxApiError).retryable).toBe(true);
+    expect((failure as Error).message).toContain('overloaded');
   });
 });

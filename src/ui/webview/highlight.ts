@@ -309,6 +309,12 @@ function scanString(codeText: string, start: number, quote: string): number {
 
 function scanNumber(codeText: string, start: number): number {
   let i = start;
+  // A number can carry a sign. The scan has to take it, otherwise the
+  // caller stands on the sign and never moves forward: the lexer spins on
+  // the same place and the webview freezes the window of the editor.
+  if (codeText.charAt(i) === '-' || codeText.charAt(i) === '+') {
+    i += 1;
+  }
   const first = codeText.charAt(i);
   if (first === '0' && /[xXbBoO]/.test(codeText.charAt(i + 1))) {
     i += 2;
@@ -338,7 +344,10 @@ function scanNumber(codeText: string, start: number): number {
       }
     }
   }
-  return i;
+  // The scan always moves forward. A scanner that stands still turns the
+  // lexer into an endless loop, and a frozen webview freezes the window of
+  // the editor with it.
+  return i > start ? i : start + 1;
 }
 
 const OPERATORS = '+-*/%=<>!&|^~?:';

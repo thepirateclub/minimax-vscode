@@ -7,7 +7,7 @@ import type {
 import type { ToolEntry } from './types';
 
 const STATUSES: TodoStatus[] = ['pending', 'in_progress', 'completed'];
-const PRIORITIES: TodoPriority[] = ['high', 'medium', 'low'];
+const PRIORITIES: TodoPriority[] = ['very_high', 'high', 'medium', 'low'];
 
 // The list is a snapshot: the model sends every task every time and the
 // host replaces the old list. A task without a text is dropped, an unknown
@@ -66,7 +66,7 @@ export function createTodoTools(): ToolEntry[] {
               },
               priority: {
                 type: 'string',
-                enum: ['high', 'medium', 'low'],
+                enum: ['very_high', 'high', 'medium', 'low'],
                 description: 'How urgent the task is.'
               }
             },

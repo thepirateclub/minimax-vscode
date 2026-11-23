@@ -1,5 +1,6 @@
 import { readFile, readdir, stat } from 'node:fs/promises';
 import { join, relative, sep } from 'node:path';
+import { resolveWorkspacePath } from '../paths';
 import { IGNORED_DIRS, TEXT_EXTENSIONS } from './files';
 
 // The search of findstr: several words, a line matches if it holds any of
@@ -147,7 +148,9 @@ export async function findInTree(
     return matches;
   }
 
-  const target = join(root, options.sub);
+  // The path of the model must stay inside the root, the join of the
+  // paths normalizes the .. and the file outside of it would be read.
+  const target = resolveWorkspacePath(root, options.sub);
   const info = await statOrUndefined(target);
   if (!info) {
     throw new Error('the path does not exist: ' + options.sub);

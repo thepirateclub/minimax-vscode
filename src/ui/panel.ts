@@ -1,9 +1,12 @@
 import * as vscode from 'vscode';
 import type { ExtToWeb, WebToExt } from './protocol';
+import { capPost } from './postCap';
 import { themeKind } from './theme';
 
 export function postToWebview(view: vscode.Webview, message: ExtToWeb): void {
-  void view.postMessage(message);
+  // The volume of one message to the panel is bounded: a big result of a
+  // tool is slow to transfer and to draw.
+  void view.postMessage(capPost(message));
 }
 
 export class AgentPanelProvider implements vscode.WebviewViewProvider {

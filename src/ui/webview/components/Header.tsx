@@ -16,6 +16,8 @@ export function Header({
   hasApiKey,
   sessions,
   activeSessionId,
+  workspaceRoot,
+  workspaceLabel,
   onSelectSession,
   onDeleteSession,
   onNewChat,
@@ -29,6 +31,9 @@ export function Header({
   hasApiKey: boolean;
   sessions: UiSessionSummary[];
   activeSessionId: string | undefined;
+  // The project of the panel: the list of the chats belongs to it.
+  workspaceRoot: string;
+  workspaceLabel: string;
   onSelectSession: (id: string) => void;
   onDeleteSession: (id: string) => void;
   onNewChat: () => void;
@@ -57,6 +62,8 @@ export function Header({
         <SessionMenu
           sessions={sessions}
           activeSessionId={activeSessionId}
+          workspaceRoot={workspaceRoot}
+          workspaceLabel={workspaceLabel}
           onSelect={onSelectSession}
           onDelete={onDeleteSession}
           onNewChat={onNewChat}

@@ -2,11 +2,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { GoalState, TodoItem } from '../../agent/state';
 import type {
   ExtToWeb,
+  UiChangedFile,
   UiMessage,
+  UiQueuedMessage,
   UiSelection,
   UiSettings,
   UiState,
   UiSuggestion,
+  UiRetryStatus,
   WebToExt,
   VoiceState
 } from '../protocol';
@@ -23,12 +26,14 @@ import { DEFAULT_GOAL_FORM } from './goalWizard';
 import { goalFormValues, parseGoalForm } from './components/GoalBar';
 import { Header, type PanelTab } from './components/Header';
 import { MessageList } from './components/MessageList';
+import { SummaryBar } from './components/SummaryBar';
 import { SettingsView } from './components/SettingsView';
 import { TaskList } from './components/TaskList';
 import { appendNotice } from './notices';
 import { messageId } from './messageId';
 import { STRINGS } from './strings';
 import { endTool } from './toolEnd';
+import { DeltaBatch } from './deltaBatch';
 
 interface VsCodeApi {
   postMessage(message: WebToExt): void;
@@ -37,6 +42,8 @@ interface VsCodeApi {
 const EMPTY_STATE: UiState = {
   sessions: [],
   activeSessionId: undefined,
+  workspaceRoot: '',
+  workspaceLabel: '',
   messages: [],
   model: 'MiniMax-M3.1-Flash',
   models: [],
@@ -51,14 +58,24 @@ const EMPTY_STATE: UiState = {
   fontSize: 13,
   collapseTools: false,
   collapseCode: false,
+  showToolSteps: false,
+  summary: [],
   version: '',
-  todos: []
+  todos: [],
+  queue: [],
+  olderMessages: 0
 };
 
 export function App({ vscode }: { vscode: VsCodeApi }) {
   const [state, setState] = useState<UiState>(EMPTY_STATE);
   const [messages, setMessages] = useState<UiMessage[]>([]);
+  // How many messages of the chat wait in the host. The panel asks for
+  // them when the reader wants to see the older part of the chat.
+  const [olderMessages, setOlderMessages] = useState(0);
   const [todos, setTodos] = useState<TodoItem[]>([]);
+  // The files that the last action changed, the panel shows them under the
+  // feed.
+  const [summary, setSummary] = useState<UiChangedFile[]>([]);
   const [goal, setGoal] = useState<GoalState | undefined>(undefined);
   // The command /goal without a text opens the wizard of the goal.
   // The input field takes the goal instead of a request.
@@ -77,16 +94,59 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
   const [voice, setVoice] = useState<VoiceState>('idle');
   const [dictation, setDictation] = useState<DictationRequest | undefined>(undefined);
   const dictationToken = useRef(0);
+  // The connection to MiniMax is lost, the request is repeated. The panel
+  // shows the attempt.
+  const [retryStatus, setRetryStatus] = useState<UiRetryStatus | undefined>(undefined);
+  // The feed goes to the end of the history: the chat was replaced or
+  // the request runs again. The flag lives in the app, the feed is built
+  // from scratch when the history goes away.
+  const [followEnd, setFollowEnd] = useState(false);
+  // The queue of the messages of the chat.
+  const [queue, setQueue] = useState<UiQueuedMessage[]>([]);
 
   useEffect(() => {
+    // The deltas of the answer wait in a batch and go to the panel in one
+    // piece: the redraw of the whole answer for every token is quadratic.
+    // Every other event flushes the batch first, the order of the events
+    // stays the order they came in.
+    const batch = new DeltaBatch({
+      onFlush: (text, thinking) => {
+        setMessages((prev) => {
+          const next = text.length > 0 ? appendToAssistant(prev, 'text', text) : prev;
+          return thinking.length > 0
+            ? appendToAssistant(next, 'thinking', thinking)
+            : next;
+        });
+      }
+    });
+
     const onMessage = (event: MessageEvent<ExtToWeb>): void => {
       const message = event.data;
+
+      if (message.type === 'text_delta') {
+        batch.pushText(message.text);
+        return;
+      }
+      if (message.type === 'thinking_delta') {
+        batch.pushThinking(message.text);
+        return;
+      }
+      // The piece of a broken answer goes away, the text that waits in the
+      // batch goes away with it.
+      if (message.type === 'assistant_reset') {
+        batch.clear();
+      } else {
+        batch.flush();
+      }
 
       if (message.type === 'init') {
         setState(message.state);
         setMessages(message.state.messages);
+        setOlderMessages(message.state.olderMessages ?? 0);
         setTodos(message.state.todos);
         setGoal(message.state.goal);
+        setSummary(message.state.summary ?? []);
+        setQueue(message.state.queue ?? []);
         return;
       }
       if (message.type === 'user_message') {
@@ -95,14 +155,6 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
       }
       if (message.type === 'assistant_start') {
         setMessages((prev) => [...prev, { id: message.id, role: 'assistant', text: '' }]);
-        return;
-      }
-      if (message.type === 'text_delta') {
-        setMessages((prev) => appendToAssistant(prev, 'text', message.text));
-        return;
-      }
-      if (message.type === 'thinking_delta') {
-        setMessages((prev) => appendToAssistant(prev, 'thinking', message.text));
         return;
       }
       if (message.type === 'tool_start') {
@@ -148,6 +200,20 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
         }));
         return;
       }
+      if (message.type === 'retry_status') {
+        setRetryStatus(message.status);
+        return;
+      }
+      if (message.type === 'queue') {
+        setQueue(message.items);
+        return;
+      }
+      if (message.type === 'assistant_reset') {
+        // The answer broke in the middle, the piece goes away: the request
+        // runs again and the new text takes its place.
+        setMessages((prev) => resetAssistant(prev));
+        return;
+      }
       if (message.type === 'theme') {
         setState((prev) => ({ ...prev, theme: message.kind }));
         return;
@@ -164,8 +230,24 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
         setGoal(message.goal);
         return;
       }
+      if (message.type === 'summary') {
+        setSummary(message.files);
+        return;
+      }
       if (message.type === 'session_loaded') {
+        // The host replaced the history of the chat: another chat was
+        // opened, or the request runs again and the messages of the failed
+        // turn went away. The feed shows the end of the history.
+        setFollowEnd(true);
         setMessages(message.messages);
+        setOlderMessages(message.olderMessages ?? 0);
+        return;
+      }
+      if (message.type === 'history_older') {
+        // The older part of the chat comes in front of the messages the
+        // panel holds.
+        setMessages((prev) => [...message.messages, ...prev]);
+        setOlderMessages(message.olderMessages);
         return;
       }
       if (message.type === 'sessions') {
@@ -331,6 +413,8 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
         hasApiKey={state.hasApiKey}
         sessions={state.sessions}
         activeSessionId={state.activeSessionId}
+        workspaceRoot={state.workspaceRoot}
+        workspaceLabel={state.workspaceLabel}
         onSelectSession={(id) => vscode.postMessage({ type: 'select_session', id })}
         onDeleteSession={(id) => vscode.postMessage({ type: 'delete_session', id })}
         onNewChat={() => vscode.postMessage({ type: 'new_session' })}
@@ -361,15 +445,30 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
         ) : (
           <MessageList
             messages={messages}
+            olderMessages={olderMessages}
+            onLoadOlder={() => vscode.postMessage({ type: 'load_older' })}
             collapseTools={state.collapseTools}
             collapseCode={state.collapseCode}
+            showToolSteps={state.showToolSteps}
             onApprove={approve}
             onReject={reject}
             onOpenFile={openFile}
-            onRetry={(id) => vscode.postMessage({ type: 'retry', id })}
+            onRetry={(id) => {
+              // The reader asked for a new turn: the feed shows the end of
+              // the history and follows the turn.
+              setFollowEnd(true);
+              vscode.postMessage({ type: 'retry', id });
+            }}
             onRewind={(id) => vscode.postMessage({ type: 'rewind', id })}
+            followEnd={followEnd}
+            onFollowEnd={() => setFollowEnd(false)}
           />
         )}
+        <SummaryBar
+          files={summary}
+          onOpenFile={(path) => vscode.postMessage({ type: 'open_file', path })}
+          onClear={() => setSummary([])}
+        />
         <Composer
           busy={busy}
           selections={selections}
@@ -434,6 +533,11 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
           onSuggest={suggest}
           voice={voice}
           dictation={dictation}
+          retryStatus={retryStatus}
+          queue={queue}
+          onSendQueued={(id) => vscode.postMessage({ type: 'send_queued', id })}
+          onSendAllQueued={() => vscode.postMessage({ type: 'send_all_queued' })}
+          onRemoveQueued={(id) => vscode.postMessage({ type: 'remove_queued', id })}
           onVoiceStart={() => vscode.postMessage({ type: 'voice_start' })}
           onVoiceStop={() => vscode.postMessage({ type: 'voice_stop' })}
         />
@@ -452,6 +556,20 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
       </div>
     </div>
   );
+}
+
+// The piece of the broken answer goes away, the last answer of the model
+// is empty until the request comes again.
+function resetAssistant(messages: UiMessage[]): UiMessage[] {
+  const next = [...messages];
+  for (let i = next.length - 1; i >= 0; i--) {
+    const item = next[i]!;
+    if (item.role === 'assistant' && !item.approval) {
+      next[i] = { ...item, text: '', thinking: '' };
+      return next;
+    }
+  }
+  return next;
 }
 
 function appendToAssistant(

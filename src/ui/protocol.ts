@@ -29,6 +29,12 @@ export interface UiToolCall {
   diff?: { path: string; lines: UiDiffLine[] };
 }
 
+// A file of the working tree that the agent has changed.
+export interface UiChangedFile {
+  path: string;
+  status: 'added' | 'modified' | 'deleted' | 'renamed';
+}
+
 export interface UiApproval {
   id: string;
   name: string;
@@ -61,6 +67,10 @@ export interface UiSessionSummary {
   id: string;
   title: string;
   updatedAt: number;
+  // The project of the chat: the root of the workspace it belongs to.
+  workspaceRoot?: string;
+  // The name of the project, the reader sees it in the list of the chats.
+  workspaceLabel?: string;
 }
 
 export interface UiFile {
@@ -83,6 +93,32 @@ export interface UiSuggestion {
   source: 'open' | 'workspace';
 }
 
+// The status of a repeated request: the connection to MiniMax is lost.
+export interface UiRetryStatus {
+  attempt: number;
+  total: number;
+  delayMs: number;
+}
+
+// The state of a message in the queue: it waits, it goes out, it is sent
+// or it failed.
+export type QueueState = 'waiting' | 'sending' | 'done' | 'error';
+
+export interface UiQueuedMessage {
+  id: string;
+  text: string;
+  state: QueueState;
+  // The reason of the failure, the reader sees it on the item.
+  error?: string;
+}
+
+// The message of the queue in the host: the mentions and the selections are
+// needed to build the prompt when the message goes out.
+export interface QueuedMessage extends UiQueuedMessage {
+  mentions: string[];
+  selections: UiSelection[];
+}
+
 export interface UiSettingsValues {
   baseUrl: BaseUrlPreset;
   customBaseUrl: string;
@@ -91,6 +127,8 @@ export interface UiSettingsValues {
   mode: AgentMode;
   thinking: boolean;
   maxIterations: number;
+  // How many times a request is repeated after the loss of the connection.
+  maxRetries: number;
   fontSize: number;
   historyMaxMessages: number;
   contextThreshold: number;
@@ -102,6 +140,8 @@ export interface UiSettingsValues {
   collapseTools: boolean;
   // The code blocks of the answers fold to their header.
   collapseCode: boolean;
+  // The steps of the tools are shown in the feed.
+  showToolSteps: boolean;
   speechLanguage: string;
   microphone: string;
 }
@@ -122,6 +162,10 @@ export interface UiUsageTurn {
 export interface UiState {
   sessions: UiSessionSummary[];
   activeSessionId: string | undefined;
+  // The project of the panel: the root of the workspace and its name. The
+  // list of the chats belongs to it.
+  workspaceRoot: string;
+  workspaceLabel: string;
   messages: UiMessage[];
   model: string;
   models: ModelInfo[];
@@ -139,12 +183,22 @@ export interface UiState {
   collapseTools: boolean;
   // The code blocks of the answers fold to their header.
   collapseCode: boolean;
+  // The steps of the tools are shown in the feed.
+  showToolSteps: boolean;
+  // The files of the last action, the panel shows them under the feed.
+  summary: UiChangedFile[];
   // The version of the running extension, the panel shows it in the header.
   version: string;
   // The list of tasks of the session.
   todos: TodoItem[];
   // The goal of the session.
   goal?: GoalState;
+  // The queue of the messages of the chat.
+  queue: UiQueuedMessage[];
+  // How many messages of the chat the panel does not hold yet. The host
+  // keeps them, the panel asks for them when the reader wants to see the
+  // older part of the chat.
+  olderMessages: number;
 }
 
 export type ExtToWeb =
@@ -174,11 +228,22 @@ export type ExtToWeb =
   | { type: 'todos'; todos: TodoItem[] }
   // The goal of the session, the host owns it.
   | { type: 'goal'; goal?: GoalState }
+  // The files that the last action changed.
+  | { type: 'summary'; files: UiChangedFile[] }
   | { type: 'error'; message: string }
   | { type: 'notice'; message: string; kind: NoticeKind }
   | { type: 'step_time'; id: string; elapsedMs: number }
+  // The connection to MiniMax is lost, the request is repeated.
+  | { type: 'retry_status'; status: UiRetryStatus | undefined }
+  // The answer broke in the middle, the piece goes away.
+  | { type: 'assistant_reset' }
+  // The queue of the messages of the chat.
+  | { type: 'queue'; items: UiQueuedMessage[] }
   | { type: 'restore_input'; text: string; mentions: string[]; selections: UiSelection[] }
-  | { type: 'session_loaded'; messages: UiMessage[] }
+  | { type: 'session_loaded'; messages: UiMessage[]; olderMessages?: number }
+  // The older messages of the chat come on demand: a big history in one
+  // message is slow to transfer and to draw.
+  | { type: 'history_older'; messages: UiMessage[]; olderMessages: number }
   | { type: 'sessions'; sessions: UiSessionSummary[] }
   | { type: 'models'; models: ModelInfo[]; selected: string }
   | { type: 'files'; requestId: string; files: UiFile[] }
@@ -195,6 +260,14 @@ export type ExtToWeb =
 export type WebToExt =
   | { type: 'ready' }
   | { type: 'send'; text: string; mentions: string[]; selections: UiSelection[] }
+  // One message of the queue goes out now.
+  | { type: 'send_queued'; id: string }
+  // Every message of the queue goes out, the failed ones are tried again.
+  | { type: 'send_all_queued' }
+  // A message leaves the queue.
+  | { type: 'remove_queued'; id: string }
+  // The panel asks for the older messages of the chat.
+  | { type: 'load_older' }
   | { type: 'stop' }
   | { type: 'retry'; id: string }
   | { type: 'rewind'; id: string }

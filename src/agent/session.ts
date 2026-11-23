@@ -16,6 +16,10 @@ export interface SessionOptions {
   model: string;
   maxTokens: number;
   maxIterations: number;
+  // How many times a request is repeated after the loss of the connection.
+  maxRetries?: number;
+  // The first pause between the attempts, the pause grows from it.
+  retryBaseDelayMs?: number;
   // The effort is set only for the models that take the depth levels.
   effort?: EffortLevel;
   thinking?: 'adaptive';
@@ -47,6 +51,11 @@ export interface SessionOptions {
   onEvent: (event: AgentEvent) => void;
   onApproval: (approval: UiApproval) => void;
 }
+
+// The counter of the approvals of the whole host. The reader can answer a
+// card of a chat that is not open, the id of the approval must not point at
+// a call of another chat.
+let approvalCounter = 0;
 
 export class AgentSession {
   private readonly options: SessionOptions;
@@ -129,6 +138,8 @@ export class AgentSession {
       model: this.options.model,
       maxTokens: this.options.maxTokens,
       maxIterations: this.options.maxIterations,
+      maxRetries: this.options.maxRetries,
+      retryBaseDelayMs: this.options.retryBaseDelayMs,
       effort: this.options.effort,
       thinking: this.options.thinking,
       mode: this.options.mode,
@@ -163,7 +174,9 @@ export class AgentSession {
   ): Promise<ApprovalDecision> {
     const preview = await buildPreview(toolName, input, this.options.workspaceRoot);
     this.approvalCounter += 1;
-    const id = toolName + '-' + Date.now().toString(36) + '-' + this.approvalCounter;
+    approvalCounter += 1;
+    const id =
+      toolName + '-' + Date.now().toString(36) + '-' + approvalCounter + '-' + this.approvalCounter;
     const approval: UiApproval = { id, name: toolName, input };
     if (preview) {
       approval.preview = { path: preview.path, lines: preview.lines };

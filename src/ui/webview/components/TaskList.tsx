@@ -1,24 +1,30 @@
 import { useState } from 'react';
 import type { TodoItem } from '../../../agent/state';
 import { IconClose, IconList } from '../icons';
+import { priorityIcon, priorityTitle } from '../taskPriority';
 import { STRINGS } from '../strings';
 
 // The rows of the tasks, shared by the widget over the feed and the card of
-// the tool in the feed. Only the high priority gets a word: a word on every
-// row is noise, the reader looks for the urgent one.
+// the tool in the feed. The priority stands on the right as an arrow of
+// jira: the low one points down, the medium and the high ones point up, the
+// very high is a double arrow. The color comes from the theme.
 export function TaskRows({ todos }: { todos: TodoItem[] }) {
   return (
     <ul className="task-rows">
       {todos.map((item, index) => (
         <li
           key={index + ':' + item.content}
-          className={'task-row task-' + item.status + (item.priority === 'high' ? ' task-high' : '')}
+          className={'task-row task-' + item.status}
         >
           <span className="task-marker" aria-hidden="true" />
           <span className="task-text">{item.content}</span>
-          {item.priority === 'high' ? (
-            <span className="task-priority">{STRINGS.taskPriorityHigh}</span>
-          ) : null}
+          <span
+            className={'task-priority task-priority-' + item.priority}
+            title={priorityTitle(item.priority)}
+            aria-label={priorityTitle(item.priority)}
+          >
+            {priorityIcon(item.priority)}
+          </span>
         </li>
       ))}
     </ul>
