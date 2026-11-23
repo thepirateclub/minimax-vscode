@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { groupToolSteps } from '../../src/ui/webview/toolSteps';
+import { groupToolSteps } from '../../src/ui/webview/toolCard';
 import type { UiMessage } from '../../src/ui/protocol';
 
 function toolMessage(id: string): UiMessage {

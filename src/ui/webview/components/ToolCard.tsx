@@ -4,7 +4,7 @@ import {
   Chevron,
 } from '../icons';
 import { STRINGS } from '../strings';
-import { cardOpen } from '../toolCardState';
+import { cardOpen, formatInput } from '../toolCard';
 import { diffStats } from '../diffStats';
 import { editDiff } from '../editDiff';
 import { AgentView } from './AgentView';
@@ -14,7 +14,6 @@ import { DiffView } from './DiffView';
 import { FileReadView } from './FileReadView';
 import { TerminalView } from './TerminalView';
 import { CopyButton } from './CopyButton';
-import { formatInput } from '../toolText';
 import { formatDuration } from '../../format';
 import { describe } from './toolDescriptions';
 import { filePaths, text } from './toolCardHelpers';

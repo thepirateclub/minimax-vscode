@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cardOpen } from '../../src/ui/webview/toolCardState';
+import { cardOpen } from '../../src/ui/webview/toolCard';
 
 // The card of an action follows the setting. The card must open again when
 // the setting is turned off, and it must stay folded while the setting is on.

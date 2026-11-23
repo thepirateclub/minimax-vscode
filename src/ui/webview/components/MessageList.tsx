@@ -7,7 +7,7 @@ import { feedAction, isAtBottom, measure } from '../listScroll';
 import { STRINGS } from '../strings';
 import { MessageRow } from './MessageRow';
 import { ToolSteps } from './ToolSteps';
-import { groupToolSteps, type FeedItem } from '../toolSteps';
+import { groupToolSteps, type FeedItem } from '../toolCard';
 
 // The panel keeps the dom small, the older messages are loaded on demand.
 const PAGE = 120;

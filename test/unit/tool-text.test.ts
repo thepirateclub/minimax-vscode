@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { approvalTitle, formatInput } from '../../src/ui/webview/toolText';
+import { approvalTitle, formatInput } from '../../src/ui/webview/toolCard';
 import { renderMarkdown } from '../../src/ui/webview/markdown';
 
 describe('the question of an approval', () => {

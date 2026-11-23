@@ -15,7 +15,7 @@ import type {
   WebToExt
 } from '../protocol';
 import { DeltaBatch } from './deltaBatch';
-import { endTool } from './toolEnd';
+import { endTool } from './toolCard';
 import { appendNotice } from './notices';
 import { messageId } from './messageId';
 import type { DictationRequest, RestoreRequest } from './components/Composer';

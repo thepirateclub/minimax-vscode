@@ -1,7 +1,7 @@
 import type { UiMessage } from '../../protocol';
 import { STRINGS } from '../strings';
 import { DiffView } from './DiffView';
-import { approvalTitle, formatInput } from '../toolText';
+import { approvalTitle, formatInput } from '../toolCard';
 
 export function ApprovalCard({
   message,

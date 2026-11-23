@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { UiMessage } from '../../src/ui/protocol';
-import { endTool } from '../../src/ui/webview/toolEnd';
+import { endTool } from '../../src/ui/webview/toolCard';
 
 describe('the result of a tool call in the panel', () => {
   it('goes into the last card with that id', () => {
