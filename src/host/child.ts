@@ -1,15 +1,19 @@
 import type { MiniMaxController } from '../extension';
 import type { AnthropicMessage } from '../api/types';
-import { Agent, type AgentEvent, type AgentRunResult } from '../agent/agent';
+import { Agent } from '../agent/agent';
 import { HttpMiniMaxClient } from '../api/client';
 import { MODELS, resolveBaseUrl } from '../config/models';
 import { getApiKey } from '../config/secrets';
 import { getSettings } from '../config/settings';
 import type { RuntimeSession } from './runtime';
 import { childApproval, releaseChildApprovals } from './approvals';
+import { handleAgentEvent } from './events';
 import { ToolRegistry } from '../tools/registry';
-import { CHILD_MAX_ITERATIONS, describeInput, type TaskOutcome, type TaskRequest, type TaskRole } from '../tools/task';
+import { CHILD_MAX_ITERATIONS, describeInput } from '../tools/task';
 import type { ToolContext } from '../tools/types';
+import type { TaskRole, TaskRequest, TaskOutcome } from '../tools/task';
+import type { AgentEvent, AgentRunResult } from '../agent/agent';
+import { sessionContext, buildPrompt, goalBudgetOk, effortFor, thinkingMode } from './setup';
 
 // The role of a sub-agent tells it what it may do and what its answer looks
 // like. The text goes to the model, it is English.
@@ -57,7 +61,7 @@ export function handleChildEvent(host: MiniMaxController, runtime: RuntimeSessio
   event: AgentEvent,
   progress: (line: string) => void): void {
   if (event.type === 'usage') {
-    host.handleAgentEvent(runtime, event);
+    handleAgentEvent(host, runtime, event);
     return;
   }
   if (event.type === 'tool_start') {
@@ -109,9 +113,9 @@ export async function spawnTask(host: MiniMaxController, request: TaskRequest,
   // The child works in the session of its parent, it gets the same context
   // of the turn as the parent: the goal, the list of the tasks and the
   // state of the repository.
-  const context = await host.sessionContext(runtime);
+  const context = await sessionContext(host, runtime);
   const systemPrompt = [
-    await host.buildPrompt(registry),
+    await buildPrompt(host, registry),
     ROLE_PROMPTS[request.role],
     context
   ]
@@ -127,8 +131,8 @@ export async function spawnTask(host: MiniMaxController, request: TaskRequest,
     model: settings.model,
     maxTokens: model?.maxTokens ?? 65_536,
     maxIterations: CHILD_MAX_ITERATIONS,
-    effort: host.effortFor(settings),
-    thinking: host.thinkingMode(settings),
+    effort: effortFor(host, settings),
+    thinking: thinkingMode(host, settings),
     mode: settings.mode,
     systemPrompt,
     workspaceRoot: host.workspaceRoot(),
@@ -142,7 +146,7 @@ export async function spawnTask(host: MiniMaxController, request: TaskRequest,
         return runtime.goal;
       }
     },
-    budget: () => host.goalBudgetOk(runtime),
+    budget: () => goalBudgetOk(host, runtime),
     logger: host.logger,
     onEvent: (event) => handleChildEvent(host, runtime, event, progress)
   });
@@ -151,7 +155,7 @@ export async function spawnTask(host: MiniMaxController, request: TaskRequest,
   // comes. The listener goes away with the child.
   const onAbort = (): void => {
     child.abort();
-    releaseChildApprovals(host, );
+    releaseChildApprovals(host);
   };
   ctx.signal.addEventListener('abort', onAbort);
   if (ctx.signal.aborted) {

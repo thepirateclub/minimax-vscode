@@ -1,11 +1,12 @@
 import type { MiniMaxController } from '../extension';
 import type { RuntimeSession } from './runtime';
-
-// How many messages wait in the queue of a chat.
-const MAX_QUEUE_ITEMS = 30;
 import type { UiSelection } from '../ui/protocol';
 import { persist } from './sessions';
 import { postFor } from './channel';
+import { runTurn } from './turn';
+
+// How many messages wait in the queue of a chat.
+const MAX_QUEUE_ITEMS = 30;
 
 export function sendQueued(host: MiniMaxController, id: string): void {
   const runtime = host.activeSession();
@@ -116,6 +117,6 @@ export async function pumpQueue(host: MiniMaxController, runtime: RuntimeSession
   }
   next.state = 'sending';
   postQueue(host, runtime);
-  await host.runTurn(runtime, next.text, next.mentions, next.selections, next);
+  await runTurn(host, runtime, next.text, next.mentions, next.selections, next);
 }
 

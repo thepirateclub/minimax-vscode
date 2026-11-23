@@ -1,0 +1,298 @@
+import type { MiniMaxController } from '../extension';
+import type { RuntimeSession } from './runtime';
+import type { UiSelection, QueuedMessage } from '../ui/protocol';
+import type { TurnAnchor } from '../agent/turns';
+import { enqueue, postQueue, pumpQueue } from './queue';
+import { setState } from './channel';
+import { persist, startNewSession, postHistory } from './sessions';
+import { stopNotice } from '../agent/stopReason';
+import { getSettings } from '../config/settings';
+import { turnOfMessage, findRequestIndex, cutHistory } from '../agent/turns';
+import { readMentionedFiles } from '../agent/mentions';
+import { goalBudgetOk, ensureAgent } from './setup';
+import { refreshQuota } from './commands';
+import * as vscode from 'vscode';
+
+// The limit of the title of a chat.
+const TITLE_LIMIT = 60;
+
+export async function handleSend(host: MiniMaxController, text: string,
+  mentions: string[],
+  selections: UiSelection[]): Promise<void> {
+  let runtime = host.activeSession();
+  if (!runtime) {
+    startNewSession(host);
+    runtime = host.activeSession();
+  }
+  if (!runtime) {
+    return;
+  }
+  if (runtime.busy) {
+    // The agent works, the request waits in the queue. The reader writes
+    // several messages in a row, they go out one after another.
+    enqueue(host, runtime, text, mentions, selections);
+    return;
+  }
+  // The reader wrote a new request, the queue is not on hold anymore.
+  runtime.queuePaused = false;
+  await runTurn(host, runtime, text, mentions, selections);
+}
+
+
+export async function runTurn(host: MiniMaxController, runtime: RuntimeSession,
+  text: string,
+  mentions: string[],
+  selections: UiSelection[],
+  queued?: QueuedMessage): Promise<void> {
+  // The turn is taken at once: the building of the agent takes a moment
+  // and a second send in that window would start two turns on one
+  // history. The queue of the reader waits behind this flag.
+  runtime.busy = true;
+  // The budget of the goal is over, the request does not go out. The user
+  // raises the limit and the work continues.
+  if (!goalBudgetOk(host, runtime)) {
+    runtime.busy = false;
+    const notice = stopNotice(
+      'goal_limit',
+      getSettings().maxIterations,
+      runtime.goal
+    );
+    host.panel.post({
+      type: 'notice',
+      message: notice?.message ?? 'The budget of the goal is exhausted.',
+      kind: notice?.kind ?? 'warn'
+    });
+    // The request does not go out, it comes back to the input field, the
+    // user does not lose it.
+    host.panel.post({ type: 'restore_input', text, mentions, selections });
+    if (queued) {
+      queued.state = 'error';
+      queued.error = 'The budget of the goal is exhausted.';
+      postQueue(host, runtime);
+    }
+    return;
+  }
+  const agent = await ensureAgent(host, runtime);
+  if (!agent) {
+    runtime.busy = false;
+    if (queued) {
+      queued.state = 'error';
+      queued.error = 'No API key, the request did not go out.';
+      postQueue(host, runtime);
+    }
+    return;
+  }
+
+  runtime.errorReported = false;
+  runtime.turnStopped = false;
+  runtime.lastError = undefined;
+  // The place of the request in the history of the model, the anchor
+  // of the turn takes it when the turn is over.
+  let requestPlace = -1;
+  const userId = host.nextId('user');
+  runtime.uiMessages.push({ id: userId, role: 'user', text });
+  host.panel.post({ type: 'user_message', id: userId, text });
+  if (runtime.title === 'New chat') {
+    const firstLine = text.trim().split('\n')[0] ?? '';
+    runtime.title = firstLine.slice(0, TITLE_LIMIT) || 'New chat';
+  }
+  setState(host, 'thinking', runtime);
+  runtime.turnStartedAt = Date.now();
+
+  try {
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Window,
+        title: 'MiniMax is working',
+        cancellable: true
+      },
+      async (_progress, token) => {
+        token.onCancellationRequested(() => agent.stop());
+        requestPlace = await agent.send(
+          await buildPromptText(host, text, mentions, selections)
+        );
+      }
+    );
+  } catch (error) {
+    host.logger.error('the agent run failed', error);
+    if (!runtime.errorReported) {
+      const message = error instanceof Error ? error.message : String(error);
+      host.panel.post({ type: 'error', message });
+      setState(host, 'error', runtime);
+    }
+  } finally {
+    runtime.busy = false;
+    runtime.history = agent.getHistory();
+    // The anchor of the request, the chat can roll back to it.
+    runtime.turns.push({
+      uiId: userId,
+      text,
+      historyIndex: requestPlace,
+      mentions,
+      selections
+    });
+    if (queued) {
+      if (runtime.turnStopped) {
+        // The user stopped the turn, the message waits for the next
+        // command. The queue is on hold until the reader asks for it.
+        queued.state = 'waiting';
+        queued.error = undefined;
+        runtime.queuePaused = true;
+      } else if (runtime.errorReported) {
+        queued.state = 'error';
+        queued.error = runtime.lastError;
+      } else {
+        queued.state = 'done';
+      }
+      postQueue(host, runtime);
+    }
+    persist(host, runtime);
+    void refreshQuota(host);
+    // The next message of the queue goes out.
+    void pumpQueue(host, runtime);
+  }
+}
+
+
+export async function rewindTo(host: MiniMaxController, id: string): Promise<void> {
+  const runtime = host.activeSession();
+  if (!runtime) {
+    return;
+  }
+  if (runtime.busy) {
+    host.panel.post({
+      type: 'notice',
+      message: 'The agent is busy, wait for the turn to end.',
+      kind: 'warn'
+    });
+    return;
+  }
+  const index = runtime.uiMessages.findIndex((message) => message.id === id);
+  if (index === -1) {
+    return;
+  }
+  const message = runtime.uiMessages[index]!;
+  if (message.role !== 'user') {
+    host.panel.post({
+      type: 'notice',
+      message: 'Only a request of the user can be taken back.',
+      kind: 'warn'
+    });
+    return;
+  }
+  const turn = runtime.turns.find((item) => item.uiId === id);
+  const text = turn?.text ?? message.text ?? '';
+  const mentions = turn?.mentions ?? [];
+  const selections = turn?.selections ?? [];
+  // The history of the model is cut before the request, the next
+  // request starts from the same state.
+  cutHistoryBefore(host, runtime, turn, text);
+  // The turns after this one go away with the messages.
+  runtime.turns = runtime.turns.filter((item) => {
+    const at = runtime.uiMessages.findIndex((entry) => entry.id === item.uiId);
+    return at !== -1 && at < index;
+  });
+  runtime.uiMessages = runtime.uiMessages.slice(0, index);
+  // The list of the tasks belongs to the turn that goes away, it goes
+  // away with it.
+  runtime.todos = [];
+  host.panel.post({ type: 'todos', todos: runtime.todos });
+  // The panel gets a copy, the chat grows right after this line.
+  postHistory(host, runtime);
+  // The request comes back to the input field, the agent waits.
+  host.panel.post({ type: 'restore_input', text, mentions, selections });
+  persist(host, runtime);
+}
+
+
+export async function retryTurn(host: MiniMaxController, id: string): Promise<void> {
+  const runtime = host.activeSession();
+  if (!runtime) {
+    return;
+  }
+  if (runtime.busy) {
+    host.panel.post({
+      type: 'notice',
+      message: 'The agent is busy, wait for the turn to end.',
+      kind: 'warn'
+    });
+    return;
+  }
+  const turn = turnOfMessage(runtime.turns, runtime.uiMessages, id);
+  if (!turn) {
+    host.panel.post({
+      type: 'notice',
+      message: 'This message has no request to repeat, the chat is too old.',
+      kind: 'warn'
+    });
+    return;
+  }
+  const userIndex = runtime.uiMessages.findIndex(
+    (message) => message.id === turn.uiId
+  );
+  if (userIndex === -1) {
+    return;
+  }
+  // The turns after this one go away with the messages.
+  runtime.turns = runtime.turns.filter((item) => {
+    const at = runtime.uiMessages.findIndex((message) => message.id === item.uiId);
+    return at !== -1 && at < userIndex;
+  });
+  cutHistoryBefore(host, runtime, turn, turn.text);
+  runtime.uiMessages = runtime.uiMessages.slice(0, userIndex);
+  // The list of the tasks belongs to the turn that goes away, it goes
+  // away with it.
+  runtime.todos = [];
+  host.panel.post({ type: 'todos', todos: runtime.todos });
+  // The panel gets a copy, the chat grows right after this line.
+  postHistory(host, runtime);
+  await handleSend(host, turn.text, turn.mentions, turn.selections);
+}
+
+
+export function cutHistoryBefore(_host: MiniMaxController, runtime: RuntimeSession,
+  turn: TurnAnchor | undefined,
+  text: string): void {
+  const hint = turn?.historyIndex;
+  const found = findRequestIndex(runtime.history, text, hint);
+  let cut = found;
+  if (cut === -1) {
+    // The request is not in the history any more, the place of the
+    // anchor is the best guess.
+    cut =
+      hint !== undefined && hint >= 0
+        ? Math.min(hint, runtime.history.length)
+        : runtime.history.length;
+  }
+  // The cut must not split a call of a tool from its result, the model
+  // would see a call without the answer and the API would refuse the
+  // request.
+  runtime.history = cutHistory(runtime.history, cut);
+  runtime.agent?.setHistory(runtime.history);
+}
+
+
+export async function buildPromptText(host: MiniMaxController, text: string,
+  mentions: string[],
+  selections: UiSelection[]): Promise<string> {
+  const blocks: string[] = [];
+  const files = await readMentionedFiles(host.workspaceRoot(), text, mentions);
+  if (files.length > 0) {
+    host.logger.info('attached ' + files.length + ' file(s) mentioned in the request');
+  }
+  for (const file of files) {
+    blocks.push('Attached file: ' + file.path + '\n' + file.content);
+  }
+  for (const selection of selections) {
+    const header =
+      'Selected code from ' +
+      selection.path +
+      (selection.detail ? ' (' + selection.detail + ')' : '');
+    blocks.push(header + ':\n' + (selection.content ?? ''));
+  }
+  if (blocks.length === 0) {
+    return text;
+  }
+  return text + '\n\n' + blocks.join('\n\n');
+}
+

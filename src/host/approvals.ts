@@ -1,11 +1,12 @@
 import type { MiniMaxController } from '../extension';
-import { ApprovalGate, type ApprovalDecision, type ApprovalRequest } from '../ui/approvals';
+import { ApprovalGate } from '../ui/approvals';
 import { buildPreview } from '../tools/preview';
 import { getSettings } from '../config/settings';
 import type { AgentSession } from '../agent/session';
 import type { UiApproval } from '../ui/protocol';
 import type { RuntimeSession } from './runtime';
 import { postFor } from './channel';
+import type { ApprovalDecision, ApprovalRequest } from '../ui/approvals';
 
 export function childApproval(host: MiniMaxController, runtime: RuntimeSession,
   signal: AbortSignal): ApprovalGate {

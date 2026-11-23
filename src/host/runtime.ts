@@ -1,6 +1,5 @@
 import type { AnthropicMessage } from '../api/types';
-import type { AgentState, UiMessage, UiUsageTurn } from '../ui/protocol';
-import type { QueuedMessage } from '../ui/protocol';
+import type { AgentState, UiMessage, UiUsageTurn, QueuedMessage } from '../ui/protocol';
 import type { AgentSession } from '../agent/session';
 import type { GoalState, TodoItem } from '../agent/state';
 import type { TurnAnchor } from '../agent/turns';

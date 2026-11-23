@@ -174,7 +174,7 @@ export function restoreSession(host: MiniMaxController): void {
       : list.find((session) => session.workspaceRoot === root);
   if (!stored) {
     // The project has no chats, a new one starts.
-    startNewSession(host, );
+    startNewSession(host);
     return;
   }
   const runtime = runtimeFrom(host, stored);
@@ -242,7 +242,7 @@ export function deleteSession(host: MiniMaxController, id: string): void {
     // The removed chat must not stay active, its id would point to nothing
     // after a restart.
     host.store.setActiveIdFor(host.workspaceRoot(), undefined);
-    startNewSession(host, );
+    startNewSession(host);
     return;
   }
   void host.sendInit();
