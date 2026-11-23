@@ -2144,6 +2144,25 @@ class MiniMaxController {
           message: 'The custom base URL is not accepted: ' + check.reason + '.'
         });
         customBaseUrl = '';
+      } else if (!isOfficialBaseUrlHost(check.host ?? '')) {
+        // The key of the user goes to this host. The command of the endpoint
+        // asks about another host, the panel has to ask the same question:
+        // a typo in the address sends the key to a stranger.
+        const answer = await vscode.window.showWarningMessage(
+          'MiniMax: the API key will go to ' +
+            check.host +
+            '. It is not the address of MiniMax.',
+          { modal: true },
+          'Use it'
+        );
+        if (answer !== 'Use it') {
+          customBaseUrl = '';
+          this.panel.post({
+            type: 'notice',
+            message: 'The custom base URL was not saved: it is not the address of MiniMax.',
+            kind: 'warn'
+          });
+        }
       }
     }
     const updates: Array<[string, unknown]> = [

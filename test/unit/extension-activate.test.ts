@@ -61,7 +61,10 @@ const state = vi.hoisted(() => ({
   // response 'HOLD' holds the turn of the model.
   holdResponse: undefined as undefined | (() => void),
   quickPick: undefined as undefined | { title: string; items: unknown[] },
-  progressCancel: undefined as undefined | (() => void)
+  progressCancel: undefined as undefined | (() => void),
+  // The answer of the modal question about the address of another host.
+  warningAnswer: undefined as undefined | string,
+  warningCalls: [] as string[]
 }));
 
 vi.mock('vscode', () => {
@@ -137,6 +140,10 @@ vi.mock('vscode', () => {
       showOpenDialog: async () => undefined,
       showInformationMessage: async () => undefined,
       showErrorMessage: async () => undefined,
+      showWarningMessage: async (...args: unknown[]) => {
+        state.warningCalls.push(String(args[0] ?? ''));
+        return state.warningAnswer;
+      },
       withProgress: async (
         _options: unknown,
         task: (progress: unknown, token: unknown) => Promise<unknown>
@@ -483,6 +490,8 @@ describe('extension activation', () => {
     state.failState = false;
     state.receive = undefined;
     state.progressCancel = undefined;
+    state.warningAnswer = undefined;
+    state.warningCalls.length = 0;
     state.theme = 2;
     state.themeListener = undefined;
     state.opened.length = 0;
@@ -778,6 +787,84 @@ describe('extension activation', () => {
       expect(ofType('suggestions').length).toBe(1);
     });
     expect(ofType('suggestions')[0]!.items).toHaveLength(0);
+  });
+
+  it('does not save the address of another host without a confirmation', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    await boot();
+    state.posted.length = 0;
+    state.receive?.({
+      type: 'save_settings',
+      values: {
+        baseUrl: 'auto',
+        customBaseUrl: 'https://api.example.com/anthropic',
+        model: 'MiniMax-M3.1-Flash',
+        effort: 'max',
+        mode: 'code',
+        thinking: false,
+        maxIterations: 40,
+        maxRetries: 5,
+        fontSize: 13,
+        historyMaxMessages: 120,
+        contextThreshold: 50,
+        semanticSearch: false,
+        autoApprove: [],
+        rulesEnabled: true,
+        enableWebSearch: false,
+        collapseTools: false,
+        collapseCode: false,
+        showToolSteps: true,
+        speechLanguage: '',
+        microphone: ''
+      }
+    });
+    await waitForState(() => {
+      expect(state.warningCalls.length).toBe(1);
+    });
+    expect(state.warningCalls[0]).toContain('api.example.com');
+    // The reader did not agree, the address is not saved and the rest of
+    // the settings is saved.
+    await waitForState(() => {
+      expect(state.config.get('model')).toBe('MiniMax-M3.1-Flash');
+      expect(state.config.get('customBaseUrl')).toBe('');
+    });
+    expect(ofType('notice').some((item) => item.message.includes('not saved'))).toBe(true);
+  });
+
+  it('saves the address of another host when the reader agrees', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.warningAnswer = 'Use it';
+    await boot();
+    state.receive?.({
+      type: 'save_settings',
+      values: {
+        baseUrl: 'auto',
+        customBaseUrl: 'https://api.example.com/anthropic',
+        model: 'MiniMax-M3.1-Flash',
+        effort: 'max',
+        mode: 'code',
+        thinking: false,
+        maxIterations: 40,
+        maxRetries: 5,
+        fontSize: 13,
+        historyMaxMessages: 120,
+        contextThreshold: 50,
+        semanticSearch: false,
+        autoApprove: [],
+        rulesEnabled: true,
+        enableWebSearch: false,
+        collapseTools: false,
+        collapseCode: false,
+        showToolSteps: true,
+        speechLanguage: '',
+        microphone: ''
+      }
+    });
+    await waitForState(() => {
+      expect(state.config.get('customBaseUrl')).toBe('https://api.example.com/anthropic');
+    });
   });
 
   it('returns the settings and saves the changes', async () => {

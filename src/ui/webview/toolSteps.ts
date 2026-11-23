@@ -21,7 +21,6 @@ export type FeedItem =
 export function groupToolSteps(messages: UiMessage[]): FeedItem[] {
   const items: FeedItem[] = [];
   let step: ToolStep | undefined;
-  let counter = 0;
   for (const message of messages) {
     // A new request of the reader starts a new step.
     if (message.role === 'user') {
@@ -34,8 +33,10 @@ export function groupToolSteps(messages: UiMessage[]): FeedItem[] {
     }
     if (message.role === 'tool' && message.tool) {
       if (!step) {
-        counter += 1;
-        step = { id: 'step-' + counter, tools: [] };
+        // The id of the step is the id of its first card. A counter over the
+        // shown slice moved when the older part of the chat came in front of
+        // it: the step got a new React key and its fold state was lost.
+        step = { id: message.id, tools: [] };
         items.push({ kind: 'steps', step });
       }
       step.tools.push(message);
