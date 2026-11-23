@@ -40,6 +40,7 @@
 - Вкладка настроек рядом с чатом: ключ, endpoint, модель, effort, лимиты, автоодобрение
 - Инструменты: `read_file`, `write_file`, `edit_file`, `list_files`, `search_code`, `run_terminal`, `todo_write`, `get_goal`, `update_goal`, `task`, инструменты git и worktree
 - Превью диффа перед записью и карточка подтверждения перед каждой командой
+- Команды терминала на Windows исполняются в PowerShell (pwsh, при отсутствии powershell), на остальных системах в sh, промпт модели называет ту же оболочку
 - Правила проекта подхватываются из `AGENTS.md`, `.github/copilot-instructions.md`, `CLAUDE.md` и `.cursorrules`
 - Бейдж в правом нижнем углу VS Code показывает остаток 5-часового лимита в процентах, а клик по нему открывает числа: расход за сутки, остаток за неделю, остаток за 5 часов и кэш-хит в процентах
 - Кнопка со звёздочкой в панели Source Control пишет текст коммита по изменениям репозитория и кладёт его в поле сообщения
@@ -260,7 +261,7 @@ npm run package
 Открыть расширение в VS Code по F5 или поставить собранный файл:
 
 ```bash
-code --install-extension minimax-agent-0.13.1.vsix --force
+code --install-extension minimax-agent-0.13.2.vsix --force
 ```
 
 Имя файла повторяет версию из `package.json`.
