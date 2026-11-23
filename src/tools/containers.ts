@@ -1,5 +1,17 @@
-import { execFile } from 'node:child_process';
 import type { ToolEntry } from './types';
+import { formatResult, requireRuntime, runRuntime } from './containers/runtime';
+import {
+  buildExecArgs,
+  buildImagesArgs,
+  buildListArgs,
+  buildLogsArgs,
+  buildRunArgs,
+  buildStopArgs,
+  isValidContainerImage,
+  isValidContainerName,
+  parseCommandArg,
+  truncateContainerOutput
+} from './containers/args';
 
 export type ContainerRuntime = 'podman' | 'docker';
 
@@ -41,184 +53,6 @@ export async function pickContainerRuntime(
 
 // Имя контейнера не может начинаться с дефиса: иначе это опция рантайма, а не
 // имя. Остальное ограничение взято из правил имён docker.
-export function isValidContainerName(name: string): boolean {
-  return /^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/.test(name);
-}
-
-export function isValidContainerImage(image: string): boolean {
-  return image.length > 0 && !image.startsWith('-');
-}
-
-// A command line is split by the spaces that stand outside the quotes. A
-// plain split by spaces broke a path with a space and a quoted phrase into
-// pieces, the container received other arguments than the model meant.
-export function splitCommandLine(text: string): string[] {
-  const parts: string[] = [];
-  let current = '';
-  let quote = '';
-  for (const ch of text) {
-    if (quote.length > 0) {
-      if (ch === quote) {
-        quote = '';
-      } else {
-        current += ch;
-      }
-      continue;
-    }
-    if (ch === '"' || ch === "'") {
-      quote = ch;
-      continue;
-    }
-    if (/\s/.test(ch)) {
-      if (current.length > 0) {
-        parts.push(current);
-        current = '';
-      }
-      continue;
-    }
-    current += ch;
-  }
-  if (current.length > 0) {
-    parts.push(current);
-  }
-  return parts;
-}
-
-// The command comes as an array; a single string is accepted too, the model
-// sends it sometimes. The string goes through the quote-aware split.
-export function parseCommandArg(value: unknown): string[] {
-  if (Array.isArray(value)) {
-    return value.filter((item): item is string => typeof item === 'string');
-  }
-  if (typeof value === 'string') {
-    const trimmed = value.trim();
-    return trimmed.length > 0 ? splitCommandLine(trimmed) : [];
-  }
-  return [];
-}
-
-export function buildListArgs(): string[] {
-  return ['ps', '--all', '--format', '{{.Names}}\t{{.Image}}\t{{.Status}}'];
-}
-
-export function buildImagesArgs(): string[] {
-  return ['images', '--format', '{{.Repository}}:{{.Tag}}\t{{.ID}}\t{{.Size}}'];
-}
-
-export function buildLogsArgs(name: string, tail: number): string[] {
-  return ['logs', '--tail', String(tail), name];
-}
-
-export function buildRunArgs(options: ContainerRunOptions): string[] {
-  const args = ['run'];
-  if (options.name !== undefined && options.name.length > 0) {
-    args.push('--name', options.name);
-  }
-  if (options.detach !== false) {
-    args.push('--detach');
-  }
-  args.push(options.image);
-  if (options.command !== undefined && options.command.length > 0) {
-    args.push(...options.command);
-  }
-  return args;
-}
-
-export function buildStopArgs(name: string): string[] {
-  return ['stop', name];
-}
-
-export function buildExecArgs(name: string, command: string[]): string[] {
-  return ['exec', name, ...command];
-}
-
-export function truncateContainerOutput(
-  text: string,
-  limit: number = CONTAINER_MAX_OUTPUT_CHARS
-): string {
-  if (text.length <= limit) {
-    return text;
-  }
-  return text.slice(0, limit) + '\n[output truncated: ' + (text.length - limit) + ' characters cut]';
-}
-
-let runtimeCache: { at: number; runtime?: ContainerRuntime } | undefined;
-const RUNTIME_CACHE_MS = 60_000;
-
-export function resetContainerRuntimeCache(): void {
-  runtimeCache = undefined;
-}
-
-async function probeRuntime(runtime: ContainerRuntime): Promise<boolean> {
-  return await new Promise<boolean>((resolve) => {
-    execFile(
-      runtime,
-      ['--version'],
-      { timeout: CONTAINER_PROBE_TIMEOUT_MS, windowsHide: true },
-      (error) => resolve(!error)
-    );
-  });
-}
-
-// Рантайм ищется один раз в минуту: проверка стоит дорого, а список
-// контейнеров модель зовёт часто.
-async function detectRuntime(): Promise<ContainerRuntime | undefined> {
-  if (runtimeCache && Date.now() - runtimeCache.at < RUNTIME_CACHE_MS) {
-    return runtimeCache.runtime;
-  }
-  const runtime = await pickContainerRuntime(CONTAINER_RUNTIMES, probeRuntime);
-  runtimeCache = { at: Date.now(), runtime };
-  return runtime;
-}
-
-async function runRuntime(
-  runtime: ContainerRuntime,
-  args: string[],
-  timeoutMs: number
-): Promise<ContainerResult> {
-  return await new Promise<ContainerResult>((resolve) => {
-    execFile(
-      runtime,
-      args,
-      { timeout: timeoutMs, maxBuffer: 16 * 1024 * 1024, windowsHide: true },
-      (error, stdout, stderr) => {
-        if (!error) {
-          resolve({ code: 0, stdout, stderr });
-          return;
-        }
-        const code = typeof error.code === 'number' ? error.code : 1;
-        resolve({
-          code,
-          stdout: typeof stdout === 'string' ? stdout : '',
-          stderr: stderr && stderr.length > 0 ? stderr : error.message
-        });
-      }
-    );
-  });
-}
-
-function formatResult(result: ContainerResult): string {
-  const parts: string[] = [];
-  if (result.stdout.trim().length > 0) {
-    parts.push(result.stdout.trim());
-  }
-  if (result.stderr.trim().length > 0) {
-    parts.push('[stderr] ' + result.stderr.trim());
-  }
-  return parts.join('\n');
-}
-
-const NO_RUNTIME_TEXT = 'neither podman nor docker is installed';
-
-async function requireRuntime(): Promise<
-  { runtime: ContainerRuntime } | { error: string }
-> {
-  const runtime = await detectRuntime();
-  if (!runtime) {
-    return { error: NO_RUNTIME_TEXT };
-  }
-  return { runtime };
-}
 
 export function createContainerTools(): ToolEntry[] {
   const list: ToolEntry = {
@@ -508,3 +342,6 @@ export function createContainerTools(): ToolEntry[] {
 
   return [list, logs, run, stop, exec];
 }
+
+// The helpers of the arguments stay reachable under the old name.
+export * from './containers/args';
