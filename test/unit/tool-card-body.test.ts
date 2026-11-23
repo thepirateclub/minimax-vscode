@@ -39,6 +39,14 @@ describe('the body of a card', () => {
     expect(markup).not.toContain('12500 ms');
   });
 
+  it('names the REPL of the language and shows the terminal', () => {
+    const node = card({ name: 'repl_node', input: {}, content: '42' });
+    const python = card({ name: 'repl_python', input: {}, content: '42' });
+    // The card names the language, the raw name of the tool is not a title.
+    expect(titleOf(node)).toBe('Node REPL');
+    expect(titleOf(python)).toBe('Python REPL');
+  });
+
   it('names the words of the search', () => {
     const markup = card({
       name: 'search_code',

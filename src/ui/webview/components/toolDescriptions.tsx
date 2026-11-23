@@ -57,6 +57,21 @@ interface DescriberContext {
 
 type Describer = (ctx: DescriberContext) => ToolView;
 
+// The REPL of node and the REPL of python are the same card, only the
+// name of the language differs. Both rows point at one describer.
+const replDescriber: Describer = ({ tool, content }) => ({
+  icon: <IconTerminal />,
+  title: tool.name === 'repl_node' ? STRINGS.toolReplNode : STRINGS.toolReplPython,
+  summary: firstLine(content)
+});
+
+// The names of the tools the panel knows. A tool without a row here falls
+// to the generic card, so the list is worth checking against the tools of
+// the extension.
+export function describerNames(): string[] {
+  return Object.keys(DESCRIBERS);
+}
+
 const DESCRIBERS: Record<string, Describer> = {
   read_file: ({ input, paths, content }) => {
     const range = readRange(input);
@@ -247,14 +262,8 @@ const DESCRIBERS: Record<string, Describer> = {
       summary: firstLine(content)
     };
   },
-  repl_node: ({ tool, content }) => {
-    return {
-      icon: <IconTerminal />,
-      title:
-        tool.name === 'repl_node' ? STRINGS.toolReplNode : STRINGS.toolReplPython,
-      summary: firstLine(content)
-    };
-  },
+  repl_node: replDescriber,
+  repl_python: replDescriber,
   container_list: ({ content }) => {
     return {
       icon: <IconList />,
