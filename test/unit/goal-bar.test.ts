@@ -2,12 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import {
-  GoalBar,
+  GoalBar
+} from '../../src/ui/webview/components/GoalBar';
+import {
   formatDuration,
   goalFormValues,
   goalMatches,
   parseGoalForm
-} from '../../src/ui/webview/components/GoalBar';
+} from '../../src/ui/webview/goalForm';
 import { STRINGS } from '../../src/ui/webview/strings';
 import type { GoalState } from '../../src/agent/state';
 import { readStyles } from '../helpers/styles';
