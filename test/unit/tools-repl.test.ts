@@ -11,6 +11,7 @@ import {
   pickInterpreter,
   resetReplProcesses,
   resolveReplTimeout,
+  stopReplSession,
   splitReplOutput,
   truncateReplOutput
 } from '../../src/tools/repl';
@@ -146,6 +147,33 @@ describe('the live REPL', () => {
     const second = await node.execute({ code: 'value + 1' }, ctx);
     expect(second.isError).toBeFalsy();
     expect(second.content).toContain('43');
+    resetReplProcesses();
+  });
+
+  it('stops the processes of one chat and keeps the state of the other', async () => {
+    const node = createReplTools().find((item) => item.name === 'repl_node');
+    if (!node) {
+      throw new Error('no tool repl_node');
+    }
+    const base = {
+      workspaceRoot: process.cwd(),
+      signal: new AbortController().signal,
+      logger: { info: () => undefined, error: () => undefined }
+    };
+    const one = { ...base, sessionId: 'chat-one' };
+    const two = { ...base, sessionId: 'chat-two' };
+    await node.execute({ code: 'const kept = 7; kept' }, one);
+    await node.execute({ code: 'const kept = 8; kept' }, two);
+
+    // The chat is deleted, its interpreter goes with it.
+    stopReplSession('chat-one');
+    const other = await node.execute({ code: 'kept' }, two);
+    expect(other.isError).toBeFalsy();
+    expect(other.content).toContain('8');
+    // The stopped chat gets a fresh interpreter.
+    const fresh = await node.execute({ code: 'typeof kept' }, one);
+    expect(fresh.isError).toBeFalsy();
+    expect(fresh.content).toContain('undefined');
     resetReplProcesses();
   });
 });

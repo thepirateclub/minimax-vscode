@@ -51,7 +51,7 @@ import { createGitTools } from './tools/git';
 import { createTerminalTools } from './tools/terminal';
 import { createTodoTools } from './tools/todo';
 import { createTaskFileTools } from './tools/tasks';
-import { createReplTools, resetReplProcesses } from './tools/repl';
+import { createReplTools, resetReplProcesses, stopReplSession } from './tools/repl';
 import { createContainerTools } from './tools/containers';
 import { createCmdTools } from './tools/cmd';
 import {
@@ -260,7 +260,14 @@ class MiniMaxController {
       vscode.commands.registerCommand('minimax.openPanel', () => this.panel.reveal())
     );
     // A recording left running would hold the microphone after the window closes.
-    context.subscriptions.push({ dispose: () => this.voice.cancel() });
+    // The REPL processes of the chats go away with the extension host too:
+    // a child of the host outlives it otherwise.
+    context.subscriptions.push({
+      dispose: () => {
+        this.voice.cancel();
+        resetReplProcesses();
+      }
+    });
     context.subscriptions.push(
       vscode.commands.registerCommand('minimax.newChat', () => this.startNewSession())
     );
@@ -2298,9 +2305,9 @@ class MiniMaxController {
   }
 
   startNewSession(): void {
-    // The processes of the repl belong to the chat, a new chat starts
-    // with clean ones.
-    resetReplProcesses();
+    // The processes of the REPL are keyed by the chat, a new chat has a new
+    // id and starts with no process of its own. The processes of the other
+    // chats stay alive: starting a chat must not drop their state.
     const current = this.activeSession();
     if (current) {
       this.persist(current);
@@ -2412,6 +2419,8 @@ class MiniMaxController {
         }
       }
     }
+    // The processes of the REPL of the chat go with it.
+    stopReplSession(id);
     this.store.remove(id);
     // The removed chat is not the open one of any project.
     this.store.clearActiveId(id);

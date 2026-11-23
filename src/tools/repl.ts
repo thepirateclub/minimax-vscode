@@ -16,6 +16,9 @@ export const REPL_DEFAULT_TIMEOUT_MS = 15_000;
 export const REPL_MIN_TIMEOUT_MS = 1_000;
 export const REPL_MAX_TIMEOUT_MS = 60_000;
 export const REPL_MAX_OUTPUT_CHARS = 30_000;
+// A chat keeps two interpreters at most, the machine does not hold a process
+// per chat that was ever opened.
+export const MAX_REPL_PROCESSES = 6;
 
 export type ReplLanguage = 'node' | 'python';
 
@@ -142,6 +145,35 @@ export function resetReplProcesses(): void {
   }
   processes.clear();
   interpreterCache.clear();
+}
+
+// The processes of one chat. A deleted chat must not keep a live interpreter,
+// and a new chat must not kill the interpreters of the chats that still work.
+export function stopReplSession(sessionId: string): void {
+  const prefix = sessionId + '::';
+  for (const [key, proc] of [...processes]) {
+    if (!key.startsWith(prefix)) {
+      continue;
+    }
+    stopProcess(proc);
+    processes.delete(key);
+  }
+}
+
+// The map does not grow with every chat that ever ran a block: the oldest
+// process that waits for nothing goes away.
+function trimProcesses(keep: string): void {
+  if (processes.size < MAX_REPL_PROCESSES) {
+    return;
+  }
+  for (const [key, proc] of [...processes]) {
+    if (key === keep || proc.waiters.length > 0) {
+      continue;
+    }
+    stopProcess(proc);
+    processes.delete(key);
+    return;
+  }
 }
 
 // Bootstrap пишется во временный каталог: файл рядом с исходником в сборку
@@ -335,6 +367,7 @@ async function executeRepl(
         isError: true
       };
     }
+    trimProcesses(key);
     processes.set(key, proc);
     ctx.logger.info('the REPL of ' + language + ' started for the session ' + sessionId);
   }
