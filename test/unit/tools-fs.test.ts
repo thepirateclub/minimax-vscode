@@ -64,6 +64,20 @@ describe('file tools', () => {
     expect(result.content).not.toContain('4: four');
   });
 
+  it('names a range outside the file, it is not an empty file', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-'));
+    await writeFile(join(root, 'a.txt'), 'one\ntwo\n', 'utf8');
+    const tools = createFileTools({ backups: new InMemoryBackupStore() });
+    const read = tools.find((t) => t.name === 'read_file');
+    const result = await read!.execute(
+      { path: 'a.txt', start_line: 10, end_line: 20 },
+      makeContext(root)
+    );
+    expect(result.isError).toBeFalsy();
+    expect(result.content).toContain('no lines in the range 10-20');
+    expect(result.content).not.toContain('empty file');
+  });
+
   it('reads several files in one call', async () => {
     const root = await mkdtemp(join(tmpdir(), 'mm-'));
     await writeFile(join(root, 'a.txt'), 'one\n', 'utf8');

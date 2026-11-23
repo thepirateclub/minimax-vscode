@@ -24,6 +24,34 @@ describe('buildPreview', () => {
     expect(preview?.lines.some((line) => line.type === 'remove')).toBe(true);
   });
 
+  it('shows every replaced place for replace_all', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-'));
+    await writeFile(join(root, 'a.txt'), 'one two one two one\n', 'utf8');
+    const preview = await buildPreview(
+      'edit_file',
+      { path: 'a.txt', old_string: 'one', new_string: 'zero', replace_all: true },
+      root
+    );
+    // The preview has to repeat the arithmetic of the write: every place,
+    // not only the first one.
+    const added = preview?.lines.filter((line) => line.type === 'add') ?? [];
+    expect(added.some((line) => line.text.includes('zero two zero'))).toBe(true);
+    expect(added.some((line) => line.text.includes('one two'))).toBe(false);
+  });
+
+  it('keeps the dollars literal for replace_all, as the write does', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-'));
+    await writeFile(join(root, 'a.txt'), 'x a y a z\n', 'utf8');
+    const preview = await buildPreview(
+      'edit_file',
+      { path: 'a.txt', old_string: 'a', new_string: '$&b', replace_all: true },
+      root
+    );
+    const added = preview?.lines.filter((line) => line.type === 'add') ?? [];
+    // split/join treats the dollars as letters, the disk holds the same.
+    expect(added.some((line) => line.text.includes('x $&b y $&b z'))).toBe(true);
+  });
+
   it('returns nothing for run_terminal', async () => {
     const root = await mkdtemp(join(tmpdir(), 'mm-'));
     expect(await buildPreview('run_terminal', { command: 'ls' }, root)).toBeUndefined();

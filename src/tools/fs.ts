@@ -84,18 +84,30 @@ export function createFileTools(deps: { backups: BackupStore }): ToolEntry[] {
       let failed = 0;
       for (const path of paths) {
         let body: string;
+        // A range that stands outside the file reads nothing: an empty
+        // answer would read as an empty file and the model would believe
+        // there is no code at all.
+        let beyondRange = false;
         try {
           const target = resolveWorkspacePath(ctx.workspaceRoot, path);
           const raw = await readFileAsync(target, 'utf8');
           const lines = raw.split('\n');
           const slice = lines.slice(Math.max(0, start - 1), Math.max(0, end));
           body = slice.map((line, offset) => (start + offset) + ': ' + line).join('\n');
+          beyondRange = slice.length === 0 && raw.length > 0;
         } catch (error) {
           failed += 1;
           body = 'read_file failed: ' + (error instanceof Error ? error.message : String(error));
         }
         const header = paths.length > 1 ? '=== ' + path + ' ===\n' : '';
-        blocks.push(header + (body.length > 0 ? body : '[empty file]'));
+        blocks.push(
+          header +
+            (body.length > 0
+              ? body
+              : beyondRange
+                ? '[no lines in the range ' + start + '-' + end + ', the file is shorter]'
+                : '[empty file]')
+        );
       }
       let content = blocks.join('\n\n');
       if (content.length > MAX_READ_CHARS) {
