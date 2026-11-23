@@ -119,12 +119,6 @@ export function balanceHistory(messages: AnthropicMessage[]): AnthropicMessage[]
   return out;
 }
 
-// About four characters per token, the estimate is rough but it keeps the
-// request inside the context window of the model.
-export function estimateTokens(messages: AnthropicMessage[]): number {
-  return Math.ceil(charsOf(messages) / 4);
-}
-
 // The history has to fit into the context window of the model, the threshold
 // is the share of the window the history may take, the rest stays free for
 // the answer of the model.
@@ -135,8 +129,9 @@ export function fitHistory(
   threshold: number = DEFAULT_CONTEXT_THRESHOLD
 ): AnthropicMessage[] {
   const share = Math.max(1, Math.min(100, threshold)) / 100;
-  // The share is a part of the window in tokens, and the estimate of the
-  // history is tokens too: the budget is not divided a second time.
+  // The share is a part of the window in tokens, and about four characters
+  // make one token: the budget in characters is the share of the window in
+  // tokens times four. The budget is not divided by four a second time.
   const budgetChars = Math.floor(contextWindow * share) * 4;
   const kept = trimHistory(messages, limit);
   let chars = charsOf(kept);
