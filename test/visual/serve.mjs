@@ -26,8 +26,18 @@ const page =
 
 createServer((request, response) => {
   if ((request.url ?? '').startsWith('/preview.js')) {
+    let bundle;
+    try {
+      bundle = readFileSync(outfile);
+    } catch {
+      // The watch has not written the bundle yet, the stand answers instead
+      // of dying with the exception of a missing file.
+      response.writeHead(503, { 'content-type': 'text/plain' });
+      response.end('the bundle is not built yet');
+      return;
+    }
     response.writeHead(200, { 'content-type': 'text/javascript' });
-    response.end(readFileSync(outfile));
+    response.end(bundle);
     return;
   }
   response.writeHead(200, { 'content-type': 'text/html' });
