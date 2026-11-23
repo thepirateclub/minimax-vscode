@@ -1,6 +1,6 @@
 # The screenshot of the open step of the actions.
 #
-#   python analysis\code-review\shoot-open.py open-steps
+#   python scripts/stands\shoot-open.py open-steps
 import os
 import sys
 

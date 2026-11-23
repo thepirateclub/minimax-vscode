@@ -1,6 +1,6 @@
 # The reproduction of the repeat of a request that leaves the feed behind.
 #
-#   python analysis\code-review\repro-retry-scroll.py
+#   python scripts/stands\repro-retry-scroll.py
 #
 # The panel of the stand gets the messages of the host directly, the same
 # way the host sends them after the repeat of a request:

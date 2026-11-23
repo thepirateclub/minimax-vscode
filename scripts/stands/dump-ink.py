@@ -6,7 +6,7 @@
 # characters, so the optical alignment of an icon and of the words can be
 # judged by the eye and not by a guess.
 #
-#   python analysis\code-review\dump-ink.py file card.png 0 120 0 40
+#   python scripts/stands\dump-ink.py file card.png 0 120 0 40
 import os
 import sys
 

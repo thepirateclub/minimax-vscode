@@ -1,6 +1,6 @@
 # The scroll of the feed after the repeat of a request.
 #
-#   python analysis\code-review\check-retry-scroll.py
+#   python scripts/stands\check-retry-scroll.py
 #
 # The stand shows a long chat with an old failed turn in the middle of it, so
 # the panel shows the button of the repeat there. The reader scrolls up to

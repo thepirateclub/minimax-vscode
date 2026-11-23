@@ -7,7 +7,7 @@
 # It prints the ids and the counts, never the text of the chat.
 #
 # Run:
-#   python analysis\code-review\scan-poison.py
+#   python scripts/stands\scan-poison.py
 import json
 import os
 import sqlite3

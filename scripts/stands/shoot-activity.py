@@ -5,7 +5,7 @@
 # the field: it appears, it counts the time and it goes away when the action
 # ends.
 #
-#   python analysis\code-review\shoot-activity.py
+#   python scripts/stands\shoot-activity.py
 import os
 
 from playwright.sync_api import sync_playwright

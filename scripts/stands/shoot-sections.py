@@ -7,8 +7,8 @@
 # are counted from the left upper corner of the feed, so they are the same
 # numbers the screenshot of the feed holds.
 #
-#   python analysis\code-review\shoot-sections.py before
-#   python analysis\code-review\shoot-sections.py after
+#   python scripts/stands\shoot-sections.py before
+#   python scripts/stands\shoot-sections.py after
 import json
 import os
 import sys

@@ -1,6 +1,6 @@
 # The screenshot of the feed of the panel for a given url of the stand.
 #
-#   python analysis\code-review\shoot-feed.py cards "theme=dark&steps=0" 0
+#   python scripts/stands\shoot-feed.py cards "theme=dark&steps=0" 0
 import os
 import sys
 

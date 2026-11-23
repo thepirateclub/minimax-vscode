@@ -1,6 +1,6 @@
 # The previews of the folded sections of the chat.
 #
-#   python analysis\code-review\check-section-preview.py
+#   python scripts/stands\check-section-preview.py
 #
 # The stand shows a chat with a long reasoning and a group of actions. Both
 # sections are folded, both show one line of themselves in the row of the

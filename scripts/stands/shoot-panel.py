@@ -1,6 +1,6 @@
 # The screenshot of the whole panel of the stand.
 #
-#   python analysis\code-review\shoot-panel.py panel-steps "theme=dark&steps=1"
+#   python scripts/stands\shoot-panel.py panel-steps "theme=dark&steps=1"
 import os
 import sys
 
