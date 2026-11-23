@@ -1,54 +1,25 @@
-import type { MiniMaxClient } from '../api/client';
 import { balanceHistory, fitHistory } from '../api/history';
-import type { AnthropicMessage, EffortLevel } from '../api/types';
-import type { AgentMode } from '../config/models';
-import { Agent, type AgentEvent } from './agent';
-import type { SessionState } from './state';
-import type { Logger } from '../logger';
+import type { AnthropicMessage } from '../api/types';
+import { Agent } from './agent';
+import type { AgentRunOptions } from './types';
 import { buildPreview } from '../tools/preview';
-import type { ToolRegistry } from '../tools/registry';
 import { ApprovalGate, type ApprovalDecision } from '../ui/approvals';
 import type { UiApproval } from '../ui/protocol';
 
-export interface SessionOptions {
-  client: MiniMaxClient;
-  registry: ToolRegistry;
-  model: string;
-  maxTokens: number;
-  maxIterations: number;
-  // How many times a request is repeated after the loss of the connection.
-  maxRetries?: number;
-  // The first pause between the attempts, the pause grows from it.
-  retryBaseDelayMs?: number;
-  // The effort is set only for the models that take the depth levels.
-  effort?: EffortLevel;
-  thinking?: 'adaptive';
+export interface SessionOptions extends AgentRunOptions {
   // The context window of the model, the history is cut to fit into it.
   contextWindow?: number;
   // How many messages the history keeps before the old turns are cut.
   historyLimit: number;
   // The share of the context window the history may take, in percent.
   contextThreshold: number;
-  mode: AgentMode;
-  systemPrompt: string;
-  // How deep the agent is. Undefined is the main agent.
-  depth?: number;
-  // The budget of the goal. The agent stops when the guard says no.
-  budget?: () => boolean;
-  // The state of the session, the tools read it.
-  sessionState?: SessionState;
-  // The id of the session, the tools know who they work for.
-  sessionId?: string;
   // The permissions of the session. The gate of the agent uses this list,
   // the gate of a child of this session shares it.
   sessionApproved?: Set<string>;
   // The state of the repository is read before every turn, the prompt of
   // the model carries the fresh one.
   contextProvider?: () => Promise<string>;
-  workspaceRoot: string;
-  logger: Logger;
   autoApprove: string[];
-  onEvent: (event: AgentEvent) => void;
   onApproval: (approval: UiApproval) => void;
 }
 
@@ -131,25 +102,13 @@ export class AgentSession {
       : '';
     const systemPrompt =
       context.length > 0 ? this.systemPrompt + '\n\n' + context : this.systemPrompt;
+    // The options of the session carry the options of the agent, a new
+    // field of the agent reaches it without a list of names here.
+    const run: AgentRunOptions = this.options;
     this.agent = new Agent({
-      client: this.options.client,
-      registry: this.options.registry,
+      ...run,
       approval: this.approval,
-      model: this.options.model,
-      maxTokens: this.options.maxTokens,
-      maxIterations: this.options.maxIterations,
-      maxRetries: this.options.maxRetries,
-      retryBaseDelayMs: this.options.retryBaseDelayMs,
-      effort: this.options.effort,
-      thinking: this.options.thinking,
-      mode: this.options.mode,
       systemPrompt,
-      workspaceRoot: this.options.workspaceRoot,
-      depth: this.options.depth,
-      sessionId: this.options.sessionId,
-      budget: this.options.budget,
-      sessionState: this.options.sessionState,
-      logger: this.options.logger,
       onEvent: (event) => this.options.onEvent(event)
     });
 

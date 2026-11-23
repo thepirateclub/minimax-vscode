@@ -46,10 +46,11 @@ export interface AgentRunResult {
   requestIndex: number;
 }
 
-export interface AgentOptions {
+// The options of a run of the agent. The session and the agent share
+// them, a field added here reaches both without a list of names.
+export interface AgentRunOptions {
   client: MiniMaxClient;
   registry: ToolRegistry;
-  approval: ApprovalGate;
   model: string;
   maxTokens: number;
   maxIterations: number;
@@ -74,4 +75,9 @@ export interface AgentOptions {
   sessionId?: string;
   logger: Logger;
   onEvent: (event: AgentEvent) => void;
+}
+
+export interface AgentOptions extends AgentRunOptions {
+  // The gate of the agent. The session builds its own gate and passes it.
+  approval: ApprovalGate;
 }
