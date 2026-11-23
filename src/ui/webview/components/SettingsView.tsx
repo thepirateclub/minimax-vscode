@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import type { EffortLevel } from '../../../api/types';
 import type { UiSettings, UiSettingsValues } from '../../protocol';
-import { currentReasoning, reasoningControl, reasoningOptions } from '../reasoning';
 import { STRINGS } from '../strings';
+import { Field } from './settings/Field';
+import { LimitsSection } from './settings/LimitsSection';
+import { ModelSection } from './settings/ModelSection';
 
 function toValues(settings: UiSettings): UiSettingsValues {
   return {
@@ -133,75 +134,17 @@ export function SettingsView({
           <option value="global">{STRINGS.endpointGlobal}</option>
           <option value="china">{STRINGS.endpointChina}</option>
         </select>
-        <label className="field">
-          <span>{STRINGS.customBaseUrl}</span>
+        <Field label={STRINGS.customBaseUrl} hint={STRINGS.customBaseUrlHint}>
           <input
             type="text"
             value={values.customBaseUrl}
             placeholder="https://api.minimax.io/anthropic"
             onChange={(event) => patch({ customBaseUrl: event.target.value })}
           />
-          <span className="hint">{STRINGS.customBaseUrlHint}</span>
-        </label>
+        </Field>
       </section>
 
-      <section className="settings-section">
-        <h3>{STRINGS.model}</h3>
-        <select value={values.model} onChange={(event) => patch({ model: event.target.value })}>
-          {settings.models.map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.label}
-            </option>
-          ))}
-        </select>
-        <label className="field">
-          <span>{STRINGS.reasoning}</span>
-          <select
-            value={currentReasoning(values.model, values.effort, values.thinking)}
-            onChange={(event) => {
-              const next = event.target.value;
-              if (next === 'off' || next === 'adaptive') {
-                patch({ thinking: next === 'adaptive' });
-                return;
-              }
-              patch({ effort: next as EffortLevel });
-            }}
-          >
-            {reasoningOptions(values.model).map((option) => (
-              <option key={option} value={option}>
-                {option === 'off'
-                  ? STRINGS.reasoningOff
-                  : option === 'adaptive'
-                    ? STRINGS.reasoningAdaptive
-                    : option}
-              </option>
-            ))}
-          </select>
-          <span className="hint">
-            {reasoningControl(values.model) === 'variants'
-              ? STRINGS.reasoningVariantsHint
-              : STRINGS.reasoningDepthHint}
-          </span>
-        </label>
-        <label className="field">
-          <span>{STRINGS.mode}</span>
-          <select
-            value={values.mode}
-            onChange={(event) =>
-              patch({ mode: event.target.value as UiSettingsValues['mode'] })
-            }
-          >
-            {(['plan', 'code'] as const).map((value) => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
-          </select>
-          <span className="hint">
-            {values.mode === 'plan' ? STRINGS.modePlanHint : STRINGS.modeCodeHint}
-          </span>
-        </label>
-      </section>
+      <ModelSection models={settings.models} values={values} patch={patch} />
 
       <section className="settings-section">
         <h3>{STRINGS.autoApprove}</h3>
@@ -218,65 +161,15 @@ export function SettingsView({
         ))}
       </section>
 
-      <section className="settings-section">
-        <h3>Limits</h3>
-        <label className="field">
-          <span>{STRINGS.maxTokens}</span>
-          <span className="value">{modelMaxTokens(settings, values.model)}</span>
-          <span className="hint">{STRINGS.maxTokensHint}</span>
-        </label>
-        <label className="field">
-          <span>{STRINGS.maxIterations}</span>
-          <input
-            type="number"
-            min={1}
-            max={200}
-            value={values.maxIterations}
-            onChange={(event) => patch({ maxIterations: Number(event.target.value) })}
-          />
-        </label>
-        <label className="field">
-          <span>{STRINGS.maxRetries}</span>
-          <input
-            type="number"
-            min={0}
-            max={20}
-            step={1}
-            value={values.maxRetries}
-            onChange={(event) => patch({ maxRetries: Number(event.target.value) })}
-          />
-          <span className="hint">{STRINGS.maxRetriesHint}</span>
-        </label>
-        <label className="field">
-          <span>{STRINGS.historyMaxMessages}</span>
-          <input
-            type="number"
-            min={10}
-            max={1000}
-            step={10}
-            value={values.historyMaxMessages}
-            onChange={(event) => patch({ historyMaxMessages: Number(event.target.value) })}
-          />
-          <span className="hint">{STRINGS.historyMaxMessagesHint}</span>
-        </label>
-        <label className="field">
-          <span>{STRINGS.contextThreshold}</span>
-          <input
-            type="number"
-            min={5}
-            max={95}
-            step={5}
-            value={values.contextThreshold}
-            onChange={(event) => patch({ contextThreshold: Number(event.target.value) })}
-          />
-          <span className="hint">{STRINGS.contextThresholdHint}</span>
-        </label>
-      </section>
+      <LimitsSection
+        values={values}
+        maxTokens={modelMaxTokens(settings, values.model)}
+        patch={patch}
+      />
 
       <section className="settings-section">
         <h3>{STRINGS.appearance}</h3>
-        <label className="field">
-          <span>{STRINGS.fontSize}</span>
+        <Field label={STRINGS.fontSize} hint={STRINGS.fontSizeHint}>
           <input
             type="number"
             min={10}
@@ -285,8 +178,7 @@ export function SettingsView({
             value={values.fontSize}
             onChange={(event) => patch({ fontSize: Number(event.target.value) })}
           />
-          <span className="hint">{STRINGS.fontSizeHint}</span>
-        </label>
+        </Field>
         <label className="checkbox">
           <input
             type="checkbox"
@@ -319,8 +211,7 @@ export function SettingsView({
       <section className="settings-section">
         <h3>{STRINGS.voice}</h3>
         <p className="hint">{STRINGS.voiceHint}</p>
-        <label className="field">
-          <span>{STRINGS.speechLanguage}</span>
+        <Field label={STRINGS.speechLanguage}>
           <select
             value={values.speechLanguage}
             onChange={(event) => patch({ speechLanguage: event.target.value })}
@@ -331,17 +222,15 @@ export function SettingsView({
               </option>
             ))}
           </select>
-        </label>
-        <label className="field">
-          <span>{STRINGS.microphone}</span>
+        </Field>
+        <Field label={STRINGS.microphone} hint={STRINGS.microphoneHint}>
           <input
             type="text"
             value={values.microphone}
             placeholder={STRINGS.microphoneAuto}
             onChange={(event) => patch({ microphone: event.target.value })}
           />
-          <span className="hint">{STRINGS.microphoneHint}</span>
-        </label>
+        </Field>
       </section>
 
       <section className="settings-section">
