@@ -2201,6 +2201,74 @@ describe('extension activation', () => {
     expect(ofType('approval_request').length).toBe(0);
   });
 
+  it('the card of an approval stays in the chat that asked for it', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.secrets.set('minimax.apiKey', 'test-key');
+    // The parent writes the tasks, starts a worker, the child asks for a
+    // write of its own.
+    state.responses.push(
+      TODO_SSE,
+      taskSse('worker', 'write a note'),
+      writeSse('toolu_1', 'note.txt', 'written by the child'),
+      TEXT_SSE,
+      TEXT_SSE
+    );
+    await boot();
+    const first = ofType('init')[0]!.state.activeSessionId;
+
+    state.receive?.({
+      type: 'send',
+      text: 'let the worker write',
+      mentions: [],
+      selections: []
+    });
+    // The list of the tasks is written without a question, the child asks
+    // for the write next.
+    await waitForState(() => {
+      expect(ofType('tool_end').some((message) => message.name === 'todo_write')).toBe(true);
+    });
+
+    // The reader opens another chat while the child waits for the answer.
+    state.receive?.({ type: 'new_session' });
+    await waitForState(() => {
+      expect(ofType('init').length).toBeGreaterThan(1);
+    });
+    state.posted.length = 0;
+    await waitForState(() => {
+      expect(state.bodies.length).toBeGreaterThanOrEqual(3);
+    });
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    // The card of the child did not land in the open chat.
+    expect(ofType('approval_request')).toHaveLength(0);
+
+    // Back in the chat that asked, the card is there and answers the turn.
+    state.receive?.({ type: 'select_session', id: first! });
+    await waitForState(() => {
+      const loaded = ofType('session_loaded').at(-1);
+      expect(loaded?.messages.some((message) => message.approval)).toBe(true);
+    });
+    const card = ofType('session_loaded')
+      .at(-1)!
+      .messages.find((message) => message.approval)!;
+    state.receive?.({ type: 'approve', id: card.approval!.id, allowForSession: false });
+    await waitForState(async () => {
+      expect(await readFile(join(root, 'note.txt'), 'utf8')).toBe('written by the child');
+    });
+
+    // The card does not go to the disk: a restored chat must not show a
+    // question whose turn is gone.
+    await waitForState(() => {
+      expect(ofType('status').at(-1)?.state).toBe('idle');
+    });
+    const stored = state.globalState.get('minimax.sessions') as Array<{
+      id: string;
+      uiMessages?: Array<{ approval?: unknown }>;
+    }>;
+    const saved = stored.find((item) => item.id === first);
+    expect(saved?.uiMessages?.some((message) => message.approval)).toBeFalsy();
+  });
+
   it('keeps the events of a chat in the background out of the open chat', async () => {
     const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
     state.config.set('root', root);

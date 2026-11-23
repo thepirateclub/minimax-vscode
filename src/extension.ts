@@ -149,6 +149,10 @@ class MiniMaxController {
       resolve: (decision: ApprovalDecision) => void;
     }
   >();
+  // The approval cards that wait for the reader: the id of the card and the
+  // chat it belongs to. The card lives in the messages of its chat, so
+  // another chat does not show it and a switch of the chats keeps it.
+  private readonly approvalOwner = new Map<string, string>();
   // The index of the project, one per workspace folder.
   private readonly searches = new Map<string, ProjectSearch>();
   private activeSessionId: string | undefined;
@@ -607,7 +611,16 @@ class MiniMaxController {
       autoApprove: settings.autoApprove,
       onEvent: (event) => this.handleAgentEvent(runtime, event),
       onApproval: (approval) => {
-        this.panel.post({ type: 'approval_request', approval });
+        // The card belongs to the chat of the turn: it goes into the
+        // messages of that chat and reaches the panel only while the chat
+        // is open.
+        runtime.uiMessages.push({
+          id: 'approval-' + approval.id,
+          role: 'assistant',
+          approval
+        });
+        this.approvalOwner.set(approval.id, runtime.id);
+        this.postFor(runtime, { type: 'approval_request', approval });
       }
     });
     agent.setHistory(runtime.history);
@@ -680,8 +693,43 @@ class MiniMaxController {
         sessionId: runtime.id,
         resolve
       });
-      this.panel.post({ type: 'approval_request', approval });
+      runtime.uiMessages.push({
+        id: 'approval-' + id,
+        role: 'assistant',
+        approval
+      });
+      this.approvalOwner.set(id, runtime.id);
+      this.postFor(runtime, { type: 'approval_request', approval });
     });
+  }
+
+  // The card of an approval leaves the chat with its answer: a card that
+  // outlives its question reads like a dead button. Returns false when the
+  // card has no owner any more, the caller tells the panel itself then.
+  private dropApprovalCard(approvalId: string, approved: boolean): boolean {
+    const owner = this.approvalOwner.get(approvalId);
+    if (owner === undefined) {
+      return false;
+    }
+    this.approvalOwner.delete(approvalId);
+    const runtime = this.sessions.get(owner);
+    if (!runtime) {
+      return true;
+    }
+    runtime.uiMessages = runtime.uiMessages.filter(
+      (message) => message.approval?.id !== approvalId
+    );
+    this.postFor(runtime, { type: 'approval_resolved', id: approvalId, approved });
+    return true;
+  }
+
+  // Every waiting card of a chat leaves it: the stop of the turn answers
+  // the questions that nobody will answer.
+  private dropApprovalCards(runtime: RuntimeSession, approved: boolean): void {
+    const cards = runtime.uiMessages.filter((message) => message.approval);
+    for (const card of cards) {
+      this.dropApprovalCard(card.approval!.id, approved);
+    }
   }
 
   // The approvals of the children that wait are released when the turn is
@@ -990,6 +1038,7 @@ class MiniMaxController {
       if (notice) {
         this.postFor(runtime, { type: 'notice', message: notice.message, kind: notice.kind });
       }
+      this.dropApprovalCards(runtime, false);
       this.setState('idle', runtime);
       // The turn is over, the time of the turn is not running anymore.
       runtime.turnStartedAt = 0;
@@ -1020,6 +1069,7 @@ class MiniMaxController {
         runtime.turnStartedAt = 0;
         return;
       }
+      this.dropApprovalCards(runtime, false);
       this.postFor(runtime, { type: 'error', message: event.message });
       this.setState('error', runtime);
       // The turn is over, the time of the turn is not running anymore.
@@ -1180,7 +1230,13 @@ class MiniMaxController {
       return;
     }
     if (message.type === 'stop') {
-      this.activeSession()?.agent?.stop();
+      const runtime = this.activeSession();
+      runtime?.agent?.stop();
+      // The stop rejects every approval that waits, the cards of them leave
+      // the chat with the answer.
+      if (runtime) {
+        this.dropApprovalCards(runtime, false);
+      }
       return;
     }
     if (message.type === 'retry') {
@@ -1210,7 +1266,11 @@ class MiniMaxController {
           pending.resolve({ approved: true, allowForSession: message.allowForSession });
         }
       }
-      this.panel.post({ type: 'approval_resolved', id: message.id, approved: true });
+      if (!this.dropApprovalCard(message.id, true)) {
+        // The card has no owner, the panel of the open chat still has to
+        // let it go.
+        this.panel.post({ type: 'approval_resolved', id: message.id, approved: true });
+      }
       return;
     }
     if (message.type === 'reject') {
@@ -1222,7 +1282,9 @@ class MiniMaxController {
           pending.resolve({ approved: false, allowForSession: false });
         }
       }
-      this.panel.post({ type: 'approval_resolved', id: message.id, approved: false });
+      if (!this.dropApprovalCard(message.id, false)) {
+        this.panel.post({ type: 'approval_resolved', id: message.id, approved: false });
+      }
       return;
     }
     if (message.type === 'new_session') {
@@ -1485,7 +1547,7 @@ class MiniMaxController {
     }
     for (let i = runtime.uiMessages.length - 1; i >= 0; i--) {
       const message = runtime.uiMessages[i]!;
-      if (message.role === 'assistant') {
+      if (message.role === 'assistant' && !message.approval) {
         message.elapsedMs = elapsed;
         this.postFor(runtime, {
           type: 'step_time',
@@ -1862,7 +1924,7 @@ class MiniMaxController {
     };
     // A full state of the host must not break the turn, the chat stays in
     // memory and the failure goes to the log.
-    void this.store.save(stored).then((saved) => {
+    void this.store.save(stored, getSettings().historyMaxMessages).then((saved) => {
       if (!saved) {
         this.logger.error('the chat was not saved to the state of the host');
       } else if (this.activeSessionId === runtime.id) {
@@ -1890,7 +1952,7 @@ class MiniMaxController {
       todos: runtime.todos,
       goal: runtime.goal
     };
-    void this.store.save(stored).then((ok) => {
+    void this.store.save(stored, getSettings().historyMaxMessages).then((ok) => {
       if (!ok) {
         this.logger.error('the list of tasks was not saved to the state of the host');
       }
@@ -2013,6 +2075,13 @@ class MiniMaxController {
       runtime.deleted = true;
       if (runtime.busy) {
         runtime.agent?.stop();
+      }
+      // The cards of the chat go with it, they must not keep an owner of a
+      // chat that is gone.
+      for (const [approvalId, owner] of this.approvalOwner) {
+        if (owner === id) {
+          this.approvalOwner.delete(approvalId);
+        }
       }
     }
     this.store.remove(id);
