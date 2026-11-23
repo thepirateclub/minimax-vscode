@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { InMemoryBackupStore } from '../../src/storage/backups';
 import { createAllTools } from '../../src/tools/all';
-import { describerNames } from '../../src/ui/webview/components/toolDescriptions';
+import { describerNames } from '../../src/ui/webview/components/toolDescriptions/table';
 
 describe('the describers of the cards', () => {
   it('knows every tool of the extension', () => {
