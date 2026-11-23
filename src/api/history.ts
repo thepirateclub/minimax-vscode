@@ -15,15 +15,54 @@ function isUnbalanced(message: AnthropicMessage): boolean {
   return message.content[message.content.length - 1]?.type === 'tool_use';
 }
 
-export function trimHistory(messages: AnthropicMessage[], limit: number): AnthropicMessage[] {
-  if (messages.length <= limit) {
+// The characters of one message, the estimate of the tokens counts them.
+function messageChars(message: AnthropicMessage): number {
+  let chars = 0;
+  for (const block of message.content) {
+    if (block.type === 'text') {
+      chars += block.text.length;
+    } else if (block.type === 'thinking') {
+      chars += block.thinking.length;
+    } else if (block.type === 'tool_use') {
+      chars += JSON.stringify(block.input).length;
+    } else {
+      chars += block.content.length;
+    }
+  }
+  return chars;
+}
+
+function charsOf(messages: AnthropicMessage[]): number {
+  let chars = 0;
+  for (const message of messages) {
+    chars += messageChars(message);
+  }
+  return chars;
+}
+
+// The limit of the messages and the budget of the characters. The stored
+// history of every chat lives in the state of the host, so a huge chat has
+// a second bound on top of the count of its messages.
+export function trimHistory(
+  messages: AnthropicMessage[],
+  limit: number,
+  maxChars: number = Number.POSITIVE_INFINITY
+): AnthropicMessage[] {
+  const overLimit = messages.length > limit;
+  if (!overLimit && !Number.isFinite(maxChars)) {
     return messages;
   }
-  const kept = messages.slice(messages.length - limit);
-  while (kept.length > 0 && isUnbalanced(kept[0]!)) {
-    kept.shift();
+  const kept = overLimit ? messages.slice(messages.length - limit) : [...messages];
+  let chars = charsOf(kept);
+  let head = 0;
+  while (
+    head < kept.length &&
+    (isUnbalanced(kept[head]!) || (kept.length - head > 2 && chars > maxChars))
+  ) {
+    chars -= messageChars(kept[head]!);
+    head += 1;
   }
-  return kept;
+  return head === 0 ? kept : kept.slice(head);
 }
 
 // The calls of an assistant message.
@@ -83,21 +122,7 @@ export function balanceHistory(messages: AnthropicMessage[]): AnthropicMessage[]
 // About four characters per token, the estimate is rough but it keeps the
 // request inside the context window of the model.
 export function estimateTokens(messages: AnthropicMessage[]): number {
-  let chars = 0;
-  for (const message of messages) {
-    for (const block of message.content) {
-      if (block.type === 'text') {
-        chars += block.text.length;
-      } else if (block.type === 'thinking') {
-        chars += block.thinking.length;
-      } else if (block.type === 'tool_use') {
-        chars += JSON.stringify(block.input).length;
-      } else {
-        chars += block.content.length;
-      }
-    }
-  }
-  return Math.ceil(chars / 4);
+  return Math.ceil(charsOf(messages) / 4);
 }
 
 // The history has to fit into the context window of the model, the threshold
@@ -110,14 +135,18 @@ export function fitHistory(
   threshold: number = DEFAULT_CONTEXT_THRESHOLD
 ): AnthropicMessage[] {
   const share = Math.max(1, Math.min(100, threshold)) / 100;
-  const budget = Math.floor((contextWindow * share) / 4);
-  let kept = trimHistory(messages, limit);
-  while (kept.length > 2 && estimateTokens(kept) > budget) {
-    const next = kept.slice(1);
-    if (isUnbalanced(next[0]!)) {
+  // The share is a part of the window in tokens, and the estimate of the
+  // history is tokens too: the budget is not divided a second time.
+  const budgetChars = Math.floor(contextWindow * share) * 4;
+  const kept = trimHistory(messages, limit);
+  let chars = charsOf(kept);
+  let head = 0;
+  while (kept.length - head > 2 && chars > budgetChars) {
+    if (isUnbalanced(kept[head + 1]!)) {
       break;
     }
-    kept = next;
+    chars -= messageChars(kept[head]!);
+    head += 1;
   }
-  return kept;
+  return head === 0 ? kept : kept.slice(head);
 }

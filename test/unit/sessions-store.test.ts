@@ -3,6 +3,8 @@ import type { AnthropicMessage } from '../../src/api/types';
 import { trimHistory } from '../../src/api/history';
 import {
   MAX_STORED_DIFF_LINES,
+  MAX_STORED_HISTORY,
+  MAX_STORED_HISTORY_CHARS,
   MAX_STORED_MESSAGE_CHARS,
   MAX_STORED_MESSAGES,
   MAX_STORED_PROGRESS_CHARS,
@@ -98,6 +100,35 @@ describe('capSession', () => {
     });
     expect(stored.uiMessages).toHaveLength(MAX_STORED_MESSAGES);
     expect(stored.uiMessages[0]?.text).toBe('line 50');
+  });
+
+  it('keeps the history the setting asks for', () => {
+    const messages = Array.from({ length: 400 }, (_, index) =>
+      index % 2 === 0 ? userMessage('q' + index) : assistantMessage('a' + index)
+    );
+    // The panel allows a thousand messages, the stored chat follows the
+    // setting instead of the old bound of a hundred and twenty.
+    const stored = capSession({ ...session('s', 1), messages }, 400);
+    expect(stored.messages).toHaveLength(400);
+  });
+
+  it('cuts the stored history to the default when the setting says nothing', () => {
+    const messages = Array.from({ length: MAX_STORED_HISTORY + 50 }, (_, index) =>
+      index % 2 === 0 ? userMessage('q' + index) : assistantMessage('a' + index)
+    );
+    const stored = capSession({ ...session('s', 1), messages });
+    expect(stored.messages).toHaveLength(MAX_STORED_HISTORY);
+  });
+
+  it('bounds the stored history by the characters', () => {
+    const messages = Array.from({ length: 40 }, () => userMessage('x'.repeat(200_000)));
+    const stored = capSession({ ...session('s', 1), messages }, 1000);
+    const chars = stored.messages.reduce((sum, message) => {
+      const block = message.content[0];
+      return sum + (block?.type === 'text' ? block.text.length : 0);
+    }, 0);
+    expect(chars).toBeLessThanOrEqual(MAX_STORED_HISTORY_CHARS);
+    expect(stored.messages.length).toBeLessThan(messages.length);
   });
 
   it('cuts a huge message', () => {
@@ -309,6 +340,16 @@ describe('SessionStore', () => {
     await store.save(session('s1', 10));
     expect(store.get('s1')?.title).toBe('s1');
     expect(store.summaryList()).toHaveLength(1);
+  });
+
+  it('saves the history the setting asks for', async () => {
+    const storage = new FakeStorage();
+    const store = new SessionStore(storage);
+    const messages = Array.from({ length: 200 }, (_, index) =>
+      index % 2 === 0 ? userMessage('q' + index) : assistantMessage('a' + index)
+    );
+    await store.save({ ...session('s1', 10), messages }, 200);
+    expect(store.get('s1')?.messages).toHaveLength(200);
   });
 
   it('keeps at most fifty sessions', async () => {

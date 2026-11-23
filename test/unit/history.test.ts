@@ -20,7 +20,6 @@ describe('trimHistory', () => {
 
 describe('fitHistory', () => {
   const long = Array.from({ length: 6 }, () => userMessage('x'.repeat(400)));
-  const short = Array.from({ length: 6 }, () => userMessage('x'.repeat(40)));
 
   it('cuts the history when it does not fit into the window', () => {
     const kept = fitHistory(long, 100, 1000, 50);
@@ -28,9 +27,25 @@ describe('fitHistory', () => {
   });
 
   it('keeps more of the history with a higher threshold', () => {
-    const low = fitHistory(short, 100, 1000, 10);
-    const high = fitHistory(short, 100, 1000, 90);
+    const low = fitHistory(long, 100, 1000, 10);
+    const high = fitHistory(long, 100, 1000, 90);
     expect(high.length).toBeGreaterThan(low.length);
+  });
+
+  it('keeps a history that fits the share of the window', () => {
+    // 600k characters are about 150k tokens, that is 15% of a window of a
+    // million. The share of 50% allows them, the budget is not divided by
+    // four a second time.
+    const big = Array.from({ length: 20 }, () => userMessage('x'.repeat(30_000)));
+    expect(fitHistory(big, 1000, 1_000_000, 50)).toHaveLength(20);
+  });
+
+  it('cuts the history that overflows the share of the window', () => {
+    // 750k tokens against a share of 50% of the same window.
+    const huge = Array.from({ length: 25 }, () => userMessage('x'.repeat(120_000)));
+    const kept = fitHistory(huge, 1000, 1_000_000, 50);
+    expect(kept.length).toBeLessThan(huge.length);
+    expect(kept.length).toBeGreaterThan(2);
   });
 
   it('respects the limit of the messages', () => {

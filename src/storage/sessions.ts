@@ -29,7 +29,14 @@ export interface SessionStorage {
 // A long chat must not fill the state of the host, the oldest parts are cut.
 export const MAX_STORED_SESSIONS = 50;
 export const MAX_STORED_MESSAGES = 400;
+// The default of the stored history, the setting of the panel overrides it.
 export const MAX_STORED_HISTORY = MAX_HISTORY_MESSAGES;
+// The setting of the panel allows more messages, the characters stay bounded:
+// the state of the host holds the history of every chat.
+export const MAX_STORED_HISTORY_CHARS = 2_000_000;
+// The bounds of the setting, a chat may not ask for more than it offers.
+const MIN_HISTORY_MESSAGES = 10;
+const MAX_HISTORY_SETTING = 1000;
 export const MAX_STORED_MESSAGE_CHARS = 200_000;
 export const MAX_STORED_DIFF_LINES = 600;
 export const MAX_STORED_PROGRESS_LINES = 600;
@@ -142,12 +149,22 @@ function capMessage(message: UiMessage): UiMessage {
   };
 }
 
-export function capSession(session: StoredSession): StoredSession {
+// The limit of the history comes from the setting of the panel: the user who
+// raised it expects the whole chat after a reload, not the first hundred
+// messages of it.
+export function capSession(
+  session: StoredSession,
+  historyLimit: number = MAX_STORED_HISTORY
+): StoredSession {
+  const limit = Math.max(
+    MIN_HISTORY_MESSAGES,
+    Math.min(Number.isFinite(historyLimit) ? Math.floor(historyLimit) : MAX_STORED_HISTORY, MAX_HISTORY_SETTING)
+  );
   return {
     id: session.id,
     title: session.title,
     updatedAt: session.updatedAt,
-    messages: trimHistory(session.messages, MAX_STORED_HISTORY),
+    messages: trimHistory(session.messages, limit, MAX_STORED_HISTORY_CHARS),
     uiMessages: session.uiMessages.slice(-MAX_STORED_MESSAGES).map(capMessage),
     usage: session.usage.slice(-MAX_STORED_USAGE_TURNS),
     turns: (session.turns ?? []).slice(-MAX_STORED_TURNS),
@@ -181,8 +198,8 @@ export class SessionStore {
   }
 
   // A write that fails must not break the turn, the chat stays in memory.
-  async save(session: StoredSession): Promise<boolean> {
-    const capped = capSession(session);
+  async save(session: StoredSession, historyLimit?: number): Promise<boolean> {
+    const capped = capSession(session, historyLimit);
     const rest = this.list().filter((item) => item.id !== capped.id);
     const all = [capped, ...rest]
       .sort((a, b) => b.updatedAt - a.updatedAt)
