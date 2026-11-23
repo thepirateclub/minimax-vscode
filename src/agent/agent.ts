@@ -15,7 +15,7 @@ import {
 import { streamWithRetry } from './retry';
 import type { AgentOptions, AgentRunResult } from './types';
 export { DEFAULT_MAX_RETRIES, retryDelay } from './retry';
-export type { AgentEvent, AgentOptions, AgentRunResult } from './types';
+export type { AgentEvent, AgentOptions, AgentRunOptions, AgentRunResult } from './types';
 import type { ToolStateUpdate } from './state';
 
 

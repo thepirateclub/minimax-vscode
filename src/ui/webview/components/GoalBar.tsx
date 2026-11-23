@@ -11,7 +11,7 @@ import {
   type GoalStep
 } from '../goalWizard';
 import {
-  formatDuration,
+  formatSeconds,
   goalFormValues,
   goalMatches,
   parseGoalForm,
@@ -23,7 +23,7 @@ import { STRINGS } from '../strings';
 export type { GoalForm } from '../goalWizard';
 
 export {
-  formatDuration,
+  formatSeconds,
   goalFormValues,
   goalMatches,
   parseGoalForm
@@ -222,7 +222,7 @@ export function GoalBar({
             <dt>{STRINGS.goalRequests}</dt>
             <dd>{shown(parsed?.requestLimit, String)}</dd>
             <dt>{STRINGS.goalMinutes}</dt>
-            <dd>{shown(parsed?.secondsLimit, formatDuration)}</dd>
+            <dd>{shown(parsed?.secondsLimit, formatSeconds)}</dd>
           </dl>
         )}
         <div className="goal-actions">
@@ -312,8 +312,8 @@ function GoalMeta({ goal }: { goal: GoalState }) {
         )}
       </span>
       <span className="goal-spend">
-        {formatDuration(goal.used.seconds) +
-          (goal.secondsLimit === undefined ? '' : ' / ' + formatDuration(goal.secondsLimit))}
+        {formatSeconds(goal.used.seconds) +
+          (goal.secondsLimit === undefined ? '' : ' / ' + formatSeconds(goal.secondsLimit))}
       </span>
     </div>
   );

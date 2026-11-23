@@ -17,6 +17,11 @@ describe('the value of an argument of a tool', () => {
   it('shows a number as a json too', () => {
     expect(text(42)).toBe('42');
   });
+
+  it('shows nothing for a value that has no json', () => {
+    // A function has no json, the panel reads the length of the text.
+    expect(text(() => undefined)).toBe('');
+  });
 });
 
 describe('the value of a file', () => {

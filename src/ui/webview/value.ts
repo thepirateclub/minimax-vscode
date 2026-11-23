@@ -7,7 +7,8 @@ export function text(value: unknown): string {
   if (value === undefined) {
     return '';
   }
-  return JSON.stringify(value);
+  // A function or a symbol has no json, the text stays empty.
+  return JSON.stringify(value) ?? '';
 }
 
 // The value of a file is a string, everything else is nothing.

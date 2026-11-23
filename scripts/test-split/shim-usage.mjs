@@ -18,7 +18,9 @@ const shims = [
   'tools/git',
   'tools/repl',
   'tools/tasks',
-  'tools/containers'
+  'tools/containers',
+  'agent/agent',
+  'storage/sessions'
 ];
 
 for (const shim of shims) {

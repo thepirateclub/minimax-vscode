@@ -9,7 +9,7 @@ export interface GoalValues {
 }
 
 // The time of the goal is written in minutes and seconds.
-export function formatDuration(seconds: number): string {
+export function formatSeconds(seconds: number): string {
   const total = Math.max(0, Math.round(seconds));
   const minutes = Math.floor(total / 60);
   const rest = total % 60;

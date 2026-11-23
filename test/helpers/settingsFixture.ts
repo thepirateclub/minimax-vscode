@@ -28,7 +28,3 @@ export const SETTINGS: UiSettings = {
   models: MODELS,
   tools: ['read_file', 'write_file', 'edit_file', 'list_files', 'search_code', 'run_terminal']
 };
-
-// The catalog of the models belongs to the extension, the fixture only points
-// at it.
-export { MODELS };

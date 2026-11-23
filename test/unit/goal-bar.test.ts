@@ -5,7 +5,7 @@ import {
   GoalBar
 } from '../../src/ui/webview/components/GoalBar';
 import {
-  formatDuration,
+  formatSeconds,
   goalFormValues,
   goalMatches,
   parseGoalForm
@@ -94,9 +94,9 @@ describe('the widget of the goal', () => {
 
 describe('the numbers of the goal', () => {
   it('writes the time in minutes and seconds', () => {
-    expect(formatDuration(20)).toBe('20s');
-    expect(formatDuration(80)).toBe('1m 20s');
-    expect(formatDuration(300)).toBe('5m');
+    expect(formatSeconds(20)).toBe('20s');
+    expect(formatSeconds(80)).toBe('1m 20s');
+    expect(formatSeconds(300)).toBe('5m');
   });
 });
 
