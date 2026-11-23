@@ -155,6 +155,52 @@ describe('the voice input', () => {
     expect(h.posted).toContainEqual({ type: 'voice_text', text: 'это PreSonus' });
   });
 
+  it('a cancel during the request of a long window leaves the field empty', async () => {
+    const posted: ExtToWeb[] = [];
+    const pcm = silence(22);
+    let step: (() => void) | undefined;
+    let release: (() => void) | undefined;
+    const controller = new VoiceController({
+      post: (message) => posted.push(message),
+      getApiKey: async () => 'key',
+      config: () => ({
+        ffmpeg: 'ffmpeg',
+        microphone: '',
+        language: 'ru',
+        baseUrl: 'https://api.minimax.io/anthropic'
+      }),
+      every: (_ms, fn) => {
+        step = fn;
+        return () => {
+          step = undefined;
+        };
+      },
+      createRecorder: () => ({
+        start: async () => undefined,
+        snapshot: () => pcm,
+        stop: async () => pcm,
+        cancel: () => undefined
+      }),
+      createClient: () => ({
+        transcribe: () =>
+          new Promise<string>((resolve) => {
+            release = () => resolve('the first window');
+          })
+      })
+    });
+    await controller.start();
+    // The long window asks for its text, the answer hangs in the air.
+    step?.();
+    // The reader cancels the input, the answer comes back after it.
+    controller.cancel();
+    release?.();
+    await controller.idle();
+    // The cancel cleared the field, the late answer did not write into it.
+    expect(posted).toContainEqual({ type: 'voice_text', text: '' });
+    expect(posted.filter((message) => message.type === 'voice_partial')).toHaveLength(0);
+    expect(posted.at(-1)).toEqual({ type: 'voice_state', state: 'idle' });
+  });
+
   it('stops the timer when the recording ends', async () => {
     const h = harness();
     await h.controller.start();

@@ -155,9 +155,13 @@ export class VoiceController {
           const end = pcm.length;
           const cut = quietestCut(pcm, end - CUT_SEARCH, end);
           const text = await this.transcribe(pcm.subarray(this.windowStart, cut));
-          this.committed.push(text);
-          this.windowStart = cut;
-          this.postPartial(this.text());
+          // The recording can be gone while the request ran: a cancelled
+          // input must not come back as a live text over the empty field.
+          if (this.recorder) {
+            this.committed.push(text);
+            this.windowStart = cut;
+            this.postPartial(this.text());
+          }
           return;
         }
         const text = await this.transcribe(pcm.subarray(this.windowStart));
