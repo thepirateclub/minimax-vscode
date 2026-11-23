@@ -86,6 +86,9 @@ interface RuntimeSession {
   uiMessages: UiMessage[];
   agent: AgentSession | undefined;
   busy: boolean;
+  // The chat was deleted while its turn was still running: the turn ends,
+  // but nothing of it goes back into the store.
+  deleted: boolean;
   errorReported: boolean;
   // The token spend of every action of this session.
   usage: UiUsageTurn[];
@@ -264,12 +267,29 @@ class MiniMaxController {
       )
     );
 
+    // One save of the settings writes many keys and every write fires the
+    // event. The agents and the panel are rebuilt once, after the last
+    // write, not a dozen times in a row.
+    let settingsTimer: ReturnType<typeof setTimeout> | undefined;
     context.subscriptions.push(
       onSettingsChanged(() => {
-        this.applySettings();
-        void this.sendInit();
+        if (settingsTimer !== undefined) {
+          clearTimeout(settingsTimer);
+        }
+        settingsTimer = setTimeout(() => {
+          settingsTimer = undefined;
+          this.applySettings();
+          void this.sendInit();
+        }, 100);
       })
     );
+    context.subscriptions.push({
+      dispose: () => {
+        if (settingsTimer !== undefined) {
+          clearTimeout(settingsTimer);
+        }
+      }
+    });
     context.subscriptions.push(
       vscode.window.onDidChangeActiveColorTheme(() => {
         this.panel.post({ type: 'theme', kind: themeKind() });
@@ -823,13 +843,13 @@ class MiniMaxController {
     if (event.type === 'assistant_text') {
       this.appendToAssistant(runtime, 'text', event.text);
       this.postFor(runtime, { type: 'text_delta', text: event.text });
-      this.setState('streaming');
+      this.setState('streaming', runtime);
       return;
     }
     if (event.type === 'assistant_thinking') {
       this.appendToAssistant(runtime, 'thinking', event.text);
       this.postFor(runtime, { type: 'thinking_delta', text: event.text });
-      this.setState('thinking');
+      this.setState('thinking', runtime);
       return;
     }
     if (event.type === 'tool_progress') {
@@ -862,7 +882,7 @@ class MiniMaxController {
         tool: { id: event.id, name: event.name, input: event.input, running: true }
       });
       this.postFor(runtime, { type: 'tool_start', id: event.id, name: event.name, input: event.input });
-      this.setState('tool');
+      this.setState('tool', runtime);
       return;
     }
     if (event.type === 'tool_end') {
@@ -967,7 +987,7 @@ class MiniMaxController {
       if (notice) {
         this.postFor(runtime, { type: 'notice', message: notice.message, kind: notice.kind });
       }
-      this.setState('idle');
+      this.setState('idle', runtime);
       // The turn is over, the time of the turn is not running anymore.
       runtime.turnStartedAt = 0;
       return;
@@ -992,13 +1012,13 @@ class MiniMaxController {
           kind: 'info'
         });
         this.markStepTime(runtime);
-        this.setState('idle');
+        this.setState('idle', runtime);
         // The turn is over, the time of the turn is not running anymore.
         runtime.turnStartedAt = 0;
         return;
       }
       this.postFor(runtime, { type: 'error', message: event.message });
-      this.setState('error');
+      this.setState('error', runtime);
       // The turn is over, the time of the turn is not running anymore.
       runtime.turnStartedAt = 0;
     }
@@ -1051,14 +1071,22 @@ class MiniMaxController {
     }
   }
 
-  private setState(state: AgentState): void {
-    this.agentState = state;
+  private setState(state: AgentState, runtime?: RuntimeSession): void {
+    // The events of a chat that runs in the background do not write into
+    // the open one: the dot of the panel describes the active chat only.
+    // The status bar of the window follows every chat, the reader sees
+    // that the agent is busy somewhere.
+    if (!runtime || runtime.id === this.activeSessionId) {
+      this.agentState = state;
+      this.statusBar.setState(state);
+      this.panel.post({
+        type: 'status',
+        state,
+        tokens: this.usageTotal(this.activeSession())
+      });
+      return;
+    }
     this.statusBar.setState(state);
-    this.panel.post({
-      type: 'status',
-      state,
-      tokens: this.usageTotal(this.activeSession())
-    });
   }
 
   // The spend of the session, input and output tokens of every action.
@@ -1352,9 +1380,14 @@ class MiniMaxController {
       });
       return;
     }
+    // The turn is taken at once: the building of the agent takes a moment
+    // and a second send in that window would start two turns on one
+    // history.
+    runtime.busy = true;
     // The budget of the goal is over, the request does not go out. The user
     // raises the limit and the work continues.
     if (!this.goalBudgetOk(runtime)) {
+      runtime.busy = false;
       const notice = stopNotice(
         'goal_limit',
         getSettings().maxIterations,
@@ -1372,10 +1405,10 @@ class MiniMaxController {
     }
     const agent = await this.ensureAgent(runtime);
     if (!agent) {
+      runtime.busy = false;
       return;
     }
 
-    runtime.busy = true;
     runtime.errorReported = false;
     // The place of the request in the history of the model, the anchor
     // of the turn takes it when the turn is over.
@@ -1440,7 +1473,7 @@ class MiniMaxController {
       const message = runtime.uiMessages[i]!;
       if (message.role === 'assistant') {
         message.elapsedMs = elapsed;
-        this.panel.post({
+        this.postFor(runtime, {
           type: 'step_time',
           id: message.id,
           elapsedMs: elapsed
@@ -1788,6 +1821,11 @@ class MiniMaxController {
   }
 
   private persist(runtime: RuntimeSession): void {
+    // The chat was deleted while its turn ran, the finished turn must not
+    // write it back into the store.
+    if (runtime.deleted) {
+      return;
+    }
     runtime.updatedAt = Date.now();
     // While the turn runs the messages of the panel and the history of the
     // model do not match. A saved state has to be a state the agent can
@@ -1861,6 +1899,7 @@ class MiniMaxController {
       uiMessages: [...(stored.uiMessages ?? [])],
       agent: undefined,
       busy: false,
+      deleted: false,
       errorReported: false,
       usage: (stored.usage ?? []).map((turn) => ({
         input: turn.input,
@@ -1891,6 +1930,7 @@ class MiniMaxController {
       uiMessages: [],
       agent: undefined,
       busy: false,
+      deleted: false,
       errorReported: false,
       usage: [],
       turns: [],
@@ -1945,6 +1985,16 @@ class MiniMaxController {
   }
 
   private deleteSession(id: string): void {
+    const runtime = this.sessions.get(id);
+    if (runtime) {
+      // A chat that still runs stops first: the tokens of a deleted chat
+      // must not burn any further, and the finished turn must not write
+      // the chat back into the store.
+      runtime.deleted = true;
+      if (runtime.busy) {
+        runtime.agent?.stop();
+      }
+    }
     this.store.remove(id);
     this.sessions.delete(id);
     if (this.activeSessionId === id) {

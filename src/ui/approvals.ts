@@ -24,6 +24,7 @@ export class ApprovalGate {
   // them works for the other too.
   private readonly sessionApproved: Set<string>;
   private autoApprove: string[];
+  private counter = 0;
   private readonly request: (request: ApprovalRequest) => Promise<ApprovalDecision>;
 
   constructor(options: {
@@ -49,8 +50,11 @@ export class ApprovalGate {
     if (this.autoApprove.includes(entry.name) || this.sessionApproved.has(entry.name)) {
       return { approved: true, allowForSession: false };
     }
+    this.counter += 1;
     const decision = await this.request({
-      id: entry.name + '-' + Date.now().toString(36),
+      // Two calls of one tool in the same millisecond are two approvals,
+      // the counter tells them apart.
+      id: entry.name + '-' + Date.now().toString(36) + '-' + this.counter,
       toolName: entry.name,
       input
     });

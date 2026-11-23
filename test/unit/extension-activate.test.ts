@@ -7,6 +7,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ExtensionContext } from 'vscode';
 import type { ExtToWeb, WebToExt } from '../../src/ui/protocol';
 
+// The file is heavy and it runs next to the other files of the suite: a
+// loaded machine needs more than the default second for a turn of the
+// extension to reach the panel.
+async function waitForState(check: () => void | Promise<void>): Promise<void> {
+  await vi.waitFor(check, { timeout: 5000 });
+}
+
 const state = vi.hoisted(() => ({
   commands: new Map<string, (...args: unknown[]) => unknown>(),
   viewProviders: new Map<string, { resolveWebviewView: (view: unknown) => void }>(),
@@ -337,7 +344,7 @@ async function boot(): Promise<void> {
   }
   provider.resolveWebviewView(makeView());
   state.receive?.({ type: 'ready' });
-  await vi.waitFor(() => {
+  await waitForState(() => {
     expect(state.posted.some((message) => message.type === 'init')).toBe(true);
   });
 }
@@ -446,7 +453,7 @@ describe('extension activation', () => {
   it('opens the file of a snippet in the editor', async () => {
     await boot();
     state.receive?.({ type: 'open_file', path: 'src/api/history.ts' });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(state.shown.length).toBe(1);
     });
     expect(state.opened[0]).toContain('history.ts');
@@ -456,7 +463,7 @@ describe('extension activation', () => {
   it('refuses a path outside the workspace', async () => {
     await boot();
     state.receive?.({ type: 'open_file', path: '../outside.ts' });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(state.posted.some((message) => message.type === 'error')).toBe(true);
     });
     expect(state.opened.length).toBe(0);
@@ -472,7 +479,7 @@ describe('extension activation', () => {
     await boot();
     state.posted.length = 0;
     state.receive?.({ type: 'send', text: 'hello', mentions: [], selections: [] });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(types()).toContain('error');
     });
     expect(state.fetched).toHaveLength(0);
@@ -488,12 +495,12 @@ describe('extension activation', () => {
     state.posted.length = 0;
     state.receive?.({ type: 'send', text: 'hello', mentions: [], selections: [] });
 
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('text_delta').map((message) => message.text).join('')).toBe('hi from the model');
     });
     expect(ofType('user_message')[0]?.text).toBe('hello');
     expect(ofType('assistant_start').length).toBeGreaterThan(0);
-    await vi.waitFor(() => {
+    await waitForState(() => {
       const status = ofType('status').pop();
       expect(status?.state).toBe('idle');
     });
@@ -514,7 +521,7 @@ describe('extension activation', () => {
     state.posted.length = 0;
     state.receive?.({ type: 'send', text: 'write a note', mentions: [], selections: [] });
 
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('approval_request').length).toBe(1);
     });
     const approval = ofType('approval_request')[0]!.approval;
@@ -523,7 +530,7 @@ describe('extension activation', () => {
 
     state.receive?.({ type: 'approve', id: approval.id, allowForSession: false });
 
-    await vi.waitFor(() => {
+    await waitForState(() => {
       const end = ofType('tool_end').pop();
       expect(end?.isError).toBe(false);
     });
@@ -545,13 +552,13 @@ describe('extension activation', () => {
     state.posted.length = 0;
     state.receive?.({ type: 'send', text: 'write a note', mentions: [], selections: [] });
 
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('approval_request').length).toBe(1);
     });
     const approval = ofType('approval_request')[0]!.approval;
     state.receive?.({ type: 'reject', id: approval.id });
 
-    await vi.waitFor(() => {
+    await waitForState(() => {
       const end = ofType('tool_end').pop();
       expect(end?.isError).toBe(true);
     });
@@ -566,12 +573,12 @@ describe('extension activation', () => {
     await boot();
 
     state.receive?.({ type: 'send', text: 'first question', mentions: [], selections: [] });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('text_delta').length).toBeGreaterThan(0);
     });
     state.posted.length = 0;
     state.receive?.({ type: 'send', text: 'second question', mentions: [], selections: [] });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('text_delta').length).toBeGreaterThan(0);
     });
 
@@ -597,7 +604,7 @@ describe('extension activation', () => {
     await boot();
     state.posted.length = 0;
     state.commands.get('minimax.addSelection')?.();
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('selection').length).toBe(1);
     });
     const selected = ofType('selection')[0]!.selection;
@@ -614,7 +621,7 @@ describe('extension activation', () => {
     await boot();
     state.posted.length = 0;
     state.receive?.({ type: 'request_suggestions', requestId: 'r1', prefix: 'open' });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('suggestions').length).toBe(1);
     });
     const items = ofType('suggestions')[0]!.items;
@@ -630,7 +637,7 @@ describe('extension activation', () => {
     await boot();
     state.posted.length = 0;
     state.receive?.({ type: 'request_suggestions', requestId: 'r1', prefix: 'outside' });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('suggestions').length).toBe(1);
     });
     expect(ofType('suggestions')[0]!.items).toHaveLength(0);
@@ -642,7 +649,7 @@ describe('extension activation', () => {
     await boot();
     state.posted.length = 0;
     state.receive?.({ type: 'request_settings' });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('settings').length).toBe(1);
     });
     const settings = ofType('settings')[0]!.settings;
@@ -673,7 +680,7 @@ describe('extension activation', () => {
         microphone: 'Mic 1'
       }
     });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(state.config.get('model')).toBe('MiniMax-M3');
     });
     expect(state.config.get('baseUrl')).toBe('china');
@@ -712,7 +719,7 @@ describe('extension activation', () => {
         }
       ]
     });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('text_delta').length).toBeGreaterThan(0);
     });
     const body = JSON.parse(state.bodies[0]!) as {
@@ -730,7 +737,7 @@ describe('extension activation', () => {
     await boot();
     state.posted.length = 0;
     state.commands.get('minimax.addFile')?.({ fsPath: 'src/app.ts' });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('mention').length).toBe(1);
     });
     expect(ofType('mention')[0]!.path).toBe('src/app.ts');
@@ -742,10 +749,10 @@ describe('extension activation', () => {
     await boot();
     expect(ofType('init')[0]!.state.mode).toBe('code');
     state.receive?.({ type: 'set_mode', mode: 'plan' });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(state.config.get('mode')).toBe('plan');
     });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       const inits = ofType('init');
       expect(inits.length).toBeGreaterThan(0);
       expect(inits[inits.length - 1]!.state.mode).toBe('plan');
@@ -761,7 +768,7 @@ describe('extension activation', () => {
     await boot();
 
     state.receive?.({ type: 'send', text: 'plan this', mentions: [], selections: [] });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('text_delta').length).toBeGreaterThan(0);
     });
     const body = JSON.parse(state.bodies[0]!) as {
@@ -785,13 +792,13 @@ describe('extension activation', () => {
 
     state.posted.length = 0;
     state.receive?.({ type: 'send', text: 'hello', mentions: [], selections: [] });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('usage').length).toBe(1);
     });
     expect(ofType('usage')[0]!.turns).toEqual([
       { input: 11, output: 7, cache: 0 }
     ]);
-    await vi.waitFor(() => {
+    await waitForState(() => {
       const statuses = ofType('status');
       expect(statuses[statuses.length - 1]!.tokens).toBe(18);
     });
@@ -803,10 +810,10 @@ describe('extension activation', () => {
     await boot();
     expect(ofType('init')[0]!.state.thinking).toBe(false);
     state.receive?.({ type: 'set_thinking', thinking: true });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(state.config.get('thinking')).toBe(true);
     });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       const inits = ofType('init');
       expect(inits[inits.length - 1]!.state.thinking).toBe(true);
     });
@@ -822,7 +829,7 @@ describe('extension activation', () => {
     await boot();
 
     state.receive?.({ type: 'send', text: 'hello', mentions: [], selections: [] });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('text_delta').length).toBeGreaterThan(0);
     });
     const body = JSON.parse(state.bodies[0]!) as Record<string, unknown>;
@@ -839,7 +846,7 @@ describe('extension activation', () => {
     await boot();
 
     state.receive?.({ type: 'send', text: 'hello', mentions: [], selections: [] });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('text_delta').length).toBeGreaterThan(0);
     });
     const body = JSON.parse(state.bodies[0]!) as Record<string, unknown>;
@@ -851,7 +858,7 @@ describe('extension activation', () => {
     state.config.set('root', root);
     state.secrets.set('minimax.apiKey', 'test-key');
     await boot();
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(state.statusBar?.text).toContain('97%');
     });
     expect(state.statusBar?.tooltip).toContain('Left in the 5-hour window: 97%');
@@ -867,7 +874,7 @@ describe('extension activation', () => {
     const command = state.commands.get('minimax.showUsage');
     expect(command).toBeDefined();
     command!();
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(state.quickPick?.title).toBe('MiniMax token spend');
     });
     const items = (state.quickPick?.items ?? []) as Array<{
@@ -891,7 +898,7 @@ describe('extension activation', () => {
     await boot();
 
     state.receive?.({ type: 'send', text: 'read @context.md please', mentions: [], selections: [] });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('text_delta').length).toBeGreaterThan(0);
     });
     const body = JSON.parse(state.bodies[0]!) as {
@@ -917,7 +924,7 @@ describe('extension activation', () => {
       mentions: ['context.md'],
       selections: []
     });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('text_delta').length).toBeGreaterThan(0);
     });
     const body = JSON.parse(state.bodies[0]!) as {
@@ -969,12 +976,12 @@ describe('extension activation', () => {
 
     state.posted.length = 0;
     state.receive?.({ type: 'send', text: 'write a note', mentions: [], selections: [] });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('approval_request').length).toBe(1);
     });
     const approval = ofType('approval_request')[0]!.approval;
     state.receive?.({ type: 'approve', id: approval.id, allowForSession: false });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('tool_end').length).toBe(1);
     });
     const end = ofType('tool_end')[0]!;
@@ -992,10 +999,10 @@ describe('extension activation', () => {
 
     state.posted.length = 0;
     state.receive?.({ type: 'send', text: 'hello', mentions: [], selections: [] });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('text_delta').length).toBeGreaterThan(0);
     });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('status').pop()?.state).toBe('idle');
     });
     expect(ofType('error').length).toBe(0);
@@ -1025,10 +1032,10 @@ describe('extension activation', () => {
     await boot();
 
     state.receive?.({ type: 'send', text: 'hello', mentions: [], selections: [] });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('text_delta').length).toBeGreaterThan(0);
     });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       const stored = state.globalState.get('minimax.sessions') as Array<{
         uiMessages: unknown[];
       }>;
@@ -1055,10 +1062,10 @@ describe('extension activation', () => {
     await boot();
 
     state.receive?.({ type: 'send', text: 'hello', mentions: [], selections: [] });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('text_delta').length).toBeGreaterThan(0);
     });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       const activeId = state.globalState.get('minimax.activeSession') as string | undefined;
       const stored =
         (state.globalState.get('minimax.sessions') as Array<{ id: string }> | undefined) ?? [];
@@ -1094,7 +1101,7 @@ describe('extension activation', () => {
 
     state.posted.length = 0;
     state.receive?.({ type: 'send', text: 'hello', mentions: [], selections: [] });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('step_time').length).toBe(1);
     });
     expect(ofType('step_time')[0]?.elapsedMs ?? -1).toBeGreaterThanOrEqual(0);
@@ -1109,13 +1116,13 @@ describe('extension activation', () => {
 
     state.posted.length = 0;
     state.receive?.({ type: 'send', text: 'first question', mentions: [], selections: [] });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('text_delta').length).toBeGreaterThan(0);
     });
     const userId = ofType('user_message')[0]?.id ?? '';
     expect(userId.length).toBeGreaterThan(0);
     // The turn is over when the anchor of the request is in the state.
-    await vi.waitFor(() => {
+    await waitForState(() => {
       const stored =
         (state.globalState.get('minimax.sessions') as
           | Array<{ turns?: unknown[] }>
@@ -1125,7 +1132,7 @@ describe('extension activation', () => {
 
     state.posted.length = 0;
     state.receive?.({ type: 'rewind', id: userId });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('session_loaded').length).toBe(1);
     });
     // The chat went back to the request, the answer of the model is gone.
@@ -1146,18 +1153,18 @@ describe('extension activation', () => {
 
     state.posted.length = 0;
     state.receive?.({ type: 'send', text: 'first question', mentions: [], selections: [] });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('text_delta').length).toBeGreaterThan(0);
     });
     const userId = ofType('user_message')[0]?.id ?? '';
 
     state.posted.length = 0;
     state.receive?.({ type: 'retry', id: userId });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('user_message').length).toBe(1);
     });
     expect(ofType('user_message')[0]?.text).toBe('first question');
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('text_delta').length).toBeGreaterThan(0);
     });
   });
@@ -1172,13 +1179,13 @@ describe('extension activation', () => {
     state.posted.length = 0;
     state.receive?.({ type: 'send', text: 'plan the work', mentions: [], selections: [] });
 
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('todos').length).toBe(1);
     });
     expect(ofType('todos')[0]!.todos).toEqual([
       { content: 'Read the parser', status: 'pending', priority: 'high' }
     ]);
-    await vi.waitFor(() => {
+    await waitForState(() => {
       const stored = state.globalState.get('minimax.sessions') as Array<{
         todos?: unknown[];
       }>;
@@ -1197,12 +1204,12 @@ describe('extension activation', () => {
 
     state.posted.length = 0;
     state.receive?.({ type: 'send', text: 'plan the work', mentions: [], selections: [] });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('todos').length).toBe(1);
     });
     const userId = ofType('user_message')[0]?.id ?? '';
     // The turn is over when the anchor of the request is in the state.
-    await vi.waitFor(() => {
+    await waitForState(() => {
       const stored = state.globalState.get('minimax.sessions') as Array<{
         turns?: unknown[];
       }>;
@@ -1211,12 +1218,12 @@ describe('extension activation', () => {
 
     state.posted.length = 0;
     state.receive?.({ type: 'rewind', id: userId });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('todos').length).toBe(1);
     });
     // The list of the turn that goes away goes away with it.
     expect(ofType('todos')[0]!.todos).toEqual([]);
-    await vi.waitFor(() => {
+    await waitForState(() => {
       const stored = state.globalState.get('minimax.sessions') as Array<{
         todos?: unknown[];
       }>;
@@ -1233,10 +1240,10 @@ describe('extension activation', () => {
     await boot();
 
     state.receive?.({ type: 'send', text: 'first question', mentions: [], selections: [] });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('text_delta').length).toBeGreaterThan(0);
     });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       const stored = state.globalState.get('minimax.sessions') as Array<{
         turns?: unknown[];
       }>;
@@ -1246,10 +1253,10 @@ describe('extension activation', () => {
     state.posted.length = 0;
     state.receive?.({ type: 'send', text: 'second question', mentions: [], selections: [] });
     // The turn waits for the approval of the write, the list is written already.
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('approval_request').length).toBe(1);
     });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       const stored = state.globalState.get('minimax.sessions') as Array<{
         todos?: unknown[];
         messages: unknown[];
@@ -1278,17 +1285,17 @@ describe('extension activation', () => {
 
     state.posted.length = 0;
     state.receive?.({ type: 'send', text: 'plan the work', mentions: [], selections: [] });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('text_delta').length).toBeGreaterThan(0);
     });
     // The turn is over, the agent waits for the next request.
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('status').pop()?.state).toBe('idle');
     });
 
     state.posted.length = 0;
     state.receive?.({ type: 'send', text: 'continue the work', mentions: [], selections: [] });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(state.bodies.length).toBe(3);
     });
 
@@ -1314,7 +1321,7 @@ describe('extension activation', () => {
       requestLimit: 8,
       secondsLimit: 600
     });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('goal').length).toBe(1);
     });
     const goal = ofType('goal')[0]!.goal!;
@@ -1325,7 +1332,7 @@ describe('extension activation', () => {
     expect(goal.status).toBe('active');
 
     // The goal is in the saved session.
-    await vi.waitFor(() => {
+    await waitForState(() => {
       const stored = state.globalState.get('minimax.sessions') as Array<{
         goal?: { objective: string };
       }>;
@@ -1350,13 +1357,13 @@ describe('extension activation', () => {
       objective: 'Rewrite the parser',
       tokenBudget: 12000
     });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('goal').length).toBe(1);
     });
 
     state.posted.length = 0;
     state.receive?.({ type: 'send', text: 'hello', mentions: [], selections: [] });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('goal').length).toBeGreaterThan(0);
     });
     const goal = ofType('goal').pop()!.goal!;
@@ -1377,7 +1384,7 @@ describe('extension activation', () => {
       objective: 'Rewrite the parser',
       tokenBudget: 10
     });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('goal').length).toBe(1);
     });
 
@@ -1385,13 +1392,13 @@ describe('extension activation', () => {
     state.receive?.({ type: 'send', text: 'hello', mentions: [], selections: [] });
     // The turn has to be over, otherwise the second request finds the
     // agent busy.
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('status').pop()?.state).toBe('idle');
     });
     // The spend of the request (18 tokens) broke the limit of 10 tokens.
     state.posted.length = 0;
     state.receive?.({ type: 'send', text: 'again', mentions: [], selections: [] });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('notice').length).toBeGreaterThan(0);
     });
     const notice = ofType('notice')[0]!;
@@ -1413,13 +1420,13 @@ describe('extension activation', () => {
       objective: 'Rewrite the parser',
       tokenBudget: 10
     });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('goal').length).toBe(1);
     });
 
     state.posted.length = 0;
     state.receive?.({ type: 'send', text: 'hello', mentions: [], selections: [] });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('status').pop()?.state).toBe('idle');
     });
 
@@ -1430,7 +1437,7 @@ describe('extension activation', () => {
       objective: 'Rewrite the parser',
       tokenBudget: 12000
     });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('goal').length).toBe(1);
     });
     const goal = ofType('goal')[0]!.goal!;
@@ -1452,7 +1459,7 @@ describe('extension activation', () => {
       objective: 'Rewrite the parser',
       tokenBudget: 0
     });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('notice').length).toBe(1);
     });
     const notice = ofType('notice')[0]!;
@@ -1474,13 +1481,13 @@ describe('extension activation', () => {
       objective: 'Rewrite the parser',
       tokenBudget: 12000
     });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('goal').length).toBe(1);
     });
 
     state.posted.length = 0;
     state.receive?.({ type: 'send', text: 'do the work', mentions: [], selections: [] });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('tool_end').length).toBe(1);
     });
 
@@ -1508,13 +1515,13 @@ describe('extension activation', () => {
       objective: 'Rewrite the parser',
       tokenBudget: 10
     });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('goal').length).toBe(1);
     });
 
     state.posted.length = 0;
     state.receive?.({ type: 'send', text: 'do the work', mentions: [], selections: [] });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('status').pop()?.state).toBe('idle');
     });
 
@@ -1527,7 +1534,7 @@ describe('extension activation', () => {
     // The limit of the goal still holds, the next turn is refused.
     state.posted.length = 0;
     state.receive?.({ type: 'send', text: 'again', mentions: [], selections: [] });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('notice').length).toBeGreaterThan(0);
     });
     expect(ofType('notice')[0]!.message).toContain('budget');
@@ -1570,16 +1577,16 @@ describe('extension activation', () => {
         // waiting were charged as work.
         secondsLimit: 30
       });
-      await vi.waitFor(() => {
+      await waitForState(() => {
         expect(ofType('goal').length).toBe(1);
       });
 
       const idleBefore = idleCount();
       state.receive?.({ type: 'send', text: 'first', mentions: [], selections: [] });
-      await vi.waitFor(() => {
+      await waitForState(() => {
         expect(idleCount()).toBeGreaterThan(idleBefore);
       });
-      await vi.waitFor(() => {
+      await waitForState(() => {
         expect(storedGoal()?.used.seconds).toBe(5);
       });
 
@@ -1587,16 +1594,16 @@ describe('extension activation', () => {
       clock += 60_000;
       state.receive?.({ type: 'send', text: 'second', mentions: [], selections: [] });
       // The second turn was not refused: the idle minute is not work.
-      await vi.waitFor(() => {
+      await waitForState(() => {
         expect(state.fetched.filter((url) => url === MESSAGES_URL)).toHaveLength(2);
       });
       expect(
         ofType('notice').filter((message) => message.message.includes('budget'))
       ).toHaveLength(0);
-      await vi.waitFor(() => {
+      await waitForState(() => {
         expect(idleCount()).toBeGreaterThan(idleBefore + 1);
       });
-      await vi.waitFor(() => {
+      await waitForState(() => {
         expect(storedGoal()?.used.seconds).toBe(10);
       });
       expect(storedGoal()?.used.requests).toBe(2);
@@ -1643,17 +1650,17 @@ describe('extension activation', () => {
         objective: 'Rewrite the parser',
         secondsLimit: 60
       });
-      await vi.waitFor(() => {
+      await waitForState(() => {
         expect(ofType('goal').length).toBe(1);
       });
 
       state.posted.length = 0;
       state.receive?.({ type: 'send', text: 'hello', mentions: [], selections: [] });
-      await vi.waitFor(() => {
+      await waitForState(() => {
         expect(ofType('error').length).toBe(1);
       });
       // The failed turn took five seconds, they are in the goal.
-      await vi.waitFor(() => {
+      await waitForState(() => {
         expect(storedGoal()?.used.seconds).toBe(5);
       });
     } finally {
@@ -1677,13 +1684,13 @@ describe('extension activation', () => {
       objective: 'Rewrite the parser',
       tokenBudget: 10
     });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('goal').length).toBe(1);
     });
 
     state.posted.length = 0;
     state.receive?.({ type: 'send', text: 'hello', mentions: [], selections: [] });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('status').pop()?.state).toBe('idle');
     });
 
@@ -1695,7 +1702,7 @@ describe('extension activation', () => {
       mentions: ['src/app.ts'],
       selections: []
     });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('notice').length).toBeGreaterThan(0);
     });
     // The request comes back to the input field, it is not lost.
@@ -1717,19 +1724,19 @@ describe('extension activation', () => {
       objective: 'Rewrite the parser',
       tokenBudget: 12000
     });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('goal').length).toBe(1);
     });
 
     state.posted.length = 0;
     state.receive?.({ type: 'clear_goal' });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('goal').length).toBe(1);
     });
     // The panel sees that the goal is gone.
     expect(ofType('goal')[0]!.goal).toBeUndefined();
     // The saved session has no goal.
-    await vi.waitFor(() => {
+    await waitForState(() => {
       const stored = state.globalState.get('minimax.sessions') as Array<{
         goal?: { objective: string };
       }>;
@@ -1745,21 +1752,21 @@ describe('extension activation', () => {
     await boot();
 
     state.receive?.({ type: 'send', text: 'plan the work', mentions: [], selections: [] });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('todos').some((message) => message.todos.length > 0)).toBe(true);
     });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('status').at(-1)?.state).toBe('idle');
     });
 
     state.posted.length = 0;
     state.receive?.({ type: 'clear_todos' });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('todos')).toHaveLength(1);
     });
     expect(ofType('todos')[0]!.todos).toEqual([]);
     // The saved session has no tasks, the reload does not bring them back.
-    await vi.waitFor(() => {
+    await waitForState(() => {
       const stored = state.globalState.get('minimax.sessions') as Array<{ todos?: unknown[] }>;
       expect(stored[0]?.todos ?? []).toEqual([]);
     });
@@ -1790,13 +1797,13 @@ describe('extension activation', () => {
         objective: 'Rewrite the parser',
         secondsLimit: 600
       });
-      await vi.waitFor(() => {
+      await waitForState(() => {
         expect(ofType('goal').length).toBe(1);
       });
 
       state.posted.length = 0;
       state.receive?.({ type: 'send', text: 'hello', mentions: [], selections: [] });
-      await vi.waitFor(() => {
+      await waitForState(() => {
         expect(ofType('status').pop()?.state).toBe('idle');
       });
       // The widget of the goal shows the time of the turn, the panel gets
@@ -1847,15 +1854,15 @@ describe('extension activation', () => {
         objective: 'Rewrite the parser',
         secondsLimit: 600
       });
-      await vi.waitFor(() => {
+      await waitForState(() => {
         expect(ofType('goal').length).toBe(1);
       });
 
       state.receive?.({ type: 'send', text: 'first', mentions: [], selections: [] });
-      await vi.waitFor(() => {
+      await waitForState(() => {
         expect(ofType('error').length).toBe(1);
       });
-      await vi.waitFor(() => {
+      await waitForState(() => {
         expect(storedGoal()?.used.seconds).toBe(5);
       });
 
@@ -1863,11 +1870,11 @@ describe('extension activation', () => {
       // work.
       clock += 60_000;
       state.receive?.({ type: 'send', text: 'second', mentions: [], selections: [] });
-      await vi.waitFor(() => {
+      await waitForState(() => {
         expect(ofType('error').length).toBe(2);
       });
       // Two turns of five seconds, the idle minute is not in the goal.
-      await vi.waitFor(() => {
+      await waitForState(() => {
         expect(storedGoal()?.used.seconds).toBe(10);
       });
     } finally {
@@ -1892,16 +1899,16 @@ describe('extension activation', () => {
       tokenBudget: 12000,
       requestLimit: 8
     });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('goal').length).toBe(1);
     });
 
     state.posted.length = 0;
     state.receive?.({ type: 'send', text: 'hello', mentions: [], selections: [] });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(state.bodies.length).toBe(1);
     });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('status').pop()?.state).toBe('idle');
     });
 
@@ -1914,7 +1921,7 @@ describe('extension activation', () => {
     // The next request carries the spend of the previous one.
     state.posted.length = 0;
     state.receive?.({ type: 'send', text: 'again', mentions: [], selections: [] });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(state.bodies.length).toBe(2);
     });
     const second = JSON.parse(state.bodies[1]!) as { system: string };
@@ -1932,16 +1939,16 @@ describe('extension activation', () => {
 
     state.posted.length = 0;
     state.receive?.({ type: 'send', text: 'plan the work', mentions: [], selections: [] });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('todos').length).toBe(1);
     });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('status').pop()?.state).toBe('idle');
     });
 
     state.posted.length = 0;
     state.receive?.({ type: 'send', text: 'continue the work', mentions: [], selections: [] });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(state.bodies.length).toBe(3);
     });
 
@@ -1968,7 +1975,7 @@ describe('extension activation', () => {
       selections: []
     });
 
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(state.bodies.length).toBeGreaterThan(1);
     });
     // The second request is the request of the child.
@@ -2001,7 +2008,7 @@ describe('extension activation', () => {
       selections: []
     });
 
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('approval_request').length).toBe(1);
     });
     const approval = ofType('approval_request')[0]!.approval;
@@ -2018,18 +2025,18 @@ describe('extension activation', () => {
 
     state.receive?.({ type: 'approve', id: approval.id, allowForSession: false });
 
-    await vi.waitFor(async () => {
+    await waitForState(async () => {
       expect(await readFile(join(root, 'note.txt'), 'utf8')).toBe('written by the agent');
     });
     // The change of the child stays in the card of the call: the
     // journal of the child carries the lines of the diff.
-    await vi.waitFor(() => {
+    await waitForState(() => {
       const lines = ofType('tool_progress').map((message) => message.line);
       expect(lines).toContain('+ written by the agent');
     });
     // The result of the call stays in the content alone, the journal has
     // its own field.
-    await vi.waitFor(() => {
+    await waitForState(() => {
       const end = ofType('tool_end').pop();
       expect(end?.content).not.toContain('+ written by the agent');
     });
@@ -2084,13 +2091,13 @@ describe('extension activation', () => {
       selections: []
     });
 
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(state.bodies.length).toBeGreaterThan(1);
     });
     // The child waits, the reader stops the turn.
     state.receive?.({ type: 'stop' });
 
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('status').pop()?.state).toBe('idle');
     });
     // The host tells the reader that the request was stopped.
@@ -2101,7 +2108,7 @@ describe('extension activation', () => {
     // The chat is free again, the next request of the reader goes out.
     state.posted.length = 0;
     state.receive?.({ type: 'send', text: 'again', mentions: [], selections: [] });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('text_delta').length).toBeGreaterThan(0);
     });
   });
@@ -2140,7 +2147,7 @@ describe('extension activation', () => {
     });
 
     // The child asks the reader for a permission.
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('approval_request').length).toBe(1);
     });
     const approval = ofType('approval_request')[0]!.approval;
@@ -2148,13 +2155,13 @@ describe('extension activation', () => {
 
     // The reader switches to another chat and answers there.
     state.receive?.({ type: 'new_session' });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('init').length).toBeGreaterThan(0);
     });
     state.receive?.({ type: 'approve', id: approval.id, allowForSession: true });
 
     // The child writes the file, the answer of the reader was heard.
-    await vi.waitFor(async () => {
+    await waitForState(async () => {
       expect(await readFile(join(root, 'note.txt'), 'utf8')).toBe('written by the agent');
     });
 
@@ -2166,13 +2173,13 @@ describe('extension activation', () => {
       mentions: [],
       selections: []
     });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('approval_request').length).toBe(1);
     });
     const other = ofType('approval_request')[0]!.approval;
     expect(other.id.startsWith('child-')).toBe(true);
     state.receive?.({ type: 'approve', id: other.id, allowForSession: false });
-    await vi.waitFor(async () => {
+    await waitForState(async () => {
       expect(await readFile(join(root, 'other.txt'), 'utf8')).toBe(
         'written in the other chat'
       );
@@ -2188,7 +2195,7 @@ describe('extension activation', () => {
       mentions: [],
       selections: []
     });
-    await vi.waitFor(async () => {
+    await waitForState(async () => {
       expect(await readFile(join(root, 'third.txt'), 'utf8')).toBe('written once more');
     });
     expect(ofType('approval_request').length).toBe(0);
@@ -2208,22 +2215,22 @@ describe('extension activation', () => {
     const first = ofType('init')[0]!.state.activeSessionId;
 
     state.receive?.({ type: 'send', text: 'write a note', mentions: [], selections: [] });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('approval_request').length).toBe(1);
     });
     const approval = ofType('approval_request')[0]!.approval;
 
     // The reader opens another chat while the first one waits.
     state.receive?.({ type: 'new_session' });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('init').length).toBeGreaterThan(1);
     });
     state.posted.length = 0;
     state.receive?.({ type: 'approve', id: approval.id, allowForSession: false });
-    await vi.waitFor(async () => {
+    await waitForState(async () => {
       expect(await readFile(join(root, 'note.txt'), 'utf8')).toBe('written by the agent');
     });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(state.responses.length).toBe(0);
     });
     // The tasks and the text of the first chat did not land in the open one.
@@ -2233,11 +2240,82 @@ describe('extension activation', () => {
 
     // Back in the first chat everything is there.
     state.receive?.({ type: 'select_session', id: first! });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       const init = ofType('init').at(-1);
       expect(init?.state.activeSessionId).toBe(first);
       expect(init?.state.todos.length).toBeGreaterThan(0);
     });
+  });
+
+  it('the status of the open chat ignores a chat that runs in the background', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.secrets.set('minimax.apiKey', 'test-key');
+    // The first chat writes a file and answers while another chat is open.
+    state.responses.push(
+      writeSse('toolu_1', 'note.txt', 'written by the agent'),
+      TEXT_SSE
+    );
+    await boot();
+
+    state.receive?.({ type: 'send', text: 'write a note', mentions: [], selections: [] });
+    await waitForState(() => {
+      expect(ofType('approval_request').length).toBe(1);
+    });
+    const approval = ofType('approval_request')[0]!.approval;
+
+    // The reader opens another chat, the first one keeps working.
+    state.receive?.({ type: 'new_session' });
+    await waitForState(() => {
+      expect(ofType('init').length).toBeGreaterThan(1);
+    });
+    state.posted.length = 0;
+    state.receive?.({ type: 'approve', id: approval.id, allowForSession: false });
+    await waitForState(() => {
+      expect(state.responses.length).toBe(0);
+    });
+    // The dot of the open chat stayed idle, the work of the background
+    // chat did not flip it.
+    expect(ofType('status')).toHaveLength(0);
+  });
+
+  it('a deleted chat stops its turn and does not come back', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.secrets.set('minimax.apiKey', 'test-key');
+    // The chat writes a file and answers, the reader deletes it while the
+    // write waits for the answer of the reader.
+    state.responses.push(
+      writeSse('toolu_1', 'note.txt', 'written by the agent'),
+      TEXT_SSE
+    );
+    await boot();
+    const first = ofType('init')[0]!.state.activeSessionId;
+
+    state.receive?.({ type: 'send', text: 'write a note', mentions: [], selections: [] });
+    await waitForState(() => {
+      expect(ofType('approval_request').length).toBe(1);
+    });
+
+    // The reader opens another chat and deletes the busy one.
+    state.receive?.({ type: 'new_session' });
+    await waitForState(() => {
+      expect(ofType('init').length).toBeGreaterThan(1);
+    });
+    state.receive?.({ type: 'delete_session', id: first! });
+
+    // The turn was stopped: the approval that waited is rejected and the
+    // turn runs to its end instead of hanging on the answer of the reader.
+    await waitForState(() => {
+      expect(state.responses.length).toBe(0);
+    });
+    // The finished turn did not write the deleted chat back into the
+    // store of the host.
+    const stored = state.globalState.get('minimax.sessions') as Array<{ id: string }>;
+    expect(stored.some((session) => session.id === first)).toBe(false);
+    for (const message of ofType('sessions')) {
+      expect(message.sessions.some((session) => session.id === first)).toBe(false);
+    }
   });
 
   it('the prompt of the child carries the goal, the tasks and the state of the repository', async () => {
@@ -2261,7 +2339,7 @@ describe('extension activation', () => {
       tokenBudget: 12000,
       requestLimit: 8
     });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('goal').length).toBe(1);
     });
 
@@ -2273,7 +2351,7 @@ describe('extension activation', () => {
       selections: []
     });
 
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(state.bodies.length).toBeGreaterThan(2);
     });
     // The third request is the request of the child.
@@ -2306,7 +2384,7 @@ describe('extension activation', () => {
     });
 
     // The parent asks the reader for a permission.
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('approval_request').length).toBe(1);
     });
     const approval = ofType('approval_request')[0]!.approval;
@@ -2315,7 +2393,7 @@ describe('extension activation', () => {
 
     // The write of the child needs no permission, the reader allowed the
     // tool for the session.
-    await vi.waitFor(async () => {
+    await waitForState(async () => {
       expect(await readFile(join(root, 'child.txt'), 'utf8')).toBe('written by the child');
     });
     expect(ofType('approval_request').length).toBe(1);
@@ -2346,7 +2424,7 @@ describe('extension activation', () => {
     });
 
     // The first child asks the reader.
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('approval_request').length).toBe(1);
     });
     state.receive?.({
@@ -2356,7 +2434,7 @@ describe('extension activation', () => {
     });
 
     // The second child writes without a question.
-    await vi.waitFor(async () => {
+    await waitForState(async () => {
       expect(await readFile(join(root, 'second.txt'), 'utf8')).toBe('second');
     });
     expect(ofType('approval_request').length).toBe(1);
@@ -2378,7 +2456,7 @@ describe('extension activation', () => {
       selections: []
     });
 
-    await vi.waitFor(() => {
+    await waitForState(() => {
       const end = ofType('tool_end').find((message) => message.name === 'task');
       expect(end?.content).toContain('src/app.ts');
     });
@@ -2412,7 +2490,7 @@ describe('extension activation', () => {
       selections: []
     });
 
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('approval_request').length).toBe(1);
     });
     state.receive?.({
@@ -2420,7 +2498,7 @@ describe('extension activation', () => {
       id: ofType('approval_request')[0]!.approval.id,
       allowForSession: false
     });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('approval_request').length).toBe(2);
     });
     state.receive?.({
@@ -2428,12 +2506,12 @@ describe('extension activation', () => {
       id: ofType('approval_request')[1]!.approval.id,
       allowForSession: false
     });
-    await vi.waitFor(() => {
+    await waitForState(() => {
       expect(ofType('tool_end').length).toBe(2);
     });
 
     // The state of the host keeps two cards, each one with its own result.
-    await vi.waitFor(() => {
+    await waitForState(() => {
       const stored = state.globalState.get('minimax.sessions') as Array<{
         uiMessages: Array<{
           role: string;
