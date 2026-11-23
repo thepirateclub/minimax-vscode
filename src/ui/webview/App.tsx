@@ -26,6 +26,7 @@ import { MessageList } from './components/MessageList';
 import { SettingsView } from './components/SettingsView';
 import { TaskList } from './components/TaskList';
 import { appendNotice } from './notices';
+import { messageId } from './messageId';
 import { STRINGS } from './strings';
 import { endTool } from './toolEnd';
 
@@ -202,12 +203,12 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
         return;
       }
       if (message.type === 'error') {
-        setMessages((prev) => appendNotice(prev, message.message, 'error-' + Date.now()));
+        setMessages((prev) => appendNotice(prev, message.message, messageId('error')));
         return;
       }
       if (message.type === 'notice') {
         setMessages((prev) =>
-          appendNotice(prev, message.message, 'notice-' + Date.now(), message.kind)
+          appendNotice(prev, message.message, messageId('notice'), message.kind)
         );
         return;
       }
@@ -466,7 +467,7 @@ function appendToAssistant(
       return next;
     }
   }
-  next.push({ id: 'assistant-' + Date.now(), role: 'assistant', [field]: delta });
+  next.push({ id: messageId('assistant'), role: 'assistant', [field]: delta });
   return next;
 }
 
