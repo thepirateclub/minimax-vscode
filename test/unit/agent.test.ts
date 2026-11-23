@@ -60,7 +60,8 @@ function makeAgent(
   client: FakeClient,
   decide: ApprovalDecision = { approved: true, allowForSession: false },
   mode: AgentMode = 'code',
-  workspaceRoot = '/tmp/root'
+  workspaceRoot = '/tmp/root',
+  maxIterations = 5
 ): { agent: Agent; events: AgentEvent[]; requests: ApprovalRequest[] } {
   const events: AgentEvent[] = [];
   const requests: ApprovalRequest[] = [];
@@ -93,7 +94,7 @@ function makeAgent(
     }),
     model: 'MiniMax-M3.1-Flash',
     maxTokens: 32000,
-    maxIterations: 5,
+    maxIterations,
     effort: 'max',
     mode,
     systemPrompt: 'system',
@@ -164,6 +165,53 @@ describe('Agent', () => {
     expect(events.some((e) => e.type === 'tool_start')).toBe(true);
     expect(events.some((e) => e.type === 'tool_end')).toBe(true);
     expect(result.messages.length).toBeGreaterThan(2);
+  });
+
+  it('lets the model read the file after every edit of it', async () => {
+    // Three cycles of a write and a read of the same file with the same
+    // arguments, then one more read. Every write changed the file, so the
+    // reads are not a loop: the fourth one is the call the guard used to
+    // refuse.
+    const cycle = [
+      toolResponse('write_file', { path: 'a.ts' }),
+      toolResponse('read_file', { path: 'a.ts' })
+    ];
+    const client = new FakeClient([
+      ...cycle,
+      ...cycle,
+      ...cycle,
+      toolResponse('read_file', { path: 'a.ts' }),
+      textResponse('done')
+    ]);
+    const { agent, events } = makeAgent(client, undefined, 'code', '/tmp/root', 12);
+    await agent.run('edit and check the file', []);
+    const ends = events.filter(
+      (event): event is Extract<AgentEvent, { type: 'tool_end' }> => event.type === 'tool_end'
+    );
+    // Every call ran: three writes and four reads, no refusal among them.
+    expect(ends).toHaveLength(7);
+    expect(ends.some((event) => event.content.includes('repeated'))).toBe(false);
+    expect(ends.at(-1)?.isError).toBe(false);
+  });
+
+  it('still refuses a loop of identical writes', async () => {
+    // A write that worked does not make the next identical write sensible:
+    // the counters of the tools with a side effect survive the reset.
+    const client = new FakeClient([
+      toolResponse('write_file', { path: 'a.ts' }),
+      toolResponse('write_file', { path: 'a.ts' }),
+      toolResponse('write_file', { path: 'a.ts' }),
+      toolResponse('write_file', { path: 'a.ts' }),
+      textResponse('done')
+    ]);
+    const { agent, events } = makeAgent(client, undefined, 'code', '/tmp/root', 12);
+    await agent.run('write the same file again and again', []);
+    const ends = events.filter(
+      (event): event is Extract<AgentEvent, { type: 'tool_end' }> => event.type === 'tool_end'
+    );
+    expect(ends).toHaveLength(4);
+    expect(ends[3]?.isError).toBe(true);
+    expect(ends[3]?.content).toContain('repeated');
   });
 
   it('shows the refusal of a repeated identical call in the panel', async () => {

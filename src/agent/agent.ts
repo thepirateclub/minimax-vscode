@@ -97,6 +97,23 @@ function signatureOf(name: string, input: Record<string, unknown>): string {
   return name + ':' + JSON.stringify(input);
 }
 
+// A tool with a side effect that worked makes every answer of a reading tool
+// stale: the model reads the file it has just written. Such a call is not a
+// loop, so the counters of the reading tools go away. The counters of the
+// tools with a side effect stay: a loop of identical writes is exactly what
+// the guard is for.
+function forgetReadCalls(counts: Map<string, number>, registry: ToolRegistry): void {
+  const writePrefixes = registry
+    .list()
+    .filter((entry) => entry.sideEffect)
+    .map((entry) => entry.name + ':');
+  for (const key of [...counts.keys()]) {
+    if (!writePrefixes.some((prefix) => key.startsWith(prefix))) {
+      counts.delete(key);
+    }
+  }
+}
+
 // One action can send several requests to the API, the spend of the action
 // is the sum of all of them.
 function addUsage(total: Usage, part: Usage): Usage {
@@ -349,6 +366,10 @@ export class Agent {
           content,
           is_error: isError
         });
+        // The write worked, the world changed: the same read is a new read.
+        if (entry.sideEffect && !isError) {
+          forgetReadCalls(identicalCalls, this.options.registry);
+        }
       }
 
       messages.push({ role: 'user', content: results });
