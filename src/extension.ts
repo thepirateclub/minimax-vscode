@@ -737,6 +737,9 @@ class MiniMaxController {
   private releaseChildApprovals(): void {
     for (const [id, pending] of this.childApprovals) {
       this.childApprovals.delete(id);
+      // The card of the child leaves the chat with its answer, the same way
+      // the cards of the parent do.
+      this.dropApprovalCard(id, false);
       pending.resolve({ approved: false, allowForSession: false });
     }
   }
@@ -1056,6 +1059,12 @@ class MiniMaxController {
         // to get the goal with the time that was added.
         this.postFor(runtime, { type: 'goal', goal: { ...goal } });
       }
+      // Every question of the turn is over: the answer that never comes
+      // must not stay in the chat as a dead card, and the card must not go
+      // to the disk with the chat. The drop stands before the early return
+      // of the stopped turn below: a turn cancelled from the window of the
+      // editor takes that branch too.
+      this.dropApprovalCards(runtime, false);
       if (isAbortMessage(event.message)) {
         // The user stopped the turn, it is not a failure of the server.
         this.postFor(runtime, {
@@ -1069,7 +1078,6 @@ class MiniMaxController {
         runtime.turnStartedAt = 0;
         return;
       }
-      this.dropApprovalCards(runtime, false);
       this.postFor(runtime, { type: 'error', message: event.message });
       this.setState('error', runtime);
       // The turn is over, the time of the turn is not running anymore.

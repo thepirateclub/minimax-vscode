@@ -35,7 +35,8 @@ const state = vi.hoisted(() => ({
   themeListener: undefined as undefined | (() => void),
   opened: [] as string[],
   shown: [] as string[],
-  quickPick: undefined as undefined | { title: string; items: unknown[] }
+  quickPick: undefined as undefined | { title: string; items: unknown[] },
+  progressCancel: undefined as undefined | (() => void)
 }));
 
 vi.mock('vscode', () => {
@@ -108,7 +109,13 @@ vi.mock('vscode', () => {
       ) =>
         task(
           { report: () => undefined },
-          { onCancellationRequested: () => ({ dispose: () => undefined }) }
+          {
+            onCancellationRequested: (listener: () => void) => {
+              // The Cancel of the window of the editor, a test can pull it.
+              state.progressCancel = listener;
+              return { dispose: () => undefined };
+            }
+          }
         ),
       executeCommand: async () => undefined,
       showTextDocument: async (document: { uri: { fsPath: string } }) => {
@@ -376,6 +383,7 @@ describe('extension activation', () => {
     state.files.length = 0;
     state.failState = false;
     state.receive = undefined;
+    state.progressCancel = undefined;
     state.theme = 2;
     state.themeListener = undefined;
     state.opened.length = 0;
@@ -2267,6 +2275,64 @@ describe('extension activation', () => {
     }>;
     const saved = stored.find((item) => item.id === first);
     expect(saved?.uiMessages?.some((message) => message.approval)).toBeFalsy();
+  });
+
+  it('the card of an approval leaves the chat when the turn is cancelled', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.secrets.set('minimax.apiKey', 'test-key');
+    state.responses.push(writeSse('toolu_1', 'note.txt', 'written by the agent'), TEXT_SSE);
+    // A cancelled turn never reaches the server, the request dies on the wire.
+    const base = globalThis.fetch;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+        if (init?.signal?.aborted) {
+          throw new Error('This operation was aborted');
+        }
+        return await base(url, init);
+      })
+    );
+    try {
+      await boot();
+      state.receive?.({ type: 'send', text: 'write a note', mentions: [], selections: [] });
+      await waitForState(() => {
+        expect(ofType('approval_request').length).toBe(1);
+      });
+      const approval = ofType('approval_request')[0]!.approval;
+
+      // The reader cancels the work in the window of the editor, not with
+      // the Stop button of the panel.
+      state.progressCancel?.();
+      await waitForState(() => {
+        expect(ofType('status').at(-1)?.state).toBe('idle');
+      });
+
+      // The card left the chat with the answer that never comes.
+      expect(
+        ofType('approval_resolved').some((message) => message.id === approval.id)
+      ).toBe(true);
+      expect(
+        ofType('notice').some((message) => message.message.includes('stopped'))
+      ).toBe(true);
+      // The answer of the server was never asked for.
+      expect(state.responses.length).toBe(1);
+      // The dead card did not go to the disk with the chat.
+      await waitForState(() => {
+        const stored = state.globalState.get('minimax.sessions') as Array<{
+          uiMessages?: Array<{ approval?: unknown }>;
+        }>;
+        expect(stored.length).toBeGreaterThan(0);
+        for (const session of stored) {
+          expect(session.uiMessages?.some((message) => message.approval)).toBeFalsy();
+        }
+      });
+    } finally {
+      vi.stubGlobal('fetch', base);
+    }
+    // The global is the stub of the file again, the next test is not
+    // touched by this one.
+    expect(globalThis.fetch).toBe(base);
   });
 
   it('keeps the events of a chat in the background out of the open chat', async () => {
