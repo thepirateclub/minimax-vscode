@@ -218,7 +218,7 @@ describe('styleguide alignment', () => {
 describe('styleguide icons', () => {
   const dir = new URL('../../src/ui/webview/components/', import.meta.url);
   const sources = readdirSync(dir)
-    .filter((name) => name.endsWith('.tsx'))
+    .filter((name) => name.endsWith('.tsx') || name.endsWith('.ts'))
     .map((name) => ({ name, text: readFileSync(new URL(name, dir), 'utf8') }));
 
   it('draws the chevrons with the icon, not with a letter', () => {
@@ -231,7 +231,10 @@ describe('styleguide icons', () => {
     for (const source of sources) {
       const crosses = source.text.match(/×/g)?.length ?? 0;
       // The chip of a file lives in the editable field, an svg moves the caret.
-      expect(crosses, source.name).toBe(source.name === 'Composer.tsx' ? 1 : 0);
+      // The helpers of the field hold that one letter, the rest of the panel
+      // draws its crosses with the icon.
+      const expected = source.name === 'composerField.ts' ? 1 : 0;
+      expect(crosses, source.name).toBe(expected);
     }
   });
 });
