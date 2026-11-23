@@ -91,13 +91,12 @@
 }
 
 /* The plate of the hover has the same space on both sides: the name of the
-   file must not touch the edge of the plate. The margin keeps the names on
-   the left edge of the bar: the plate goes into the margin of the bar. */
+   file must not touch the edge of the plate. */
 .summary-file {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin: 0 -8px;
+  width: 100%;
   padding: 2px 8px;
   border: none;
   background: none;

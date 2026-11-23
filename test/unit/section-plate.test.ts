@@ -180,10 +180,9 @@ describe('the plates of the summary of the files', () => {
   });
 
   it('keeps the names on the left edge of the bar', () => {
-    // The plate of the hover goes into the margin of the bar, the names keep
-    // their place.
-    const margin = sides(rule('.summary-file').get('margin') ?? '');
-    expect(margin.left).toBeLessThan(0);
+    // The row of the file takes the whole width of the bar: the plate of the
+    // hover stays inside the bar and does not stick out of it.
+    expect(rule('.summary-file').get('width')).toBe('100%');
   });
 
   it('has the same space on both sides of the bar', () => {
