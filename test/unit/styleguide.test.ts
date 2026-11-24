@@ -209,6 +209,19 @@ describe('styleguide alignment', () => {
     expect(pixels(token('--nest') ?? '')).toEqual([Number(head[1]) + Number(gap[1])]);
   });
 
+  it('draws the guide line of a sub-agent under the center of the icon of its card', () => {
+    // The body of a card starts on the edge of the chevron. The icon of the
+    // head stands one nest further (chevron 14 and gap 6) and is 14 wide:
+    // the line of 1px stands in the middle of it, the rows go to its right.
+    const line = USES.filter((item) => item.selector === '.agent-log::before');
+    const left = line.find((item) => item.property === 'left')?.value;
+    expect(left).toBe('calc(var(--nest) + 6.5px)');
+    expect(line.find((item) => item.property === 'width')?.value).toBe('1px');
+    const log = USES.filter((item) => item.selector === '.agent-log');
+    expect(log.find((item) => item.property === 'border-left')).toBeUndefined();
+    expect(log.find((item) => item.property === 'padding-left')?.value).toBe('calc(var(--nest) * 2)');
+  });
+
   it('keeps the text of a failed action and of a notice on the edge, the bar in the margin', () => {
     const bar = 2;
     const card = leftOf(box('.tool-card', 'margin'));

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createTaskTools, describeInput, type TaskOutcome } from '../../src/tools/task';
+import { actionInput, createTaskTools, describeInput, type TaskOutcome } from '../../src/tools/task';
 import type { ToolContext } from '../../src/tools/types';
 
 function makeContext(over: Partial<ToolContext> = {}): ToolContext {
@@ -195,5 +195,20 @@ describe('the tool of a sub-agent', () => {
     expect(describeInput({})).toBe('');
     // A long name is cut.
     expect(describeInput({ path: 'a'.repeat(80) })).toBe('a'.repeat(60) + '…');
+  });
+});
+
+describe('actionInput', () => {
+  it('keeps the fields that name the action and drops the payload', () => {
+    expect(
+      actionInput({ path: 'a.ts', content: 'body', old_string: 'x', new_string: 'y', start_line: 3, replace_all: true })
+    ).toEqual({ path: 'a.ts', start_line: 3, replace_all: true });
+  });
+
+  it('keeps the lists of strings and cuts a long value', () => {
+    const input = actionInput({ patterns: ['a', 'b', 1], command: 'x'.repeat(500), nested: { a: 1 } });
+    expect(input['patterns']).toEqual(['a', 'b']);
+    expect(String(input['command']).length).toBe(200);
+    expect(input['nested']).toBeUndefined();
   });
 });

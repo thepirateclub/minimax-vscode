@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { UiMessage } from '../../protocol';
 import { Chevron, IconList } from '../icons';
 import { STRINGS } from '../strings';
-import { actionPreview } from '../sectionPreview';
+import { actionPreview } from './toolDescriptions';
 import { SectionPreview } from './SectionPreview';
 import { ToolCard } from './ToolCard';
 

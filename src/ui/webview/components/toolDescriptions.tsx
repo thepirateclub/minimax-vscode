@@ -20,6 +20,12 @@ export function describe(tool: UiToolCall, folded: boolean): ToolView {
   return view;
 }
 
+// The preview of a folded group of the actions: the last action in the words
+// of its folded card, so the head of the group and the card read the same.
+export function actionPreview(tool: UiToolCall): string {
+  return describe(tool, true).title;
+}
+
 function describeTool(tool: UiToolCall, folded: boolean): ToolView {
   const input = tool.input;
   const paths = filePaths(input);

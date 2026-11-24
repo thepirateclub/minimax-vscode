@@ -68,10 +68,10 @@ with sync_playwright() as pw:
         if item['lines'] != 1:
             failed.append('the preview takes %d lines, one is expected' % item['lines'])
     thinking = next((item['text'] for item in shown if item['text'].startswith('The user')), '')
-    actions = next((item['text'] for item in shown if item['text'].startswith('read_file')), '')
+    actions = next((item['text'] for item in shown if item['text'].startswith('Read ')), '')
     if not thinking.endswith('…'):
         failed.append('the reasoning is not cut with the ellipsis')
-    if actions != 'read_file src/tools/git.ts':
+    if actions != 'Read src/tools/git.ts':
         failed.append('the group does not show its last action: ' + actions)
     # The live status of the agent is gone: the preview of the group took
     # its place.

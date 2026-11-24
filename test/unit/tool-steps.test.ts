@@ -108,3 +108,34 @@ describe('the grouping of the actions by step', () => {
     expect(steps[0]?.kind === 'steps' ? steps[0].step.tools.length : 0).toBe(2);
   });
 });
+
+describe('the card of a sub-agent in the feed', () => {
+  function taskMessage(id: string): UiMessage {
+    return {
+      id,
+      role: 'tool',
+      tool: { id, name: 'task', input: { description: 'Find the parser', role: 'explore' } }
+    };
+  }
+
+  // The work of a sub-agent is a block of its own: its actions stand in its
+  // card, the card does not hide in the group of the actions of the parent.
+  it('stands outside of the group and splits it in two', () => {
+    const items = groupToolSteps([
+      userMessage('u1'),
+      toolMessage('t1'),
+      taskMessage('k1'),
+      toolMessage('t2')
+    ]);
+    expect(items.map((item) => item.kind)).toEqual(['message', 'steps', 'message', 'steps']);
+    const task = items[2];
+    expect(task?.kind === 'message' ? task.message.id : '').toBe('k1');
+    const second = items[3];
+    expect(second?.kind === 'steps' ? second.step.id : '').toBe('t2');
+  });
+
+  it('stands alone when two sub-agents follow each other', () => {
+    const items = groupToolSteps([taskMessage('k1'), taskMessage('k2')]);
+    expect(items.map((item) => item.kind)).toEqual(['message', 'message']);
+  });
+});

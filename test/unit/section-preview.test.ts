@@ -3,10 +3,10 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ThinkingBlock } from '../../src/ui/webview/components/ThinkingBlock';
 import { ToolSteps } from '../../src/ui/webview/components/ToolSteps';
+import { actionPreview } from '../../src/ui/webview/components/toolDescriptions';
 import {
   PREVIEW_CHARS,
   PREVIEW_WORDS,
-  actionPreview,
   thinkingPreview
 } from '../../src/ui/webview/sectionPreview';
 import type { UiMessage } from '../../src/ui/protocol';
@@ -68,23 +68,26 @@ describe('the preview of the reasoning', () => {
 });
 
 describe('the preview of the actions', () => {
-  it('names the tool and the object of it', () => {
-    const tool = {
-      id: 't1',
-      name: 'read_file',
-      input: { path: 'src/tools/git.ts' }
-    };
-    expect(actionPreview(tool)).toBe('read_file src/tools/git.ts');
+  // The preview names the action in the words of its card: the folded group
+  // and the open card read the same, the raw name of the tool stays out.
+  it('names the reading of a file like the card', () => {
+    const tool = { id: 't1', name: 'read_file', input: { path: 'src/tools/git.ts' } };
+    expect(actionPreview(tool)).toBe('Read src/tools/git.ts');
   });
 
-  it('names the command of the terminal', () => {
+  it('names the command of the terminal like the folded card', () => {
     const tool = { id: 't2', name: 'run_terminal', input: { command: 'npm test' } };
-    expect(actionPreview(tool)).toBe('run_terminal npm test');
+    expect(actionPreview(tool)).toBe('Run npm test');
   });
 
-  it('names the tool alone when it has no object', () => {
+  it('names a tool without an object by its word', () => {
     const tool = { id: 't3', name: 'git_status', input: { staged: false } };
-    expect(actionPreview(tool)).toBe('git_status');
+    expect(actionPreview(tool)).toBe('Git status');
+  });
+
+  it('never shows the raw name of a tool that has a card', () => {
+    const tool = { id: 't4', name: 'search_code', input: { query: 'parser', path: 'src' } };
+    expect(actionPreview(tool)).toBe('Find "parser"');
   });
 });
 
@@ -111,8 +114,9 @@ describe('the folded sections of the chat', () => {
     );
     expect(markup).toContain('section-preview');
     // The last action of the group, not the first one.
-    expect(markup).toContain('read_file src/tools/git.ts');
-    expect(markup).not.toContain('read_file src/ui/format.ts');
+    expect(markup).toContain('Read src/tools/git.ts');
+    expect(markup).not.toContain('read_file');
+    expect(markup).not.toContain('src/ui/format.ts');
   });
 
   it('opens the section on a click of the preview', () => {

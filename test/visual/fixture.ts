@@ -4,6 +4,11 @@ import type { UiMessage, UiSessionSummary, UiUsageTurn } from '../../src/ui/prot
 
 const README = Array.from({ length: 14 }, (_, i) => `${i + 1}: ${i % 3 === 0 ? 'import { join } from \'node:path\';' : i % 3 === 1 ? 'export function run(args: string[]): number {' : '  return args.length; // count'}`).join('\n');
 
+// The start of an action of a sub-agent, the form of src/host/child.ts.
+function start(tool: string, input: Record<string, string>): string {
+  return JSON.stringify({ tool, input });
+}
+
 export const MESSAGES: UiMessage[] = [
   { id: 'u1', role: 'user', text: 'Найди, где считается расход токенов, и добавь округление.' },
   {
@@ -69,7 +74,23 @@ export const MESSAGES: UiMessage[] = [
       input: { description: 'Find the callers of formatCount', role: 'explore', prompt: 'Find every caller of formatCount.' },
       content: 'formatCount is called in **statusBar.ts** and **Header.tsx**.',
       durationMs: 8400,
-      progress: ['Search formatCount', 'Read src/ui/statusBar.ts', 'Read src/ui/webview/components/Header.tsx']
+      // The journal in the form of the host (src/host/child.ts).
+      progress: [
+        start('list_files', { path: 'src/ui' }),
+        'list_files done',
+        start('search_code', { query: 'formatCount', path: 'src' }),
+        'search_code done',
+        start('read_file', { path: 'src/ui/statusBar.ts' }),
+        'read_file done',
+        start('read_file', { path: 'src/ui/webview/components/Header.tsx' }),
+        'read_file failed',
+        start('edit_file', { path: 'src/ui/format.ts' }),
+        'edit_file done',
+        '+ export const B = 1e9;',
+        '- export const M = 1e6;',
+        '+ export const M = 1e6;',
+        start('git_status', {})
+      ]
     }
   },
   {

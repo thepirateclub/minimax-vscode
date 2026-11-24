@@ -71,13 +71,23 @@ describe('the card of a sub-agent', () => {
         role: 'explore'
       },
       content: 'The parser is in src/app.ts.',
-      progress: ['read_file src/app.ts', 'search_code parser 3 matches']
+      progress: [
+        JSON.stringify({ tool: 'read_file', input: { path: 'src/app.ts' } }),
+        'read_file done',
+        JSON.stringify({ tool: 'search_code', input: { query: 'parser', path: 'src' } })
+      ]
     });
     // The title names the task of the child.
     expect(markup).toContain('Find the parser');
-    // The journal of the child stands in its own block.
-    expect(markup).toContain('agent-log');
-    expect(markup).toContain('read_file src/app.ts');
+    // The actions of the child are rows with the word of the card, the
+    // object and the dot of the state, not the raw lines of the journal.
+    expect(markup).toContain('agent-log-row');
+    expect(markup).toContain('Read src/app.ts');
+    expect(markup).toContain('Find &quot;parser&quot;');
+    expect(markup).not.toContain('read_file');
+    expect(markup).not.toContain('search_code');
+    expect(markup).toContain('tool-dot-done');
+    expect(markup).toContain('tool-dot-running');
     // The answer of the child stands under the journal.
     expect(markup).toContain('The parser is in src/app.ts.');
   });

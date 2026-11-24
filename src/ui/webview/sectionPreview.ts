@@ -1,4 +1,3 @@
-import type { UiToolCall } from '../protocol';
 
 // The preview of a folded section of the chat: one line that says what the
 // section holds, so the reader knows what he opens before he opens it.
@@ -33,27 +32,4 @@ export function thinkingPreview(text: string): string {
   }
   const cut = kept.length < words.length;
   return kept.join(' ') + (cut ? '…' : '');
-}
-
-// The preview of the actions: the last action of the group, the name of the
-// tool and the object of it.
-export function actionPreview(tool: UiToolCall): string {
-  const target = toolTarget(tool);
-  return target.length > 0 ? tool.name + ' ' + target : tool.name;
-}
-
-// The object of the action: the file, the command, the query of the tool.
-export function toolTarget(tool: UiToolCall): string {
-  const input = tool.input ?? {};
-  for (const key of ['path', 'command', 'query', 'ref', 'branch', 'description']) {
-    const value = input[key];
-    if (typeof value === 'string' && value.trim().length > 0) {
-      return value.trim();
-    }
-  }
-  const patterns = input['patterns'];
-  if (Array.isArray(patterns) && patterns.length > 0) {
-    return patterns.map((item) => String(item)).join(' ');
-  }
-  return '';
 }

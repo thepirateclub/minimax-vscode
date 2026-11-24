@@ -59,6 +59,7 @@ export function endTool(
 // The group ends at the thought or at the answer of the model: the actions
 // that follow a thought are the next step of the work, not the tail of the
 // step before it. The order of the chat reads as actions, thought, actions.
+// The card of a sub-agent ends the group too and stands between the groups.
 export function groupToolSteps(messages: UiMessage[]): FeedItem[] {
   const items: FeedItem[] = [];
   let step: ToolStep | undefined;
@@ -71,6 +72,14 @@ export function groupToolSteps(messages: UiMessage[]): FeedItem[] {
     // actions: the next actions stand under a new head.
     if (message.role === 'assistant' && !message.approval && speaks(message)) {
       step = undefined;
+    }
+    // The card of a sub-agent is a block of its own: the actions of the
+    // child stand inside it, and in the group of the parent it read as one
+    // more action. It closes the group, the next actions start a new one.
+    if (message.role === 'tool' && message.tool?.name === 'task') {
+      step = undefined;
+      items.push({ kind: 'message', message });
+      continue;
     }
     if (message.role === 'tool' && message.tool) {
       if (!step) {

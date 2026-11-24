@@ -217,21 +217,62 @@
   padding-right: 32px;
 }
 
-/* the card of a sub-agent */
+/* The card of a sub-agent. The actions of the child are rows of the feed in
+   small, nested on a guide line: the work of the child reads as a part of
+   this card, not as actions of the parent. The line grows out of the icon
+   of the head: the body starts on the edge of the chevron, the icon stands
+   one nest further and is 14 wide, the line of 1px takes its middle. The
+   rows stand right of the line, one nest more. */
 .agent-log {
-  margin-bottom: 8px;
-  padding: 6px 8px;
-  border: 1px solid var(--border);
-  background: var(--code-bg);
-  color: var(--muted);
-  font-family: var(--mono);
-  font-size: var(--fs-sm);
-  border-radius: var(--radius-sm);
+  position: relative;
+  margin: 0 0 8px;
+  padding: 0;
+  padding-left: calc(var(--nest) * 2);
+  list-style: none;
 }
 
-.agent-log-line {
-  white-space: pre-wrap;
-  word-break: break-word;
+.agent-log::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--nest) + 6.5px);
+  width: 1px;
+  background: var(--border);
+}
+
+.agent-log-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--control-h);
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+
+.agent-log-title {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* the error of the child, it has no tool to name */
+.agent-log-target {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-log-row .tool-dot {
+  margin-left: auto;
+}
+
+.agent-log-failed .agent-log-title {
+  color: var(--err);
 }
 
 .agent-answer {

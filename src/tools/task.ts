@@ -38,6 +38,31 @@ const PAYLOAD_FIELDS = ['content', 'new_string', 'old_string', 'text', 'prompt']
 // The arguments of a tool as a short line for the journal of the card. The
 // line names the target of the action and not its payload: the content of a
 // file is not a line of the journal.
+// The input of an action of the child for the journal of the card: the
+// fields that name the action stay, the payload (the content of a file, the
+// text of an edit) goes, a long value is cut. The panel names the action
+// from it with the same describer as a card of the parent.
+const ACTION_VALUE_MAX = 200;
+
+export function actionInput(input: Record<string, unknown>): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(input)) {
+    if (PAYLOAD_FIELDS.includes(key)) {
+      continue;
+    }
+    if (typeof value === 'string') {
+      result[key] = value.slice(0, ACTION_VALUE_MAX);
+    } else if (typeof value === 'number' || typeof value === 'boolean') {
+      result[key] = value;
+    } else if (Array.isArray(value)) {
+      result[key] = value
+        .filter((item): item is string => typeof item === 'string')
+        .map((item) => item.slice(0, ACTION_VALUE_MAX));
+    }
+  }
+  return result;
+}
+
 export function describeInput(input: Record<string, unknown>): string {
   const path = input['path'];
   let target = typeof path === 'string' ? path.trim() : '';

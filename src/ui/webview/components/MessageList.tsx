@@ -208,6 +208,10 @@ export function MessageList({
                 collapsed={collapseTools}
               />
             ) : null
+          ) : item.message.role === 'tool' && !showToolSteps ? (
+            // The card of a sub-agent stands outside of the steps, the
+            // setting hides it with them.
+            null
           ) : (
             <MessageRow
               key={item.message.id}

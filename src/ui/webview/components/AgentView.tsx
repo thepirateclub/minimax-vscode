@@ -1,7 +1,13 @@
 import { renderMarkdown } from '../markdown';
+import { parseAgentLog, type AgentLogRow } from '../agentLog';
+import { STRINGS } from '../strings';
+import { describe } from './toolDescriptions';
 
-// The card of a sub-agent: the journal of the child on the top, the
-// answer of the child under it.
+// The card of a sub-agent: the actions of the child on the top, the answer
+// of the child under it. The actions are the rows of the feed in small: the
+// icon and the word of the card, the object, the size of a change and the
+// dot of the state. They stand on a guide line, the work of the child is
+// nested in the card of the parent and does not look like its own actions.
 export function AgentView({
   progress,
   content
@@ -9,21 +15,53 @@ export function AgentView({
   progress: string[];
   content: string;
 }) {
+  const rows = parseAgentLog(progress);
   return (
     <>
-      {progress.length > 0 ? (
-        <div className="agent-log">
-          {progress.map((line, index) => (
-            <div key={index} className="agent-log-line">
-              {line}
-            </div>
+      {rows.length > 0 ? (
+        <ol className="agent-log">
+          {rows.map((row, index) => (
+            <AgentLogItem key={index} row={row} />
           ))}
-        </div>
+        </ol>
       ) : null}
       <div
         className="markdown agent-answer"
         dangerouslySetInnerHTML={{ __html: renderMarkdown(content) }}
       />
     </>
+  );
+}
+
+function AgentLogItem({ row }: { row: AgentLogRow }) {
+  // The title of the card: the same describer as a card of the parent,
+  // folded, so a command stands in the title. An old chat has no input,
+  // its target stands in for the fields that name an action.
+  const input = row.input ?? { path: row.target, query: row.target, command: row.target };
+  const view =
+    row.name.length > 0 ? describe({ id: '', name: row.name, input }, true) : undefined;
+  const status =
+    row.state === 'running'
+      ? STRINGS.toolRunning
+      : row.state === 'failed'
+        ? STRINGS.toolFailed
+        : STRINGS.toolDone;
+  return (
+    <li className={'agent-log-row' + (row.state === 'failed' ? ' agent-log-failed' : '')}>
+      {view ? <span className="tool-icon">{view.icon}</span> : null}
+      <span className="agent-log-title" title={view?.title}>
+        {view ? view.title : STRINGS.toolFailed}
+      </span>
+      {view ? null : <span className="agent-log-target">{row.target}</span>}
+      {row.added > 0 ? <span className="tool-stat tool-stat-add">+{row.added}</span> : null}
+      {row.removed > 0 ? (
+        <span className="tool-stat tool-stat-remove">-{row.removed}</span>
+      ) : null}
+      <span
+        className={'tool-dot tool-dot-' + row.state}
+        title={status}
+        aria-label={status}
+      />
+    </li>
   );
 }

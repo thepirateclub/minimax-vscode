@@ -9,7 +9,7 @@ import type { RuntimeSession } from './runtime';
 import { childApproval, releaseChildApprovals } from './approvals';
 import { handleAgentEvent } from './events';
 import { ToolRegistry } from '../tools/registry';
-import { CHILD_MAX_ITERATIONS, describeInput } from '../tools/task';
+import { actionInput, CHILD_MAX_ITERATIONS } from '../tools/task';
 import type { ToolContext } from '../tools/types';
 import type { TaskRole, TaskRequest, TaskOutcome } from '../tools/task';
 import type { AgentEvent, AgentRunResult } from '../agent/agent';
@@ -65,10 +65,10 @@ export function handleChildEvent(host: MiniMaxController, runtime: RuntimeSessio
     return;
   }
   if (event.type === 'tool_start') {
-    // The line names the target of the action, the content of a file is
-    // not a line of the journal.
-    const target = describeInput(event.input);
-    progress(target.length > 0 ? event.name + ' ' + target : event.name);
+    // The start of the action carries its input without the payload: the
+    // panel names the action like a card of the parent. The content of a
+    // file is not a line of the journal.
+    progress(JSON.stringify({ tool: event.name, input: actionInput(event.input) }));
     return;
   }
   if (event.type === 'tool_end') {
