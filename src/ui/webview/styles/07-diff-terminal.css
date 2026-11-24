@@ -107,7 +107,9 @@
 .file-read-lines {
   max-height: 300px;
   overflow: auto;
-  padding: 4px 0;
+  /* The room on the right belongs to the copy button, the same room the
+     command of the terminal keeps. */
+  padding: 4px 32px 4px 0;
 }
 
 .file-read-line {
@@ -238,4 +240,4 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
+

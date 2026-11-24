@@ -183,11 +183,17 @@
 /* The head of a section is a quiet row, not a button of the panel. The
    general rule of the buttons paints it with the fill of the primary button
    on hover: the plate ended right after the name of the section, the letter
-   touched the edge of the plate and the reader saw half of a highlight. The
-   row carries the plate of the hover, the button keeps the tone of the row. */
+   touched the edge of the plate and the reader saw half of a highlight.
+
+   One layer of highlight on the whole row: the row of the head carries it
+   (see .section-head:hover below) and the button of the name keeps no fill
+   of its own, like the preview of the section does. A plate of the button
+   inside the plate of the row was two highlights where the reader expects
+   one. The rule of the button of the panel is weaker than this one, the
+   fill of the theme would win without it. */
 .section-toggle:hover {
   color: var(--fg);
-  background: var(--hover);
+  background: transparent;
 }
 
 /* The preview of a folded section: one italic line that says what the

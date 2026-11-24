@@ -238,7 +238,24 @@
   font-size: var(--fs-md);
 }
 
-/* the copy button of a block, it shows itself when the mouse is over it */
+/* The copy button of a block. It shows itself when the mouse is over the
+   block: the reader sees it when he wants to copy, not before.
+
+   The button of the panel is quiet, this one is too. The general rule of the
+   buttons paints it with the fill of the primary button on hover, and that
+   fill of the theme has no place inside a card of the chat. The rule of the
+   button of the panel is weaker than this one, the fill of the theme would
+   win without it.
+
+   The plate of the button is the same in every place: the block of a file
+   and the row of a command. It has its own frame, otherwise the plate of the
+   button melted into the code under it in one place and stood out as a dark
+   square in the other. The frame keeps the button the same shape over the
+   code and over the row of a command.
+
+   The size of the plate and the place of the icon inside it are the same in
+   every state: the check of a copy replaces the copy, the plate keeps its
+   size and the block under it does not move. */
 .tool-copy {
   position: absolute;
   top: 4px;
@@ -250,7 +267,7 @@
   width: var(--control-h);
   height: var(--control-h);
   padding: 0;
-  border: none;
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--popup-bg);
   color: var(--muted);
@@ -265,9 +282,12 @@
   opacity: 1;
 }
 
+/* The hover of the copy button is quiet: the plate keeps its ground and
+   its frame, only the icon and the frame take the color of the text. */
 .tool-copy:hover {
   color: var(--fg);
   background: var(--popup-bg);
+  border-color: var(--muted);
 }
 
 /* the check after a copy stays visible while the mouse goes away */
@@ -276,4 +296,4 @@
   opacity: 1;
   color: var(--ok);
 }
-
+
