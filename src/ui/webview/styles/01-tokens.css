@@ -89,6 +89,8 @@ body {
   --dot: 8px;
   --radius-sm: 4px;
   --radius: 6px;
+  /* the indent of a nested row: the chevron column and the gap of a section head */
+  --nest: 20px;
   /* colors */
   --fg: var(--vscode-foreground);
   --muted: var(--vscode-descriptionForeground, #9d9d9d);

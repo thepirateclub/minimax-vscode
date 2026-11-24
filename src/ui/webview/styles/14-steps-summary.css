@@ -1,6 +1,8 @@
 /* the actions of one step of the agent, the step is folded by default.
    The head of the step stands on the left edge of the answer, the cards of
-   the step keep their own chevron on the same edge. */
+   the step are nested: their chevron stands under the icon of the head
+   (chevron 14 and gap 6 of .section-head), so the hover and the bar of a
+   failure go into the indent of the step. */
 .tool-steps {
   margin: 2px 0 0;
 }
@@ -20,7 +22,7 @@
 }
 
 .tool-steps-body {
-  padding: 2px 0 4px;
+  padding: 2px 0 4px var(--nest);
 }
 
 .tool-steps-failed .tool-steps-head {

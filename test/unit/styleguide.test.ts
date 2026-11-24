@@ -199,6 +199,16 @@ describe('styleguide alignment', () => {
     expect(margin + leftOf(box('.tool-body', 'padding'))).toBe(0);
   });
 
+  it('nests the cards of a step under the icon of its head', () => {
+    // The head of a step is the grid of a section: chevron 14, gap 6, icon.
+    // The chevron of a card inside the step stands under that icon.
+    const head = /grid-template-columns:\s*(\d+)px/.exec(CSS.slice(CSS.indexOf('.section-head {')))!;
+    const gap = /column-gap:\s*(\d+)px/.exec(CSS.slice(CSS.indexOf('.section-head {')))!;
+    const padding = USES.find((item) => item.selector === '.tool-steps-body' && item.property === 'padding');
+    expect(padding?.value.split(/\s+/)[3]).toBe('var(--nest)');
+    expect(pixels(token('--nest') ?? '')).toEqual([Number(head[1]) + Number(gap[1])]);
+  });
+
   it('keeps the text of a failed action and of a notice on the edge, the bar in the margin', () => {
     const bar = 2;
     const card = leftOf(box('.tool-card', 'margin'));
