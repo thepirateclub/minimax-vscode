@@ -124,6 +124,17 @@ describe('styleguide rules', () => {
     expect(wrong).toEqual([]);
   });
 
+  it('takes the color of the focus from one token', () => {
+    expect(token('--focus')).toContain('--vscode-focusBorder');
+    const raw = USES.filter((item) => item.value.includes('--vscode-focusBorder'));
+    expect(raw.map((item) => item.selector)).toEqual([]);
+  });
+
+  it('builds a translucent fill on a color of the theme, not on a bare gray', () => {
+    const bare = USES.filter((item) => /^rgba?\(/.test(item.value));
+    expect(bare.map((item) => item.selector)).toEqual([]);
+  });
+
   it('paints a failure in one red', () => {
     const reds = USES.filter((item) => item.value.includes('iconFailed') || item.value.includes('errorForeground'));
     // The red comes through the token, the rules do not name the theme color.

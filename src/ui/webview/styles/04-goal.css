@@ -116,7 +116,7 @@
 
 .goal-input:focus {
   outline: none;
-  border-color: var(--vscode-focusBorder, #007fd4);
+  border-color: var(--focus);
 }
 
 .goal-actions {

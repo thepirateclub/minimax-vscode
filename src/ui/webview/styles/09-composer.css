@@ -20,7 +20,7 @@
 }
 
 .composer-input-wrap:focus-within {
-  border-color: var(--vscode-focusBorder, #007fd4);
+  border-color: var(--focus);
 }
 
 .composer-input {

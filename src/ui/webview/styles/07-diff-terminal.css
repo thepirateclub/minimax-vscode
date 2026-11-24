@@ -1,6 +1,6 @@
 /* approval */
 .approval {
-  border: 1px solid var(--vscode-focusBorder, #007fd4);
+  border: 1px solid var(--focus);
   border-radius: var(--radius);
   padding: 12px;
   background: var(--surface);
