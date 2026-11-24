@@ -2,7 +2,7 @@
   "name": "minimax-agent",
   "displayName": "MiniMax Agent",
   "description": "Coding agent for VS Code powered by MiniMax models",
-  "version": "0.16.0",
+  "version": "0.17.0",
   "publisher": "local",
   "license": "MIT",
   "engines": {
@@ -306,7 +306,7 @@
           },
           "default": [],
           "scope": "application",
-          "description": "Tool names approved without confirmation for the whole session."
+          "description": "Rules approved without confirmation. A tool name approves the whole tool; a scoped rule approves part of it: run_terminal(npm test) for commands starting with that prefix (chained or redirected commands never match), write_file(src/ui/) for writes inside that folder."
         },
         "minimax.enableWebSearch": {
           "type": "boolean",

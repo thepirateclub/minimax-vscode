@@ -2,6 +2,7 @@ import type { UiMessage } from '../../protocol';
 import { STRINGS } from '../strings';
 import { DiffView } from './DiffView';
 import { approvalTitle, formatInput } from '../toolCard';
+import { scopeLabel } from '../../approvalScope';
 
 export function ApprovalCard({
   message,
@@ -32,9 +33,10 @@ export function ApprovalCard({
       ) : null}
       <div className="approval-actions">
         <button onClick={() => onApprove(false)}>{STRINGS.approve}</button>
-        {/* One primary button in a group, the wider grant is secondary. */}
+        {/* One primary button in a group, the wider grant is secondary. The
+            button names its scope: the prefix of the command or the folder. */}
         <button className="secondary" onClick={() => onApprove(true)}>
-          {STRINGS.alwaysAllow}
+          {scopeLabel(approval.name, approval.input)}
         </button>
         <button className="secondary" onClick={onReject}>
           {STRINGS.reject}

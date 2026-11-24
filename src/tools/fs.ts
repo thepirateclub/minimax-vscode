@@ -130,7 +130,7 @@ export function createFileTools(deps: {
       try {
         const target = resolveWorkspacePath(ctx.workspaceRoot, String(input['path'] ?? ''));
         const previous = await readFileAsync(target, 'utf8').catch(() => null);
-        await deps.backups.save(target, previous);
+        await deps.backups.save(target, previous, { sessionId: ctx.sessionId, next: content });
         await mkdir(dirname(target), { recursive: true });
         await writeFileAsync(target, content, 'utf8');
         const wrote = 'Wrote ' + String(input['path']);
@@ -174,7 +174,7 @@ export function createFileTools(deps: {
           return { content: edit.error, isError: true };
         }
         const updated = edit.text;
-        await deps.backups.save(target, raw);
+        await deps.backups.save(target, raw, { sessionId: ctx.sessionId, next: updated });
         await writeFileAsync(target, updated, 'utf8');
         // A lenient match is named: the model learns its old_string was off.
         const edited =

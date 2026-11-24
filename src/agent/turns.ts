@@ -16,6 +16,9 @@ export interface TurnAnchor {
   mentions: string[];
   // The code of the editor that the request carried.
   selections: UiSelection[];
+  // The moment the turn started, the rewind takes back the files the agent
+  // changed since then. Absent in an anchor of an older version.
+  startedAt?: number;
 }
 
 // The message of the user holds the text of the request, the messages of the

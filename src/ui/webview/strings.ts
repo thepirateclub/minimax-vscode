@@ -16,7 +16,6 @@ export const STRINGS = {
   modeCodeHint: 'Code mode: the agent can change files and run commands, every write asks for approval.',
   approve: 'Allow',
   reject: 'Reject',
-  alwaysAllow: 'Always allow in this session',
   reasoning: 'Reasoning',
   reasoningOff: 'Off',
   reasoningAdaptive: 'Adaptive',

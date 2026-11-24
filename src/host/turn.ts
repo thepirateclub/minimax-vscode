@@ -12,6 +12,8 @@ import { readMentionedFiles } from '../agent/mentions';
 import { goalBudgetOk, ensureAgent } from './setup';
 import { refreshQuota } from './commands';
 import * as vscode from 'vscode';
+import { relative } from 'node:path';
+import { planRestore, restoreFiles } from '../storage/backups';
 
 // The limit of the title of a chat.
 const TITLE_LIMIT = 60;
@@ -48,6 +50,8 @@ export async function runTurn(host: MiniMaxController, runtime: RuntimeSession,
   // and a second send in that window would start two turns on one
   // history. The queue of the reader waits behind this flag.
   runtime.busy = true;
+  // The moment of the turn: the rewind takes back the files changed since.
+  const startedAt = Date.now();
   // The budget of the goal is over, the request does not go out. The user
   // raises the limit and the work continues.
   if (!goalBudgetOk(host, runtime)) {
@@ -129,7 +133,8 @@ export async function runTurn(host: MiniMaxController, runtime: RuntimeSession,
       text,
       historyIndex: requestPlace,
       mentions,
-      selections
+      selections,
+      startedAt
     });
     if (queued) {
       if (runtime.turnStopped) {
@@ -202,6 +207,37 @@ export async function rewindTo(host: MiniMaxController, id: string): Promise<voi
   // The request comes back to the input field, the agent waits.
   host.panel.post({ type: 'restore_input', text, mentions, selections });
   persist(host, runtime);
+  await restoreTurnFiles(host, runtime, turn?.startedAt);
+}
+
+// The rewind takes back the files the agent changed since the request: the
+// chat and the disk go back to the same point. A file the user changed after
+// the agent stays as it is, the notice names it.
+async function restoreTurnFiles(host: MiniMaxController, runtime: RuntimeSession,
+  since: number | undefined): Promise<void> {
+  if (since === undefined) {
+    return;
+  }
+  const plans = planRestore(await host.backups.takeSince(runtime.id, since));
+  if (plans.length === 0) {
+    return;
+  }
+  const { restored, skipped } = await restoreFiles(plans);
+  const name = (path: string) => relative(runtime.workspaceRoot, path) || path;
+  const parts: string[] = [];
+  if (restored.length > 0) {
+    parts.push('The files went back to the request: ' + restored.map(name).join(', ') + '.');
+  }
+  if (skipped.length > 0) {
+    parts.push(
+      'Left as they are, they changed after the agent: ' + skipped.map(name).join(', ') + '.'
+    );
+  }
+  host.panel.post({
+    type: 'notice',
+    message: parts.join(' '),
+    kind: skipped.length > 0 ? 'warn' : 'info'
+  });
 }
 
 

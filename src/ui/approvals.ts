@@ -1,5 +1,6 @@
 import type { DiffLine } from '../tools/diff';
 import type { ToolEntry } from '../tools/types';
+import { ruleAllows, ruleFor } from './approvalScope';
 
 export interface DiffPreview {
   path: string;
@@ -19,9 +20,9 @@ export interface ApprovalDecision {
 }
 
 export class ApprovalGate {
-  // The permissions of the session. The gate of the parent and the gate of
-  // a child share one list, a permission that the reader gave to one of
-  // them works for the other too.
+  // The permissions of the session, the rules of src/ui/approvalScope.ts.
+  // The gate of the parent and the gate of a child share one list, a
+  // permission that the reader gave to one of them works for the other too.
   private readonly sessionApproved: Set<string>;
   private autoApprove: string[];
   private counter = 0;
@@ -47,7 +48,8 @@ export class ApprovalGate {
     if (entry.approval === 'never') {
       return { approved: true, allowForSession: false };
     }
-    if (this.autoApprove.includes(entry.name) || this.sessionApproved.has(entry.name)) {
+    const rules = [...this.autoApprove, ...this.sessionApproved];
+    if (rules.some((rule) => ruleAllows(rule, entry.name, input))) {
       return { approved: true, allowForSession: false };
     }
     this.counter += 1;
@@ -59,7 +61,9 @@ export class ApprovalGate {
       input
     });
     if (decision.approved && decision.allowForSession) {
-      this.sessionApproved.add(entry.name);
+      // The grant has the scope of this call: the prefix of the command,
+      // the folder of the write, the tool for the rest.
+      this.sessionApproved.add(ruleFor(entry.name, input));
     }
     return decision;
   }

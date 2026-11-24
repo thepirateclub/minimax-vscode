@@ -338,8 +338,9 @@ describe('AgentSession', () => {
     session.approve(approvals[0]!.id, true);
     await running;
 
-    // The permission is in the list of the session.
-    expect(approved.has('write_file')).toBe(true);
+    // The permission is in the list of the session, with the scope of the
+    // call: the folder of the file, b.ts sits in the same folder.
+    expect(approved.has('write_file(./)')).toBe(true);
 
     // The next action of the session needs no question.
     await session.send('write again');
