@@ -2,9 +2,12 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { readStyles } from '../helpers/styles';
 
-// The plate of the head of a section. The name of the section and the marks
-// of it stand on one quiet plate, and the plate has the same space on both
-// sides: the name of the section must not touch its edge.
+// The plate of the head of a section.
+//
+// One layer of highlight on the whole row: the row of the head carries it
+// and the button of the name keeps no fill of its own, like the preview of
+// the section does. A plate of the button inside the plate of the row was
+// two highlights where the reader expects one.
 //
 // The general rule of the buttons paints every button of the panel with the
 // fill of the primary button on hover. A button that keeps a quiet fill and
@@ -68,6 +71,26 @@ function hoverBackgrounds(): Map<string, string> {
   for (const item of rules()) {
     for (const part of item.selector.split(',')) {
       const match = /^\.([\w-]+):hover$/.exec(part.trim());
+      if (!match) {
+        continue;
+      }
+      const value = declarations(item.body).get('background');
+      if (value !== undefined) {
+        result.set(match[1]!, value);
+      }
+    }
+  }
+  return result;
+}
+
+// The background of a class in the rule of the class itself: the last rule
+// of the sheet wins. A class with no rule of its own takes the ground of
+// the button of the panel, the loud one.
+function ownBackgrounds(): Map<string, string> {
+  const result = new Map<string, string>();
+  for (const item of rules()) {
+    for (const part of item.selector.split(',')) {
+      const match = /^\.([\w-]+)$/.exec(part.trim());
       if (!match) {
         continue;
       }
@@ -157,12 +180,18 @@ describe('the plate of the head of a section', () => {
     expect(margin + padding.left).toBe(0);
   });
 
-  it('does not take the fill of the primary button on hover', () => {
-    const hover = rule('.section-toggle:hover').get('background');
-    expect(hover).toBeDefined();
-    expect(hover ?? '').not.toContain('--vscode-button');
-    // The plate of the head is quiet, the reader sees a row and not a button.
-    expect(hover).not.toBe('transparent');
+  it('keeps one layer of highlight on the head', () => {
+    // The row of the head carries the highlight, the button of the name
+    // keeps no fill of its own. A plate of the button inside the plate of
+    // the row was two highlights where the reader expects one.
+    expect(rule('.section-toggle:hover').get('background')).toBe('transparent');
+
+    // The one layer lives on the row of the head, and it is quiet: the fill
+    // of the primary button of the theme has no place in the chat.
+    const row = rule('.section-head:hover').get('background');
+    expect(row).toBeDefined();
+    expect(row ?? '').not.toContain('--vscode-button');
+    expect(row).not.toBe('transparent');
   });
 
   it('keeps the preview of the section without a fill of its own', () => {
@@ -210,17 +239,22 @@ describe('the buttons of the panel', () => {
     // primary button on hover. A button that keeps a quiet fill and has no
     // rule of its own for the hover takes that fill, and the plate of the
     // panel stops being quiet.
+    //
+    // A quiet button is a button with no fill of its own (transparent or
+    // none) and a button with a fill of its own that is not the fill of the
+    // button of the theme (the copy button of a block, the command of the
+    // terminal). Both kinds have to keep their own ground on hover.
+    const own = ownBackgrounds();
     const quiet = new Set<string>();
-    for (const item of rules()) {
-      const value = declarations(item.body).get('background');
-      if (value !== 'transparent' && value !== 'none') {
+    for (const [name, value] of own) {
+      if (value === 'transparent' || value === 'none') {
+        quiet.add(name);
         continue;
       }
-      for (const part of item.selector.split(',')) {
-        const match = /^\.([\w-]+)$/.exec(part.trim());
-        if (match) {
-          quiet.add(match[1]!);
-        }
+      // The fill of the button of the theme is loud on purpose: the button
+      // of the panel and the secondary button of the host keep it.
+      if (!value.includes('--vscode-button')) {
+        quiet.add(name);
       }
     }
     const hovers = hoverBackgrounds();
@@ -237,5 +271,17 @@ describe('the buttons of the panel', () => {
       }
     }
     expect([...wrong]).toEqual([]);
+  });
+
+  it('sees the buttons with a ground of their own', () => {
+    // The guard above has to reach the copy button of a block: it keeps a
+    // ground of its own and the fill of the button of the theme has no
+    // place in it.
+    const own = ownBackgrounds();
+    expect(own.get('tool-copy')).toBeDefined();
+    expect(own.get('tool-copy') ?? '').not.toContain('--vscode-button');
+    const hover = hoverBackgrounds();
+    expect(hover.get('tool-copy')).toBeDefined();
+    expect(hover.get('tool-copy') ?? '').not.toContain('--vscode-button');
   });
 });
