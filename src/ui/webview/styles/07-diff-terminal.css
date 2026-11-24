@@ -140,10 +140,29 @@
 
 /* the output of a command */
 
+/* The copy button of the command belongs to the row of the command: the
+   row is its anchor, the button takes its place from that row and not
+   from the whole block of the terminal. It stands in the middle of the
+   row, with the same space above and below, and it never touches the
+   line under the command. */
+.term-head {
+  position: relative;
+}
+
+.term-head .tool-copy {
+  top: 50%;
+  right: 4px;
+  transform: translateY(-50%);
+}
+
 /* The command stands on its own line, a click opens a long one. */
 .term-command {
   appearance: none;
   display: flex;
+  /* The row holds the copy button, it is taller than the text of the
+     command: the button finds the same space above and below. */
+  align-items: center;
+  min-height: 30px;
   gap: 8px;
   width: 100%;
   text-align: left;

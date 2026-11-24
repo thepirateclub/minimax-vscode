@@ -23,18 +23,22 @@ export function TerminalView({
   const transcript = [command, ...body.map((line) => line.text)].join('\n');
   return (
     <div className="term">
-      <CopyButton text={transcript} />
-      <button
-        className={'term-command' + (open ? ' term-command-open' : '')}
-        title={command}
-        aria-expanded={open}
-        onClick={() => setOpen(!open)}
-      >
-        <span className="term-prompt" aria-hidden="true">
-          $
-        </span>
-        <span className="term-cmd-text">{command}</span>
-      </button>
+      {/* The row of the command is the anchor of the copy button: the button
+          takes its place from that row and stands in the middle of it. */}
+      <div className="term-head">
+        <CopyButton text={transcript} />
+        <button
+          className={'term-command' + (open ? ' term-command-open' : '')}
+          title={command}
+          aria-expanded={open}
+          onClick={() => setOpen(!open)}
+        >
+          <span className="term-prompt" aria-hidden="true">
+            $
+          </span>
+          <span className="term-cmd-text">{command}</span>
+        </button>
+      </div>
       <div className="term-body">
         {running && body.length === 0 ? (
           <div className="term-line term-line-note">{STRINGS.toolRunning}</div>
