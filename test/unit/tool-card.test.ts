@@ -237,6 +237,18 @@ describe('the dot of an action', () => {
     expect(property(ruleFor(CSS, '.tool-tail'), 'margin-left')).toBe('auto');
   });
 
+  // The gutter of the numbers takes room only when there are numbers: an
+  // empty gutter pushed the text of the file far from the frame.
+  it('draws no gutter when the lines of a read carry no numbers', () => {
+    const markup = card({
+      name: 'read_file',
+      input: { path: 'demo.ts' },
+      content: 'export function read(): void {}'
+    });
+    expect(markup).toContain('file-read-text');
+    expect(markup).not.toContain('file-read-num');
+  });
+
   it('shows a read of a file as numbered lines', () => {
     const markup = card({
       name: 'read_file',

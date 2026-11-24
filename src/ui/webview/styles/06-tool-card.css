@@ -219,26 +219,29 @@
 
 /* The card of a sub-agent. The actions of the child are rows of the feed in
    small, nested on a guide line: the work of the child reads as a part of
-   this card, not as actions of the parent. The line grows out of the icon
-   of the head: the body starts on the edge of the chevron, the icon stands
-   one nest further and is 14 wide, the line of 1px takes its middle. The
-   rows stand right of the line, one nest more. */
+   this card, not as actions of the parent. The line grows out of the
+   chevron of the head: the body starts on the edge of the chevron, it is 14
+   wide, the line of 1px takes its middle. The rows stand one nest further,
+   under the icon of the head: the indent stays narrow. */
 .agent-log {
   position: relative;
   margin: 0 0 8px;
   padding: 0;
-  padding-left: calc(var(--nest) * 2);
+  padding-left: var(--nest);
   list-style: none;
 }
 
+/* The guide line of every group: the group of the actions and the work of a
+   sub-agent. It grows out of the chevron of the head of the group. */
+.tool-steps-body::before,
 .agent-log::before {
   content: '';
   position: absolute;
   top: 0;
   bottom: 0;
-  left: calc(var(--nest) + 6.5px);
+  left: 6.5px;
   width: 1px;
-  background: var(--border);
+  background: color-mix(in srgb, var(--muted) 50%, transparent);
 }
 
 .agent-log-row {

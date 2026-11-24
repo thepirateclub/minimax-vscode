@@ -201,26 +201,34 @@ describe('styleguide alignment', () => {
 
   it('nests the cards of a step under the icon of its head', () => {
     // The head of a step is the grid of a section: chevron 14, gap 6, icon.
-    // The chevron of a card inside the step stands under that icon.
+    // The nest token is that chevron column with its gap.
     const head = /grid-template-columns:\s*(\d+)px/.exec(CSS.slice(CSS.indexOf('.section-head {')))!;
     const gap = /column-gap:\s*(\d+)px/.exec(CSS.slice(CSS.indexOf('.section-head {')))!;
-    const padding = USES.find((item) => item.selector === '.tool-steps-body' && item.property === 'padding');
-    expect(padding?.value.split(/\s+/)[3]).toBe('var(--nest)');
     expect(pixels(token('--nest') ?? '')).toEqual([Number(head[1]) + Number(gap[1])]);
   });
 
-  it('draws the guide line of a sub-agent under the center of the icon of its card', () => {
-    // The body of a card starts on the edge of the chevron. The icon of the
-    // head stands one nest further (chevron 14 and gap 6) and is 14 wide:
-    // the line of 1px stands in the middle of it, the rows go to its right.
-    const line = USES.filter((item) => item.selector === '.agent-log::before');
-    const left = line.find((item) => item.property === 'left')?.value;
-    expect(left).toBe('calc(var(--nest) + 6.5px)');
-    expect(line.find((item) => item.property === 'width')?.value).toBe('1px');
-    const log = USES.filter((item) => item.selector === '.agent-log');
-    expect(log.find((item) => item.property === 'border-left')).toBeUndefined();
-    expect(log.find((item) => item.property === 'padding-left')?.value).toBe('calc(var(--nest) * 2)');
-  });
+  // Every group draws one guide line: under the center of the icon of its
+  // head, the children stand to the right of it. The group of the actions
+  // and the sub-agent share the rule, a group without the line is a defect.
+  for (const body of ['.tool-steps-body', '.agent-log']) {
+    it('draws the guide line of ' + body + ' under the center of the chevron of its head', () => {
+      // The body starts on the edge of the chevron of the head, the chevron
+      // is 14 wide: the line of 1px stands in its middle. The children stand
+      // one nest further, their chevron under the icon of the head.
+      const lines = USES.filter((item) => item.selector.split(/,\s*/).includes(body + '::before'));
+      expect(lines.find((item) => item.property === 'left')?.value).toBe('6.5px');
+      expect(lines.find((item) => item.property === 'width')?.value).toBe('1px');
+      // The line is a connector, not a border: the color of the quiet text at
+      // half strength, the border of the theme was lost on a dark panel.
+      expect(lines.find((item) => item.property === 'background')?.value).toBe(
+        'color-mix(in srgb, var(--muted) 50%, transparent)'
+      );
+      const own = USES.filter((item) => item.selector === body);
+      expect(own.find((item) => item.property === 'border-left')).toBeUndefined();
+      expect(own.find((item) => item.property === 'padding-left')?.value).toBe('var(--nest)');
+      expect(own.find((item) => item.property === 'position')?.value).toBe('relative');
+    });
+  }
 
   it('keeps the text of a failed action and of a notice on the edge, the bar in the margin', () => {
     const bar = 2;

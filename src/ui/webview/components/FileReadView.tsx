@@ -14,6 +14,9 @@ export function FileReadView({ content, path }: { content: string; path: string 
       const language = languageOf(block.path);
       return {
         path: block.path,
+        // The gutter of the numbers takes room only when the block has
+        // numbers, an empty gutter pushed the text away from the frame.
+        numbered: block.lines.some((line) => line.number > 0),
         lines: block.lines.map((line) => ({
           number: line.number,
           html: highlight(line.text, language)
@@ -31,7 +34,9 @@ export function FileReadView({ content, path }: { content: string; path: string 
           <div className="file-read-lines">
             {block.lines.map((line, lineIndex) => (
               <div className="file-read-line" key={lineIndex}>
-                <span className="file-read-num">{line.number > 0 ? line.number : ''}</span>
+                {block.numbered ? (
+                  <span className="file-read-num">{line.number > 0 ? line.number : ''}</span>
+                ) : null}
                 <span
                   className="file-read-text"
                   dangerouslySetInnerHTML={{ __html: line.html }}
