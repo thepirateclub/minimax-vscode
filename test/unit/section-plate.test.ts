@@ -50,6 +50,12 @@ function rule(selector: string): Map<string, string> {
   return declarations(found?.body ?? '');
 }
 
+// The size of a token of the sheet in pixels.
+function token(name: string): number {
+  const match = new RegExp('--' + name + ':\\s*([\\d.]+)px').exec(CSS);
+  return Number.parseFloat(match?.[1] ?? '0');
+}
+
 // The left and the right of a padding shorthand.
 function sides(value: string): { left: number; right: number } {
   const parts = value
@@ -198,6 +204,39 @@ describe('the plate of the head of a section', () => {
     // The preview stands in the same row as the name of the section: the
     // plate of the row carries the hover.
     expect(rule('.section-preview:hover').get('background')).toBe('transparent');
+  });
+});
+
+describe('the copy button of the command', () => {
+  it('stands in the middle of the row of the command', () => {
+    // The row of the command is the anchor of the button: the button takes
+    // its place from that row and not from the whole block of the
+    // terminal. Anchored to the block, the button hung over the line
+    // under the command and the reader saw it pressed to the bottom.
+    expect(rule('.term-head').get('position')).toBe('relative');
+    expect(rule('.term-head .tool-copy').get('top')).toBe('50%');
+    expect(rule('.term-head .tool-copy').get('transform')).toBe('translateY(-50%)');
+  });
+
+  it('leaves the same space above and below of the button', () => {
+    // The row is taller than the button by two gaps of four pixels, so
+    // the button stands in the middle of it and never touches the line
+    // under the command.
+    const control = token('control-h');
+    expect(control).toBeGreaterThan(0);
+    const minHeight = Number.parseFloat(rule('.term-command').get('min-height') ?? '0');
+    expect(minHeight).toBeGreaterThanOrEqual(control + 8);
+
+    // The row keeps the room for the button on the right.
+    const padding = sides(rule('.term-command').get('padding') ?? '');
+    expect(padding.right).toBeGreaterThanOrEqual(control);
+  });
+
+  it('keeps the button of the block of a file where it was', () => {
+    // The button of the read stands in the right corner of the block, the
+    // rule of the row of the command does not reach it.
+    expect(rule('.tool-copy').get('top')).toBe('4px');
+    expect(rule('.tool-copy').get('right')).toBe('4px');
   });
 });
 
