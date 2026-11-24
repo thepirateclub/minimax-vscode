@@ -1,3 +1,4 @@
+import { applyEdit } from './editMatch';
 import { readFile } from 'node:fs/promises';
 import { diffLines } from './diff';
 import { resolveWorkspacePath } from './fs';
@@ -28,16 +29,11 @@ export async function buildPreview(
   } else {
     const oldString = String(input['old_string'] ?? '');
     const newString = String(input['new_string'] ?? '');
-    // The same arithmetic as the write itself: replace_all replaces every
-    // occurrence and keeps the dollars literal, a single replace takes the
-    // first occurrence and expands the dollar patterns. The reader approves
-    // this diff, it must be the diff that lands on the disk.
-    newText =
-      oldString.length === 0
-        ? oldText
-        : input['replace_all'] === true
-          ? oldText.split(oldString).join(newString)
-          : oldText.replace(oldString, newString);
+    // The same arithmetic as the write itself (src/tools/editMatch.ts):
+    // the reader approves this diff, it must be the diff that lands on the
+    // disk. A failed edit changes nothing.
+    const edit = applyEdit(oldText, oldString, newString, input['replace_all'] === true);
+    newText = edit.ok ? edit.text : oldText;
   }
 
   return { path, lines: diffLines(oldText, newText) };

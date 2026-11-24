@@ -24,6 +24,24 @@ describe('buildPreview', () => {
     expect(preview?.lines.some((line) => line.type === 'remove')).toBe(true);
   });
 
+  // The preview takes the lenient match of the write: the reader approves
+  // the diff that lands on the disk, with the indentation of the file.
+  it('shows the lenient match of edit_file with the indentation of the file', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-'));
+    await writeFile(join(root, 'a.ts'), 'class A {\n  f() {\n    run();\n  }\n}\n', 'utf8');
+    const preview = await buildPreview(
+      'edit_file',
+      {
+        path: 'a.ts',
+        old_string: 'f() {\n  run();\n}',
+        new_string: 'f() {\n  run();\n  log();\n}'
+      },
+      root
+    );
+    const added = preview?.lines.filter((line) => line.type === 'add').map((line) => line.text);
+    expect(added).toContain('    log();');
+  });
+
   it('shows every replaced place for replace_all', async () => {
     const root = await mkdtemp(join(tmpdir(), 'mm-'));
     await writeFile(join(root, 'a.txt'), 'one two one two one\n', 'utf8');

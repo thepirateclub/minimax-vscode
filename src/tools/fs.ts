@@ -2,6 +2,8 @@ import { mkdir, readFile as readFileAsync, writeFile as writeFileAsync } from 'n
 import { dirname } from 'node:path';
 import { resolveWorkspacePath } from '../paths';
 import type { BackupStore } from '../storage/backups';
+import { withProblems, type DiagnosticsProvider } from './diagnostics';
+import { applyEdit } from './editMatch';
 import type { ToolEntry } from './types';
 
 export { resolveWorkspacePath };
@@ -11,19 +13,6 @@ const MAX_READ_CHARS = 200_000;
 const MAX_WRITE_CHARS = 200_000;
 // One call reads several files, the list is bounded so a single request stays sane.
 const MAX_READ_FILES = 12;
-
-function countOccurrences(haystack: string, needle: string): number {
-  if (needle.length === 0) {
-    return 0;
-  }
-  let count = 0;
-  let index = haystack.indexOf(needle);
-  while (index !== -1) {
-    count++;
-    index = haystack.indexOf(needle, index + needle.length);
-  }
-  return count;
-}
 
 // The model reads one file or a list of files in a single call.
 function collectPaths(input: Record<string, unknown>): string[] {
@@ -47,7 +36,12 @@ function collectPaths(input: Record<string, unknown>): string[] {
   return paths.slice(0, MAX_READ_FILES);
 }
 
-export function createFileTools(deps: { backups: BackupStore }): ToolEntry[] {
+export function createFileTools(deps: {
+  backups: BackupStore;
+  // The problems of a file after a change, the host reads them from the
+  // language servers of the editor.
+  diagnostics?: DiagnosticsProvider;
+}): ToolEntry[] {
   const readFileTool: ToolEntry = {
     name: 'read_file',
     description:
@@ -114,7 +108,7 @@ export function createFileTools(deps: { backups: BackupStore }): ToolEntry[] {
   const writeFileTool: ToolEntry = {
     name: 'write_file',
     description:
-      'Create a file or replace its whole content. Prefer edit_file for targeted changes. The user reviews a diff before the write is applied.',
+      'Create a file or replace its whole content. Prefer edit_file for targeted changes. The user reviews a diff before the write is applied. The result lists the errors and warnings of the file after the write, fix the ones your change caused.',
     approval: 'always',
     sideEffect: true,
     inputSchema: {
@@ -139,7 +133,11 @@ export function createFileTools(deps: { backups: BackupStore }): ToolEntry[] {
         await deps.backups.save(target, previous);
         await mkdir(dirname(target), { recursive: true });
         await writeFileAsync(target, content, 'utf8');
-        return { content: 'Wrote ' + String(input['path']), isError: false };
+        const wrote = 'Wrote ' + String(input['path']);
+        return {
+          content: await withProblems(wrote, target, deps.diagnostics, ctx.signal),
+          isError: false
+        };
       } catch (error) {
         return {
           content: 'write_file failed: ' + (error instanceof Error ? error.message : String(error)),
@@ -152,7 +150,7 @@ export function createFileTools(deps: { backups: BackupStore }): ToolEntry[] {
   const editFileTool: ToolEntry = {
     name: 'edit_file',
     description:
-      'Replace an exact string in a file. old_string must appear exactly once unless replace_all is true.',
+      'Replace an exact string in a file. old_string must appear exactly once unless replace_all is true. When the exact text is not found, the lines are matched with the indentation and the trailing spaces ignored, and a miss shows the closest text with its line numbers. The result lists the errors and warnings of the file after the edit, fix the ones your change caused.',
     approval: 'always',
     sideEffect: true,
     inputSchema: {
@@ -168,32 +166,25 @@ export function createFileTools(deps: { backups: BackupStore }): ToolEntry[] {
     async execute(input, ctx) {
       const oldString = String(input['old_string'] ?? '');
       const newString = String(input['new_string'] ?? '');
-      if (oldString.length === 0) {
-        return { content: 'edit_file failed: old_string must not be empty', isError: true };
-      }
       try {
         const target = resolveWorkspacePath(ctx.workspaceRoot, String(input['path'] ?? ''));
         const raw = await readFileAsync(target, 'utf8');
-        const matches = countOccurrences(raw, oldString);
-        const replaceAll = input['replace_all'] === true;
-        if (matches === 0) {
-          return { content: 'edit_file failed: old_string not found in the file', isError: true };
+        const edit = applyEdit(raw, oldString, newString, input['replace_all'] === true);
+        if (!edit.ok) {
+          return { content: edit.error, isError: true };
         }
-        if (matches > 1 && !replaceAll) {
-          return {
-            content:
-              'edit_file failed: old_string found ' +
-              matches +
-              ' times, provide more context or set replace_all',
-            isError: true
-          };
-        }
-        const updated = replaceAll
-          ? raw.split(oldString).join(newString)
-          : raw.replace(oldString, newString);
+        const updated = edit.text;
         await deps.backups.save(target, raw);
         await writeFileAsync(target, updated, 'utf8');
-        return { content: 'Edited ' + String(input['path']), isError: false };
+        // A lenient match is named: the model learns its old_string was off.
+        const edited =
+          'Edited ' +
+          String(input['path']) +
+          (edit.lenient ? ' (old_string matched with the whitespace ignored)' : '');
+        return {
+          content: await withProblems(edited, target, deps.diagnostics, ctx.signal),
+          isError: false
+        };
       } catch (error) {
         return {
           content: 'edit_file failed: ' + (error instanceof Error ? error.message : String(error)),

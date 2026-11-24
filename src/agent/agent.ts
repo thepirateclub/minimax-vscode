@@ -1,3 +1,4 @@
+import { clearOldToolResults } from '../api/clearResults';
 import { balanceHistory } from '../api/history';
 import type {
   AnthropicContentBlock,
@@ -62,7 +63,10 @@ export class Agent {
 
     for (let iteration = 0; iteration < this.options.maxIterations; iteration++) {
       this.pendingAssistantStart = true;
-      const streamed = await streamWithRetry(this.options, this.controller, messages, (event) => this.handleEvent(event));
+      // The request carries the old long results of the tools as stubs, the
+      // history of the run keeps them whole (src/api/clearResults.ts).
+      const request = clearOldToolResults(messages);
+      const streamed = await streamWithRetry(this.options, this.controller, request, (event) => this.handleEvent(event));
       const blocks = streamed.blocks;
       usage = addUsage(usage, streamed.usage);
       // The spend of every request goes to the host, the limits of the goal

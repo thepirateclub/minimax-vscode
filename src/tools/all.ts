@@ -1,5 +1,6 @@
 import type { BackupStore } from '../storage/backups';
 import type { ProjectSearch } from '../search/project';
+import type { DiagnosticsProvider } from './diagnostics';
 import { createCmdTools } from './cmd';
 import { createContainerTools } from './containers';
 import { createExploreTools } from './explore';
@@ -23,11 +24,13 @@ export interface AllToolDeps {
   search: (workspaceRoot: string) => ProjectSearch | undefined;
   // The host starts the child of the task tool.
   spawn: TaskOptions['spawn'];
+  // The problems of a file after a change, absent in the tests.
+  diagnostics?: DiagnosticsProvider;
 }
 
 export function createAllTools(deps: AllToolDeps): ToolEntry[] {
   return [
-    ...createFileTools({ backups: deps.backups }),
+    ...createFileTools({ backups: deps.backups, diagnostics: deps.diagnostics }),
     ...createExploreTools({ search: deps.search }),
     ...createGitTools(),
     ...createTerminalTools(),

@@ -9,22 +9,11 @@ import type { RuntimeSession } from './runtime';
 import { childApproval, releaseChildApprovals } from './approvals';
 import { handleAgentEvent } from './events';
 import { ToolRegistry } from '../tools/registry';
-import { actionInput, CHILD_MAX_ITERATIONS } from '../tools/task';
+import { actionInput, CHILD_MAX_ITERATIONS, ROLE_PROMPTS, toolAllowedForRole } from '../tools/task';
 import type { ToolContext } from '../tools/types';
 import type { TaskRole, TaskRequest, TaskOutcome } from '../tools/task';
 import type { AgentEvent, AgentRunResult } from '../agent/agent';
 import { sessionContext, buildPrompt, goalBudgetOk, effortFor, thinkingMode } from './setup';
-
-// The role of a sub-agent tells it what it may do and what its answer looks
-// like. The text goes to the model, it is English.
-const ROLE_PROMPTS: Record<TaskRole, string> = {
-  explore:
-    'You are a sub-agent of the main agent. Your task is to explore: you read the files and you search the project, you never change anything. Answer with a short report: what you found, the paths and the facts. Your answer is the result of the task, write it as plain text.',
-  worker:
-    'You are a sub-agent of the main agent. Your task is to make the change: you edit the files and you run the commands. Answer with a short report: what you changed and what you checked. Your answer is the result of the task, write it as plain text.',
-  verifier:
-    'You are a sub-agent of the main agent. Your task is to check the work: you read the files and the changes and you look for the defects. Answer with the list of the defects you found, or with the words that there are none. Your answer is the result of the task, write it as plain text.'
-};
 
 // The answer of the child is the text of its last message.
 function finalText(messages: AnthropicMessage[]): string {
@@ -46,10 +35,7 @@ function finalText(messages: AnthropicMessage[]): string {
 export function registryForRole(host: MiniMaxController, role: TaskRole): ToolRegistry {
   const registry = new ToolRegistry();
   for (const entry of host.registry.list()) {
-    if (entry.name === 'task') {
-      continue;
-    }
-    if (role === 'worker' || !entry.sideEffect) {
+    if (toolAllowedForRole(entry, role)) {
       registry.register(entry);
     }
   }

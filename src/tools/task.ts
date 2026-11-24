@@ -83,11 +83,41 @@ export function describeInput(input: Record<string, unknown>): string {
   return target.length > 60 ? target.slice(0, 60) + '…' : target;
 }
 
+// The role of a sub-agent tells it what it may do and what its answer looks
+// like. The text goes to the model, it is English.
+export const ROLE_PROMPTS: Record<TaskRole, string> = {
+  explore:
+    'You are a sub-agent of the main agent. Your task is to explore: you read the files and you search the project, you never change anything. Answer with a short report: what you found, the paths and the facts. Your answer is the result of the task, write it as plain text.',
+  worker:
+    'You are a sub-agent of the main agent. Your task is to make the change: you edit the files and you run the commands. Answer with a short report: what you changed and what you checked. Your answer is the result of the task, write it as plain text.',
+  verifier:
+    'You are a sub-agent of the main agent. Your task is to check the work: you read the files and the changes and you look for the defects. A reading alone is not a check: find how the project runs its checks (the scripts of the manifest, the test and typecheck commands named in AGENTS.md or the README) and run the existing tests and the check of the types that cover the change, before you say the work is done. You never change the files. Answer with the list of the defects you found, or with the words that there are none, and with the commands you ran and their results. Your answer is the result of the task, write it as plain text.'
+};
+
+// The commands the verifier runs: the tests and the checks of the project.
+const VERIFIER_COMMANDS = ['run_terminal', 'run_cmd'];
+
+// The tools of a child by its role. Explore reads, the worker gets every
+// tool, the verifier reads and runs the commands of the checks behind the
+// same approval, it never writes. No child starts a child of its own.
+export function toolAllowedForRole(
+  entry: { name: string; sideEffect: boolean },
+  role: TaskRole
+): boolean {
+  if (entry.name === 'task') {
+    return false;
+  }
+  if (role === 'worker' || !entry.sideEffect) {
+    return true;
+  }
+  return role === 'verifier' && VERIFIER_COMMANDS.includes(entry.name);
+}
+
 export function createTaskTools(options: TaskOptions): ToolEntry[] {
   const task: ToolEntry = {
     name: 'task',
     description:
-      'Start a sub-agent that works on its own and answers with a report. Use it for a piece of work that needs its own context: exploring the project, making a change or checking the work of somebody. The answer of the sub-agent is the result of this call. The role "explore" only reads, "worker" changes files, "verifier" checks the work.',
+      'Start a sub-agent that works on its own and answers with a report. Use it for a piece of work that needs its own context: exploring the project, making a change or checking the work of somebody. The answer of the sub-agent is the result of this call. The role "explore" only reads, "worker" changes files, "verifier" checks the work and runs the tests of the project.',
     approval: 'never',
     // The child can change files, the tool is not available in plan mode.
     sideEffect: true,
@@ -106,7 +136,7 @@ export function createTaskTools(options: TaskOptions): ToolEntry[] {
           type: 'string',
           enum: ['explore', 'worker', 'verifier'],
           description:
-            'What the sub-agent is allowed to do. "explore" reads, "worker" changes files, "verifier" checks the work.'
+            'What the sub-agent is allowed to do. "explore" reads, "worker" changes files, "verifier" checks the work and runs the tests.'
         }
       },
       required: ['description', 'prompt']

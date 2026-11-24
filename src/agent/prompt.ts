@@ -159,7 +159,7 @@ const TOOL_LINES: Array<{ name: string; line: string }> = [
   {
     name: 'task',
     line:
-      '- task(description, prompt, role?) - start a sub-agent that works on its own and answers with a report, the role is "explore" (reads), "worker" (changes files) or "verifier" (checks the work)'
+      '- task(description, prompt, role?) - start a sub-agent that works on its own and answers with a report, the role is "explore" (reads), "worker" (changes files) or "verifier" (checks the work and runs the tests of the project)'
   }
 ];
 

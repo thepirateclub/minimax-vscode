@@ -6,6 +6,7 @@ import { ProjectSearch } from './search/project';
 import { InMemoryBackupStore } from './storage/backups';
 import { projectLabel, SessionStore } from './storage/sessions';
 import { UsageLedger } from './storage/usage';
+import { editorDiagnostics } from './host/diagnostics';
 import { createAllTools } from './tools/all';
 import { ToolRegistry } from './tools/registry';
 import { resetReplProcesses } from './tools/repl';
@@ -108,7 +109,8 @@ export class MiniMaxController {
       backups: this.backups,
       search: (root) => searchFor(this, root),
       spawn: async (request, ctx, progress) =>
-        await spawnTask(this, request, ctx, progress)
+        await spawnTask(this, request, ctx, progress),
+      diagnostics: editorDiagnostics()
     })) {
       this.registry.register(tool);
     }

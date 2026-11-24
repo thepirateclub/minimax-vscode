@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { actionInput, createTaskTools, describeInput, type TaskOutcome } from '../../src/tools/task';
+import { actionInput, createTaskTools, describeInput, ROLE_PROMPTS, toolAllowedForRole, type TaskOutcome } from '../../src/tools/task';
 import type { ToolContext } from '../../src/tools/types';
 
 function makeContext(over: Partial<ToolContext> = {}): ToolContext {
@@ -210,5 +210,38 @@ describe('actionInput', () => {
     expect(input['patterns']).toEqual(['a', 'b']);
     expect(String(input['command']).length).toBe(200);
     expect(input['nested']).toBeUndefined();
+  });
+});
+
+// The verifier checks the work by running it: the tests and the check of the
+// types of the project, a reading alone missed the defects (Agentless: the
+// selection by the tests raised the share of the solved tasks from 27% to
+// 32%). It runs the commands behind the same approval and never writes.
+describe('the tools of a role', () => {
+  const entry = (name: string, sideEffect: boolean) => ({ name, sideEffect });
+
+  it('gives the verifier the commands and the reading, not the writing', () => {
+    expect(toolAllowedForRole(entry('run_terminal', true), 'verifier')).toBe(true);
+    expect(toolAllowedForRole(entry('run_cmd', true), 'verifier')).toBe(true);
+    expect(toolAllowedForRole(entry('read_file', false), 'verifier')).toBe(true);
+    expect(toolAllowedForRole(entry('write_file', true), 'verifier')).toBe(false);
+    expect(toolAllowedForRole(entry('edit_file', true), 'verifier')).toBe(false);
+    expect(toolAllowedForRole(entry('git_commit', true), 'verifier')).toBe(false);
+  });
+
+  it('keeps explore to the reading and gives the worker everything', () => {
+    expect(toolAllowedForRole(entry('run_terminal', true), 'explore')).toBe(false);
+    expect(toolAllowedForRole(entry('write_file', true), 'worker')).toBe(true);
+  });
+
+  it('never gives a child the task tool', () => {
+    for (const role of ['explore', 'worker', 'verifier'] as const) {
+      expect(toolAllowedForRole(entry('task', false), role)).toBe(false);
+    }
+  });
+
+  it('tells the verifier to run the tests before it confirms the work', () => {
+    expect(ROLE_PROMPTS.verifier).toContain('run the existing tests');
+    expect(ROLE_PROMPTS.verifier).toContain('commands you ran');
   });
 });
