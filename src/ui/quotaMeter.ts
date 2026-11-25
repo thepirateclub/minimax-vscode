@@ -5,6 +5,7 @@
 
 import type { QuotaSnapshot } from '../api/quota';
 import { formatDuration } from './format';
+import { weeklyResetText } from './usageRows';
 
 export interface UiQuota {
   // The share left in percent, absent when the server did not send it.
@@ -12,6 +13,8 @@ export interface UiQuota {
   weekly?: number;
   // When the 5-hour window starts again.
   resetsAt?: number;
+  // When the weekly limit starts again.
+  weeklyResetsAt?: number;
 }
 
 export type MeterLevel = 'ok' | 'warn' | 'low';
@@ -24,8 +27,13 @@ export function toUiQuota(snapshot: QuotaSnapshot, now: number = Date.now()): Ui
   if (snapshot.weeklyRemainingPercent !== undefined) {
     quota.weekly = clamp(snapshot.weeklyRemainingPercent);
   }
-  if (snapshot.resetsInMs > 0) {
+  if (snapshot.resetsAt !== undefined) {
+    quota.resetsAt = snapshot.resetsAt;
+  } else if (snapshot.resetsInMs > 0) {
     quota.resetsAt = now + snapshot.resetsInMs;
+  }
+  if (snapshot.weeklyResetsAt !== undefined) {
+    quota.weeklyResetsAt = snapshot.weeklyResetsAt;
   }
   return quota;
 }
@@ -48,7 +56,11 @@ export function quotaTitle(quota: UiQuota, now: number = Date.now()): string {
     lines.push('5-hour window: ' + Math.round(quota.fiveHour) + '% left' + reset);
   }
   if (quota.weekly !== undefined) {
-    lines.push('Week: ' + Math.round(quota.weekly) + '% left');
+    const reset =
+      quota.weeklyResetsAt !== undefined && quota.weeklyResetsAt > now
+        ? ', resets ' + weeklyResetText(quota.weeklyResetsAt, now)
+        : '';
+    lines.push('Week: ' + Math.round(quota.weekly) + '% left' + reset);
   }
   return lines.join('\n');
 }

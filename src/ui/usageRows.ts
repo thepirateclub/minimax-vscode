@@ -3,7 +3,7 @@
 
 import type { QuotaSnapshot } from '../api/quota';
 import type { UsageSummary } from '../storage/usage';
-import { formatCount } from './format';
+import { formatCount, formatCountdown, formatStamp } from './format';
 
 export interface UsageRow {
   label: string;
@@ -37,12 +37,25 @@ export function buildUsageRows(
     },
     { label: 'Left this week', value: percent(quota?.weeklyRemainingPercent) },
     {
+      label: 'The weekly limit resets',
+      value: quota?.weeklyResetsAt !== undefined ? weeklyResetText(quota.weeklyResetsAt) : 'unknown'
+    },
+    {
       label: 'Left in the 5-hour window',
       value: percent(quota?.remainingPercent)
+    },
+    {
+      label: 'The 5-hour window resets',
+      value: quota?.resetsAt !== undefined ? weeklyResetText(quota.resetsAt) : 'unknown'
     },
     {
       label: 'Cache hit in the last 24 hours',
       value: spend.cacheHitPercent + '%'
     }
   ];
+}
+
+// The reset of a limit: the date and the time, and the time left to it.
+export function weeklyResetText(at: number, now: number = Date.now()): string {
+  return formatStamp(at, now) + ' (in ' + formatCountdown(at - now) + ')';
 }

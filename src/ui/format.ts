@@ -79,3 +79,17 @@ export function fullStamp(at: number): string {
     pad(date.getHours()) + ':' + pad(date.getMinutes()) + ':' + pad(date.getSeconds())
   );
 }
+
+// The time left to a moment: days, hours and minutes, the zero parts in
+// front dropped. A countdown of a limit is read in minutes, not seconds.
+export function formatCountdown(milliseconds: number): string {
+  // The minutes are cut down, the last minute stays 1m until the reset.
+  const totalMinutes = milliseconds <= 0 ? 0 : Math.max(1, Math.floor(milliseconds / 60_000));
+  const days = Math.floor(totalMinutes / 1440);
+  const hours = Math.floor((totalMinutes % 1440) / 60);
+  const minutes = totalMinutes % 60;
+  if (days > 0) {
+    return days + 'd ' + hours + 'h ' + minutes + 'm';
+  }
+  return hours > 0 ? hours + 'h ' + minutes + 'm' : minutes + 'm';
+}

@@ -4,6 +4,10 @@ export interface QuotaSnapshot {
   remainingPercent: number | undefined;
   weeklyRemainingPercent: number | undefined;
   resetsInMs: number;
+  // When the weekly limit starts again, the clock of the server.
+  weeklyResetsAt?: number;
+  // When the 5-hour window starts again.
+  resetsAt?: number;
 }
 
 interface RemainsRow {
@@ -11,6 +15,9 @@ interface RemainsRow {
   current_interval_remaining_percent?: number;
   current_weekly_remaining_percent?: number;
   remains_time?: number;
+  end_time?: number;
+  weekly_end_time?: number;
+  weekly_remains_time?: number;
 }
 
 interface RemainsResponse {
@@ -45,10 +52,26 @@ export async function fetchQuota(options: {
   if (!row) {
     throw new MiniMaxApiError('MiniMax returned no quota data.', 200, undefined, true);
   }
+  // The end of the week comes as a moment; an answer without it gives the
+  // time left, counted from now.
+  const weeklyResetsAt =
+    typeof row.weekly_end_time === 'number' && row.weekly_end_time > 0
+      ? row.weekly_end_time
+      : typeof row.weekly_remains_time === 'number' && row.weekly_remains_time > 0
+        ? Date.now() + row.weekly_remains_time
+        : undefined;
+  const resetsAt =
+    typeof row.end_time === 'number' && row.end_time > 0
+      ? row.end_time
+      : typeof row.remains_time === 'number' && row.remains_time > 0
+        ? Date.now() + row.remains_time
+        : undefined;
   return {
     remainingPercent: percent(row.current_interval_remaining_percent),
     weeklyRemainingPercent: percent(row.current_weekly_remaining_percent),
-    resetsInMs: row.remains_time ?? 0
+    resetsInMs: row.remains_time ?? 0,
+    ...(weeklyResetsAt !== undefined ? { weeklyResetsAt } : {}),
+    ...(resetsAt !== undefined ? { resetsAt } : {})
   };
 }
 
