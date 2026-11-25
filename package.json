@@ -2,7 +2,7 @@
   "name": "minimax-agent",
   "displayName": "MiniMax Agent",
   "description": "Coding agent for VS Code powered by MiniMax models",
-  "version": "0.42.4",
+  "version": "0.42.5",
   "publisher": "katagarov",
   "license": "MIT",
   "repository": {
@@ -311,6 +311,7 @@
           "description": "The share of the context window the history may take, in percent."
         },
         "minimax.semanticSearch": {
+          "scope": "application",
           "type": "boolean",
           "default": false,
           "description": "Adds the semantic layer to the search. The code of the project is sent to MiniMax to build the vectors."
@@ -345,6 +346,7 @@
           "markdownDescription": "MCP servers of the agent, the form of `mcpServers` of Claude and Cursor: `{ \"name\": { \"command\": \"npx\", \"args\": [\"-y\", \"package\"] } }` or `{ \"name\": { \"url\": \"https://...\" } }`. The servers of the plugins in `~/.minimax/plugins` start too. Every call of an MCP tool asks for approval."
         },
         "minimax.enableWebSearch": {
+          "scope": "application",
           "type": "boolean",
           "default": false,
           "description": "The agent searches the web with the M Plan key (the web_search tool). The queries go to MiniMax."

@@ -78,6 +78,9 @@ describe('the manifest of the extension', () => {
     expect(properties['minimax.baseUrl']?.scope).toBe('application');
     expect(properties['minimax.autoApprove']?.scope).toBe('application');
     expect(properties['minimax.ffmpegPath']?.scope).toBe('application');
+    // The code and the queries of the user go to the server only by the user.
+    expect(properties['minimax.semanticSearch']?.scope).toBe('application');
+    expect(properties['minimax.enableWebSearch']?.scope).toBe('application');
   });
 
   it('offers the switches that fold the panels of the chat', () => {

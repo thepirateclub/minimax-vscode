@@ -80,13 +80,15 @@ export function getSettings(): MiniMaxSettings {
     fontSize: cfg.get<number>('fontSize', 13),
     historyMaxMessages: cfg.get<number>('historyMaxMessages', 120),
     contextThreshold: cfg.get<number>('contextThreshold', 50),
-    semanticSearch: cfg.get<boolean>('semanticSearch', false),
+    // The semantic search sends the code of the project to the server, the
+    // web search sends the queries: a repository must not turn them on.
+    semanticSearch: userValue<boolean>(cfg, 'semanticSearch', false),
     collapseTools: cfg.get<boolean>('collapseTools', false),
     collapseCode: cfg.get<boolean>('collapseCode', false),
     showToolSteps: cfg.get<boolean>('showToolSteps', true),
     autoApprove: userValue<string[]>(cfg, 'autoApprove', []),
     mcpServers: userValue<Record<string, unknown>>(cfg, 'mcpServers', {}),
-    enableWebSearch: cfg.get<boolean>('enableWebSearch', false),
+    enableWebSearch: userValue<boolean>(cfg, 'enableWebSearch', false),
     rulesEnabled: cfg.get<boolean>('rulesEnabled', true),
     speechLanguage: cfg.get<string>('speechLanguage', ''),
     microphone: cfg.get<string>('microphone', ''),
