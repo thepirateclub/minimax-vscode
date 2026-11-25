@@ -168,6 +168,8 @@ describe('the folded sections of the chat', () => {
     const count = markup.indexOf('tool-steps-count');
     expect(preview).toBeGreaterThan(-1);
     expect(count).toBeGreaterThan(preview);
+    // The count is a chip with a word, not a bare number after the time.
+    expect(markup).toContain('>1 action<');
   });
 
   it('has no live status over the field of the request', () => {

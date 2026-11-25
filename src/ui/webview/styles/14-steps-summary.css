@@ -29,9 +29,14 @@
 }
 
 .tool-steps-count {
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
   color: var(--muted);
   font-size: var(--fs-xs);
+  line-height: var(--lh-tight);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .tool-steps-body {
@@ -218,4 +223,4 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
+}

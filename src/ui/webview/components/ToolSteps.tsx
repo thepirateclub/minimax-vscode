@@ -7,7 +7,7 @@ import { SectionPreview } from './SectionPreview';
 import { ToolCard } from './ToolCard';
 import { formatSpan, stepSpan, timelineState } from '../timeline';
 import { fullStamp } from '../../format';
-import { CARDS_PAGE, formatStepSummary, SUMMARY_FROM, summarizeStep } from '../stepSummary';
+import { actionCount, CARDS_PAGE, formatStepSummary, SUMMARY_FROM, summarizeStep } from '../stepSummary';
 
 // The actions of one step of the agent. The step is folded by default, the
 // header of it stays visible: the reader sees that the agent worked and
@@ -65,7 +65,7 @@ export function ToolSteps({
               {formatSpan(span)}
             </span>
           ) : null}
-          <span className="tool-steps-count">{step.tools.length}</span>
+          <span className="tool-steps-count">{actionCount(step.tools.length)}</span>
         </span>
       </div>
       {open ? (
