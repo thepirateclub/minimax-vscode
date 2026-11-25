@@ -53,7 +53,8 @@ export function markStepTime(host: MiniMaxController, runtime: RuntimeSession): 
   if (runtime.turnStartedAt === 0) {
     return;
   }
-  const elapsed = Date.now() - runtime.turnStartedAt;
+  const endedAt = Date.now();
+  const elapsed = endedAt - runtime.turnStartedAt;
   if (elapsed < 0) {
     return;
   }
@@ -61,10 +62,12 @@ export function markStepTime(host: MiniMaxController, runtime: RuntimeSession): 
     const message = runtime.uiMessages[i]!;
     if (message.role === 'assistant' && !message.approval) {
       message.elapsedMs = elapsed;
+      message.endedAt = endedAt;
       postFor(host, runtime, {
         type: 'step_time',
         id: message.id,
-        elapsedMs: elapsed
+        elapsedMs: elapsed,
+        endedAt
       });
       return;
     }

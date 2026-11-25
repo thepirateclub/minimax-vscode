@@ -3,8 +3,8 @@ import type { MouseEvent } from 'react';
 import type { UiMessage } from '../../protocol';
 import type { CodeSource } from '../codeSources';
 import type { CommandHint } from '../commandHistory';
-import { IconRetry, IconRewind } from '../icons';
-import { formatDuration } from '../../format';
+import { IconClock, IconRetry, IconRewind } from '../icons';
+import { formatDuration, formatStamp, fullStamp } from '../../format';
 import { writeToClipboard } from '../clipboard';
 import { renderMarkdown } from '../markdown';
 import { STRINGS } from '../strings';
@@ -139,7 +139,14 @@ export const MessageRow = memo(function MessageRow({
               <IconRewind />
             </button>
           )}
-          <div className="bubble user-bubble">{message.text}</div>
+          <div className="user-stack">
+            <div className="bubble user-bubble">{message.text}</div>
+            {message.at !== undefined ? (
+              <span className="message-time" title={STRINGS.startedAt + ' ' + fullStamp(message.at)}>
+                {formatStamp(message.at)}
+              </span>
+            ) : null}
+          </div>
         </div>
       ) : null}
       {message.role === 'assistant' ? (
@@ -165,7 +172,7 @@ export const MessageRow = memo(function MessageRow({
         <div className="message-notice">{message.text}</div>
       ) : null}
       {message.role === 'tool' && message.tool ? (
-        <ToolCard tool={message.tool} collapsed={collapseTools} />
+        <ToolCard tool={message.tool} collapsed={collapseTools} {...(message.at !== undefined ? { at: message.at } : {})} />
       ) : null}
       {message.approval ? (
         <ApprovalCard
@@ -177,8 +184,17 @@ export const MessageRow = memo(function MessageRow({
       {hasActions ? (
         <div className="message-actions">
           {message.elapsedMs !== undefined ? (
-            <span className="message-elapsed" title={STRINGS.stepTime}>
-              {formatDuration(message.elapsedMs)}
+            // The plate of the turn: how long the task ran and when it ended.
+            <span className="turn-plate">
+              <IconClock />
+              <span className="turn-plate-elapsed" title={STRINGS.stepTime}>
+                {STRINGS.turnDone} {formatDuration(message.elapsedMs)}
+              </span>
+              {message.endedAt !== undefined ? (
+                <span className="turn-plate-stamp" title={STRINGS.turnEnded + ' ' + fullStamp(message.endedAt)}>
+                  {formatStamp(message.endedAt)}
+                </span>
+              ) : null}
             </span>
           ) : null}
         </div>

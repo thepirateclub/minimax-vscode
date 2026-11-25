@@ -178,8 +178,8 @@ const vscode = {
         messages: cut.slice(-RETRY_PAGE),
         olderMessages: Math.max(0, cut.length - RETRY_PAGE)
       });
-      post({ type: 'user_message', id: id + '-again', text });
-      post({ type: 'assistant_start', id: id + '-answer' });
+      post({ type: 'user_message', id: id + '-again', text, at: Date.now() });
+      post({ type: 'assistant_start', id: id + '-answer', at: Date.now() });
       window.setTimeout(() => {
         post({
           type: 'text_delta',

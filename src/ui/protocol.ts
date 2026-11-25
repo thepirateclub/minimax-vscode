@@ -61,6 +61,10 @@ export interface UiMessage {
   kind?: NoticeKind;
   // The time of the step that ends with this message.
   elapsedMs?: number;
+  // When the message came, the feed shows the moment of every action.
+  at?: number;
+  // When the turn ended, the plate of the turn shows it.
+  endedAt?: number;
 }
 
 export interface UiSessionSummary {
@@ -203,11 +207,11 @@ export interface UiState {
 
 export type ExtToWeb =
   | { type: 'init'; state: UiState }
-  | { type: 'user_message'; id: string; text: string }
-  | { type: 'assistant_start'; id: string }
+  | { type: 'user_message'; id: string; text: string; at: number }
+  | { type: 'assistant_start'; id: string; at: number }
   | { type: 'text_delta'; text: string }
   | { type: 'thinking_delta'; text: string }
-  | { type: 'tool_start'; id: string; name: string; input: Record<string, unknown> }
+  | { type: 'tool_start'; id: string; name: string; input: Record<string, unknown>; at: number }
   | {
       type: 'tool_end';
       id: string;
@@ -232,7 +236,7 @@ export type ExtToWeb =
   | { type: 'summary'; files: UiChangedFile[] }
   | { type: 'error'; message: string }
   | { type: 'notice'; message: string; kind: NoticeKind }
-  | { type: 'step_time'; id: string; elapsedMs: number }
+  | { type: 'step_time'; id: string; elapsedMs: number; endedAt: number }
   // The connection to MiniMax is lost, the request is repeated.
   | { type: 'retry_status'; status: UiRetryStatus | undefined }
   // The answer broke in the middle, the piece goes away.

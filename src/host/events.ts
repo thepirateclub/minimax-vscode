@@ -13,9 +13,10 @@ import { postSummary } from './workspace';
 
 export function handleAgentEvent(host: MiniMaxController, runtime: RuntimeSession, event: AgentEvent): void {
   if (event.type === 'assistant_start') {
-    runtime.uiMessages.push({ id: host.nextId('assistant'), role: 'assistant', text: '' });
-    const last = runtime.uiMessages[runtime.uiMessages.length - 1];
-    postFor(host, runtime, { type: 'assistant_start', id: last ? last.id : '' });
+    const at = Date.now();
+    const id = host.nextId('assistant');
+    runtime.uiMessages.push({ id, role: 'assistant', text: '', at });
+    postFor(host, runtime, { type: 'assistant_start', id, at });
     return;
   }
   if (event.type === 'assistant_text') {
@@ -77,13 +78,15 @@ export function handleAgentEvent(host: MiniMaxController, runtime: RuntimeSessio
     return;
   }
   if (event.type === 'tool_start') {
-    host.toolStarted.set(event.id, Date.now());
+    const at = Date.now();
+    host.toolStarted.set(event.id, at);
     runtime.uiMessages.push({
       id: event.id,
       role: 'tool',
-      tool: { id: event.id, name: event.name, input: event.input, running: true }
+      tool: { id: event.id, name: event.name, input: event.input, running: true },
+      at
     });
-    postFor(host, runtime, { type: 'tool_start', id: event.id, name: event.name, input: event.input });
+    postFor(host, runtime, { type: 'tool_start', id: event.id, name: event.name, input: event.input, at });
     setState(host, 'tool', runtime);
     return;
   }

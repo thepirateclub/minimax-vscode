@@ -95,8 +95,9 @@ export async function runTurn(host: MiniMaxController, runtime: RuntimeSession,
   // of the turn takes it when the turn is over.
   let requestPlace = -1;
   const userId = host.nextId('user');
-  runtime.uiMessages.push({ id: userId, role: 'user', text });
-  host.panel.post({ type: 'user_message', id: userId, text });
+  const sentAt = Date.now();
+  runtime.uiMessages.push({ id: userId, role: 'user', text, at: sentAt });
+  host.panel.post({ type: 'user_message', id: userId, text, at: sentAt });
   if (runtime.title === 'New chat') {
     const firstLine = text.trim().split('\n')[0] ?? '';
     runtime.title = firstLine.slice(0, TITLE_LIMIT) || 'New chat';

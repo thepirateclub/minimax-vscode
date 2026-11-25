@@ -9,7 +9,23 @@ function start(tool: string, input: Record<string, string>): string {
   return JSON.stringify({ tool, input });
 }
 
-export const MESSAGES: UiMessage[] = [
+// The moments of the chat: it started yesterday at 14:00, a message every
+// 40 seconds, the last answer closes the turn. The stand shows the date for
+// the older day and the plate of the turn.
+function stamped(messages: UiMessage[]): UiMessage[] {
+  const start = new Date();
+  start.setDate(start.getDate() - 1);
+  start.setHours(14, 0, 0, 0);
+  const last = messages.map((message) => message.role === 'assistant' && !message.approval).lastIndexOf(true);
+  return messages.map((message, index) => {
+    const at = start.getTime() + index * 40_000;
+    return index === last
+      ? { ...message, at, elapsedMs: index * 40_000 + 12_000, endedAt: at + 12_000 }
+      : { ...message, at };
+  });
+}
+
+export const MESSAGES: UiMessage[] = stamped([
   { id: 'u1', role: 'user', text: 'Найди, где считается расход токенов, и добавь округление.' },
   {
     id: 'a1',
@@ -180,7 +196,7 @@ export const MESSAGES: UiMessage[] = [
     role: 'assistant',
     approval: { id: 'ap2', name: 'run_terminal', input: { command: 'npm run typecheck && npm test' } }
   }
-];
+]);
 
 
 // The chat of the folding sections: an answer, a step of the actions and three

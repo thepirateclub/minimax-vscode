@@ -14,15 +14,18 @@ import { DiffView } from './DiffView';
 import { FileReadView } from './FileReadView';
 import { TerminalView } from './TerminalView';
 import { CopyButton } from './CopyButton';
-import { formatDuration } from '../../format';
+import { formatDuration, formatStamp, fullStamp } from '../../format';
 import { describe } from './toolDescriptions';
 import { filePaths, text } from './toolCardHelpers';
 
 export function ToolCard({
   tool,
-  collapsed
+  collapsed,
+  at
 }: {
   tool: UiToolCall;
+  // When the action started, the card names the moment.
+  at?: number;
   // The setting folds the card, only the title stays until a click.
   collapsed: boolean;
 }) {
@@ -79,6 +82,11 @@ export function ToolCard({
           </span>
         ) : null}
         <span className="tool-tail">
+          {at !== undefined ? (
+            <span className="tool-stamp" title={STRINGS.startedAt + ' ' + fullStamp(at)}>
+              {formatStamp(at)}
+            </span>
+          ) : null}
           {tool.durationMs !== undefined ? (
             <span className="tool-time" title={STRINGS.toolElapsed}>
               {formatDuration(tool.durationMs)}

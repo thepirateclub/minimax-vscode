@@ -105,11 +105,11 @@ export function usePanelMessages(
         return;
       }
       if (message.type === 'user_message') {
-        setMessages((prev) => [...prev, { id: message.id, role: 'user', text: message.text }]);
+        setMessages((prev) => [...prev, { id: message.id, role: 'user', text: message.text, at: message.at }]);
         return;
       }
       if (message.type === 'assistant_start') {
-        setMessages((prev) => [...prev, { id: message.id, role: 'assistant', text: '' }]);
+        setMessages((prev) => [...prev, { id: message.id, role: 'assistant', text: '', at: message.at }]);
         return;
       }
       if (message.type === 'tool_start') {
@@ -118,7 +118,8 @@ export function usePanelMessages(
           {
             id: message.id,
             role: 'tool',
-            tool: { id: message.id, name: message.name, input: message.input, running: true }
+            tool: { id: message.id, name: message.name, input: message.input, running: true },
+            at: message.at
           }
         ]);
         return;
@@ -280,7 +281,9 @@ export function usePanelMessages(
       if (message.type === 'step_time') {
         setMessages((prev) =>
           prev.map((item) =>
-            item.id === message.id ? { ...item, elapsedMs: message.elapsedMs } : item
+            item.id === message.id
+              ? { ...item, elapsedMs: message.elapsedMs, endedAt: message.endedAt }
+              : item
           )
         );
       }

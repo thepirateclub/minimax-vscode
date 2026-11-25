@@ -156,11 +156,29 @@ describe('the actions of a message', () => {
 
   it('has a rule for the classes of the actions', () => {
     expect(CSS).toMatch(/\.message-actions\s*\{/);
-    expect(CSS).toMatch(/\.message-elapsed\s*\{/);
+    expect(CSS).toMatch(/\.turn-plate\s*\{/);
+    expect(CSS).toMatch(/\.turn-plate-stamp\s*\{/);
+    expect(CSS).toMatch(/\.tool-stamp\s*,\s*\.message-time\s*\{/);
+    expect(CSS).toMatch(/\.user-stack\s*\{/);
     expect(CSS).toMatch(/\.user-row\s*\{/);
     // The two buttons share one rule, they stand in a list.
     expect(CSS).toMatch(/\.message-rewind\s*,\s*\.message-retry\s*\{/);
     expect(CSS).toMatch(/\.message-rewind:hover\s*,\s*\.message-retry:hover\s*\{/);
+  });
+
+  // The reader finds when every action was done and how long the task ran.
+  it('names the moments of the request, the actions and the end of the turn', () => {
+    const at = new Date().setHours(9, 5, 0, 0);
+    const markup = render([
+      { id: 'u1', role: 'user', text: 'the question', at },
+      { id: 't1', role: 'tool', tool: { id: 't1', name: 'git_status', input: {} }, at: at + 1000 },
+      { id: 'a1', role: 'assistant', text: 'done', at: at + 2000, elapsedMs: 135_000, endedAt: at + 135_000 }
+    ]);
+    expect(markup).toContain('message-time');
+    expect(markup).toContain('09:05');
+    expect(markup).toContain('turn-plate');
+    expect(markup).toContain('Done in 2m 15s');
+    expect(markup).toContain('09:07');
   });
 
   it('keeps the kinds of the notices apart', () => {

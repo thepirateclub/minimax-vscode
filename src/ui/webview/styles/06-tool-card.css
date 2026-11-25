@@ -48,12 +48,48 @@
   min-height: var(--control-h);
 }
 
-/* The time of the step stands in the right edge of the row. */
-.message-elapsed {
+/* The plate of the turn stands in the right edge of the row: how long the
+   task ran and when it ended. A quiet frame, not a button: it is read, not
+   clicked. */
+.turn-plate {
   margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
   color: var(--muted);
   font-size: var(--fs-xs);
   font-variant-numeric: tabular-nums;
+}
+
+.turn-plate svg {
+  width: 12px;
+  height: 12px;
+}
+
+.turn-plate-stamp {
+  padding-left: 6px;
+  border-left: 1px solid var(--border);
+}
+
+/* The moment of an action: the time for today, the date for another day. */
+.tool-stamp,
+.message-time {
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* The bubble of the user and its moment under it, on the right edge. */
+.user-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  min-width: 0;
 }
 
 /* A failed action is marked with a straight bar in the color of the failed

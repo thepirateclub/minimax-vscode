@@ -18,6 +18,11 @@ export function formatDuration(milliseconds: number): string {
   if (seconds < 60) {
     return (Math.round(seconds * 10) / 10).toFixed(1).replace(/\.0$/, '') + 's';
   }
+  if (seconds >= 3600) {
+    // A turn of a goal runs for hours: 95m reads worse than 1h 35m.
+    const hours = Math.floor(seconds / 3600);
+    return hours + 'h ' + Math.floor((seconds - hours * 3600) / 60) + 'm';
+  }
   const minutes = Math.floor(seconds / 60);
   const rest = Math.round(seconds - minutes * 60);
   if (rest === 60) {
@@ -43,4 +48,34 @@ export function formatCount(value: number): string {
     return sign + text + unit.suffix;
   }
   return sign + String(Math.round(amount));
+}
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function pad(value: number): string {
+  return value < 10 ? '0' + value : String(value);
+}
+
+// The moment of an action in the feed: the time for today, the date and the
+// time for another day, the year only when it is not this year. The reader
+// finds when a thing was done without a full date on every line.
+export function formatStamp(at: number, now: number = Date.now()): string {
+  const date = new Date(at);
+  const today = new Date(now);
+  const time = pad(date.getHours()) + ':' + pad(date.getMinutes());
+  if (date.toDateString() === today.toDateString()) {
+    return time;
+  }
+  const day = date.getDate() + ' ' + MONTHS[date.getMonth()];
+  const year = date.getFullYear() === today.getFullYear() ? '' : ' ' + date.getFullYear();
+  return day + year + ', ' + time;
+}
+
+// The full moment for the tooltip, with the seconds.
+export function fullStamp(at: number): string {
+  const date = new Date(at);
+  return (
+    date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate()) + ' ' +
+    pad(date.getHours()) + ':' + pad(date.getMinutes()) + ':' + pad(date.getSeconds())
+  );
 }

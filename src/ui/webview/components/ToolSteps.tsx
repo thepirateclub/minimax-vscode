@@ -55,6 +55,7 @@ export function ToolSteps({
                 key={message.id}
                 tool={message.tool}
                 collapsed={collapsed}
+                {...(message.at !== undefined ? { at: message.at } : {})}
               />
             ) : null
           )}
