@@ -2,7 +2,6 @@ import * as vscode from 'vscode';
 import type { QuotaSnapshot } from '../api/quota';
 import type { UsageSummary } from '../storage/usage';
 import { buildUsageRows, weeklyResetText } from './usageRows';
-import { formatCountdown } from './format';
 
 export type AgentState = 'idle' | 'thinking' | 'streaming' | 'tool' | 'error';
 
@@ -51,14 +50,10 @@ export class StatusBarController {
       error: '$(error) MiniMax error'
     };
     const remaining = this.quota?.remainingPercent;
-    // The time left to the reset of the 5-hour window and of the week, next
-    // to the share of the window.
-    const left = (at: number | undefined, icon: string): string =>
-      at !== undefined && at > Date.now() ? '  $(' + icon + ') ' + formatCountdown(at - Date.now()) : '';
+    // The badge stays short: the share of the 5-hour window. The resets and
+    // the rest of the numbers open on a click (minimax.showUsage).
     this.item.text =
-      (remaining === undefined ? labels[this.state] : labels[this.state] + ' (' + remaining + '%)') +
-      left(this.quota?.resetsAt, 'clock') +
-      left(this.quota?.weeklyResetsAt, 'calendar');
+      remaining === undefined ? labels[this.state] : labels[this.state] + ' (' + remaining + '%)';
     this.item.tooltip = this.tooltip();
     this.item.show();
   }
