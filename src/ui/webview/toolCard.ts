@@ -60,7 +60,20 @@ export function endTool(
 // that follow a thought are the next step of the work, not the tail of the
 // step before it. The order of the chat reads as actions, thought, actions.
 // The card of a sub-agent ends the group too and stands between the groups.
+// A group needs more than three actions: a head over one or two cards only
+// repeated them, and a chat of short steps turned into a list of heads.
+export const GROUP_FROM = 4;
+
 export function groupToolSteps(messages: UiMessage[]): FeedItem[] {
+  return groupBySteps(messages).flatMap((item) =>
+    item.kind === 'steps' && item.step.tools.length < GROUP_FROM
+      ? item.step.tools.map((message): FeedItem => ({ kind: 'message', message }))
+      : [item]
+  );
+}
+
+// The groups before the threshold: the rules of the step, tested alone.
+export function groupBySteps(messages: UiMessage[]): FeedItem[] {
   const items: FeedItem[] = [];
   let step: ToolStep | undefined;
   for (const message of messages) {
