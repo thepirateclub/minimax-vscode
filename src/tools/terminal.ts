@@ -1,3 +1,4 @@
+import { cutMiddle, dropExitEcho, powershellScript, splitLeadingCd, stripAnsi, tailLines } from './commandOutput';
 import { SCRATCH_REFUSAL, writesScratch } from './scratch';
 import { exec, execFile, type ExecFileException } from 'node:child_process';
 import { isAbsolute, relative, resolve } from 'node:path';
@@ -119,14 +120,15 @@ export function createTerminalTools(): ToolEntry[] {
   const runTerminal: ToolEntry = {
     name: 'run_terminal',
     description:
-      'Run a shell command in the workspace root and return its output. Use it for build, test and git commands.',
+      'Run a shell command and return its output and its exit code: the answer always ends with [exit code N]. Run it in a subfolder with cwd instead of cd, keep the end of a long output with tail_lines instead of a pipe into Select-Object or tail, and do not echo $LASTEXITCODE or $?: the tool reports the code. The colors of the terminal are removed, a long output keeps its head and its end.',
     approval: 'always',
     sideEffect: true,
     inputSchema: {
       type: 'object',
       properties: {
         command: { type: 'string', description: 'Shell command to execute.' },
-        cwd: { type: 'string', description: 'Working directory relative to the workspace root.' },
+        cwd: { type: 'string', description: 'The folder to run in, relative to the workspace root, for example "app". Use it instead of cd.' },
+        tail_lines: { type: 'integer', minimum: 1, description: 'Keep only the last lines of the output, for example 20 for a build or a test run.' },
         timeout_ms: {
           type: 'integer',
           minimum: 1000,
@@ -137,7 +139,16 @@ export function createTerminalTools(): ToolEntry[] {
       required: ['command']
     },
     async execute(input, ctx) {
-      const command = String(input['command'] ?? '');
+      let command = String(input['command'] ?? '');
+      // `cd app; npm run check` is the same run with cwd: the folder goes to
+      // cwd, the hand-made echo of the exit code goes away.
+      const leading = input['cwd'] === undefined ? splitLeadingCd(command) : undefined;
+      if (leading) {
+        input = { ...input, cwd: leading.cwd };
+        command = leading.command;
+      }
+      command = dropExitEcho(command);
+      const tail = Number(input['tail_lines'] ?? 0);
       if (command.trim().length === 0) {
         return { content: 'run_terminal failed: command must not be empty', isError: true };
       }
@@ -183,20 +194,17 @@ export function createTerminalTools(): ToolEntry[] {
           if (stderr.trim().length > 0) {
             parts.push('[stderr] ' + stderr.trim());
           }
-          let text = parts.join('\n');
-          if (text.length > MAX_OUTPUT_CHARS) {
-            text = text.slice(0, MAX_OUTPUT_CHARS) + '\n[output truncated]';
-          }
+          const text = cutMiddle(tailLines(stripAnsi(parts.join('\n')), tail), MAX_OUTPUT_CHARS);
           if (error) {
             const code = typeof error.code === 'number' ? error.code : 1;
             const detail = text.length > 0 ? text : error.message;
             resolvePromise({
-              content: 'Command failed with exit code ' + code + '\n' + detail,
+              content: 'Command failed with exit code ' + code + '\n' + detail + '\n[exit code ' + code + ']',
               isError: true
             });
             return;
           }
-          resolvePromise({ content: text.length > 0 ? text : '[no output]', isError: false });
+          resolvePromise({ content: (text.length > 0 ? text : '[no output]') + '\n[exit code 0]', isError: false });
         };
         if (process.platform === 'win32') {
           // The command runs as one PowerShell script: the exit code of the
@@ -204,7 +212,7 @@ export function createTerminalTools(): ToolEntry[] {
           void windowsShell().then((shell) => {
             execFile(
               shell,
-              ['-NoProfile', '-NonInteractive', '-Command', command],
+              ['-NoProfile', '-NonInteractive', '-Command', powershellScript(command)],
               { cwd, timeout, maxBuffer: 10 * 1024 * 1024, signal: ctx.signal, windowsHide: true },
               done
             );
