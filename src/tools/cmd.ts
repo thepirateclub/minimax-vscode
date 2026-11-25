@@ -1,3 +1,4 @@
+import { SCRATCH_REFUSAL, writesScratch } from './scratch';
 import { exec, type ExecException } from 'node:child_process';
 import { resolveWorkspacePath } from '../paths';
 import { gitToolFor } from './terminal';
@@ -63,6 +64,9 @@ export function createCmdTools(): ToolEntry[] {
       const command = String(input['command'] ?? '');
       if (command.trim().length === 0) {
         return { content: 'run_cmd failed: command must not be empty', isError: true };
+      }
+      if (writesScratch(command)) {
+        return { content: '[stderr] ' + SCRATCH_REFUSAL, isError: true };
       }
       // Команды git не идут в оболочку: у них есть свои инструменты.
       const gitTool = gitToolFor(command);

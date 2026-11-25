@@ -22,10 +22,19 @@ function declarations(name: string, python: boolean): RegExp[] {
   if (python) {
     return [new RegExp('^\\s*(?:async\\s+)?def\\s+' + n + '\\b'), new RegExp('^\\s*class\\s+' + n + '\\b')];
   }
-  const modifiers = '(?:(?:export|default|declare|public|private|protected|static|async|readonly|override|abstract|get|set)\\s+)*';
+  // The modifiers of TS and JS, and of Kotlin, Java, C# and Rust: the model
+  // compares the same code in two languages, a web and a native version.
+  const modifiers =
+    '(?:(?:export|default|declare|public|private|protected|internal|static|async|readonly|override|abstract|get|set|' +
+    'suspend|inline|open|final|data|sealed|operator|infix|tailrec|external|lateinit|const|virtual|partial|extern|unsafe|pub(?:\\([^)]*\\))?|synchronized)\\s+)*';
   return [
-    new RegExp('^\\s*' + modifiers + '(?:function\\*?|class|interface|type|enum|namespace)\\s+' + n + '\\b'),
-    new RegExp('^\\s*' + modifiers + '(?:const|let|var)\\s+' + n + '\\b'),
+    new RegExp('^\\s*' + modifiers + '(?:function\\*?|class|interface|type|enum|namespace|object|struct|trait|impl|record)\\s+' + n + '\\b'),
+    new RegExp('^\\s*' + modifiers + '(?:const|let|var|val)\\s+' + n + '\\b'),
+    // fun of Kotlin (also an extension `fun Foo.name`), func of Go with a
+    // receiver, fn of Rust.
+    new RegExp('^\\s*' + modifiers + '(?:fun|func|fn)\\s+(?:<[^>]*>\\s*)?(?:\\([^)]*\\)\\s*)?(?:[\\w.]+\\.)?' + n + '\\s*[<(]'),
+    // A method of Java and C#: a type before the name.
+    new RegExp('^\\s*' + modifiers + '[\\w<>\\[\\],.?]+\\s+' + n + '\\s*\\('),
     // A method: the name, generics, the parameters, at the start of a line.
     new RegExp('^\\s*' + modifiers + '\\*?' + n + '\\s*(?:<[^>]*>)?\\s*\\('),
     // A property with an arrow function: `name = (...) =>`.

@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { resolveWorkspacePath } from '../paths';
 import { diffLines, type DiffLine } from './diff';
+import { extractSymbol } from './symbols';
 import type { ToolEntry } from './types';
 
 // The model compared two files by reading both and looking for the
@@ -37,10 +38,26 @@ export function formatUnified(lines: DiffLine[], labelA: string, labelB: string)
   return out.join('\n');
 }
 
-async function readSide(root: string, path: unknown, text: unknown, name: string): Promise<{ label: string; text: string }> {
+async function readSide(
+  root: string,
+  path: unknown,
+  text: unknown,
+  name: string,
+  symbol?: unknown
+): Promise<{ label: string; text: string }> {
   if (typeof path === 'string' && path.trim().length > 0) {
     const full = resolveWorkspacePath(root, path.trim());
-    return { label: path.trim(), text: (await readFile(full, 'utf8')).replace(/\r\n/g, '\n') };
+    const content = (await readFile(full, 'utf8')).replace(/\r\n/g, '\n');
+    // A side may be one function of the file: the model compared the same
+    // method of a web and of a native version by cutting both out by hand.
+    if (typeof symbol === 'string' && symbol.trim().length > 0) {
+      const body = extractSymbol(content, symbol.trim(), path.trim());
+      if (!body) {
+        throw new Error('no symbol ' + symbol.trim() + ' in ' + path.trim());
+      }
+      return { label: path.trim() + '#' + symbol.trim(), text: body.text };
+    }
+    return { label: path.trim(), text: content };
   }
   if (typeof text === 'string') {
     return { label: name, text: text.replace(/\r\n/g, '\n') };
@@ -77,7 +94,7 @@ export function createCompareTools(): ToolEntry[] {
   const compare: ToolEntry = {
     name: 'compare',
     description:
-      'Compare two texts as a unified diff: each side is a file of the workspace (path_a, path_b) or a text you pass (text_a, text_b). Use it to check a file against the text you expect, or two outputs against each other.',
+      'Compare two texts as a unified diff: each side is a file of the workspace (path_a, path_b) or a text you pass (text_a, text_b). Use it to check a file against the text you expect, two outputs against each other, or the same function in two files: give symbol_a and symbol_b with the paths, for example a method of a web and of a native version.',
     approval: 'never',
     sideEffect: false,
     inputSchema: {
@@ -86,13 +103,15 @@ export function createCompareTools(): ToolEntry[] {
         path_a: { type: 'string', description: 'The first side as a file of the workspace.' },
         text_a: { type: 'string', description: 'The first side as a text, when there is no path_a.' },
         path_b: { type: 'string', description: 'The second side as a file of the workspace.' },
-        text_b: { type: 'string', description: 'The second side as a text, when there is no path_b.' }
+        text_b: { type: 'string', description: 'The second side as a text, when there is no path_b.' },
+        symbol_a: { type: 'string', description: 'Only this function, method or class of path_a.' },
+        symbol_b: { type: 'string', description: 'Only this function, method or class of path_b.' }
       }
     },
     async execute(input, ctx) {
       try {
-        const a = await readSide(ctx.workspaceRoot, input['path_a'], input['text_a'], 'text_a');
-        const b = await readSide(ctx.workspaceRoot, input['path_b'], input['text_b'], 'text_b');
+        const a = await readSide(ctx.workspaceRoot, input['path_a'], input['text_a'], 'text_a', input['symbol_a']);
+        const b = await readSide(ctx.workspaceRoot, input['path_b'], input['text_b'], 'text_b', input['symbol_b']);
         return { content: formatUnified(diffLines(a.text, b.text), a.label, b.label) };
       } catch (error) {
         return { content: 'compare failed: ' + (error as Error).message, isError: true };

@@ -260,6 +260,7 @@ export function buildSystemPrompt(context: PromptContext): string {
     '- After a tool returns, use its output. Never guess the content of a file you have not read.',
     '- Work in batches, not in a loop of one call and one thought. Before you act, write a short list of the next 2-5 steps, then make all the independent tool calls of that list in one response: read several files at once, run several searches at once. Think again only when the results change the plan.',
     '- Keep your scratch in your notes: a piece of code you study, a finding, a plan, a list of places to change goes to note_write, never to a file of the project such as tmp/ or notes.txt. Read the notes back with note_read and note_search instead of reading such files again.',
+    '- Never write a script that cuts code out of files, counts lines or compares pieces through files in temp/ or tmp/: compare two functions with compare (path_a, symbol_a, path_b, symbol_b), count or find lines inside a function with grep (path, symbol, count_only), and print a result instead of writing it to a file.',
     '- Read the functions, the methods and the classes you need with read_symbol, several names in one call, instead of cutting them out of a file into another file.',
     plan
       ? '- Your notes live in .minimax/agent/ of the project. On the first turn of a chat, read .gitignore and tell the user if it does not ignore .minimax/agent/.'

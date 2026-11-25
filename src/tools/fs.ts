@@ -1,3 +1,4 @@
+import { isScratchPath, SCRATCH_REFUSAL } from './scratch';
 import { mkdir, readFile as readFileAsync, writeFile as writeFileAsync } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { resolveWorkspacePath } from '../paths';
@@ -130,6 +131,11 @@ export function createFileTools(deps: {
       try {
         const target = resolveWorkspacePath(ctx.workspaceRoot, String(input['path'] ?? ''));
         const previous = await readFileAsync(target, 'utf8').catch(() => null);
+        // A new file in a scratch folder is the scratch of the model, a file
+        // that is already there belongs to the project.
+        if (previous === null && isScratchPath(String(input['path'] ?? ''))) {
+          return { content: SCRATCH_REFUSAL, isError: true };
+        }
         await deps.backups.save(target, previous, { sessionId: ctx.sessionId, next: content });
         await mkdir(dirname(target), { recursive: true });
         await writeFileAsync(target, content, 'utf8');
