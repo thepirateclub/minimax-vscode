@@ -14,12 +14,32 @@
 }
 
 .settings-tabs-wrap {
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+}
+
+/* The pane carries the scroll: the wrapper between .view and the form must
+   keep the height chain, or the form grows past the panel and never scrolls. */
+.settings-pane {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.settings-pane.view-hidden {
+  display: none;
+}
+
+.settings-pane > .settings-extras {
+  padding-top: 12px;
 }
 
 .settings-tabs {
+  flex: none;
   display: flex;
   gap: 4px;
   padding: 0 12px;

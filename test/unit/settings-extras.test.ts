@@ -5,6 +5,7 @@ import { parseServerForm, splitCommand } from '../../src/ui/webview/mcpForm';
 import { McpSettings } from '../../src/ui/webview/components/settings/McpSettings';
 import { SkillsSettings } from '../../src/ui/webview/components/settings/SkillsSettings';
 import { skillSource } from '../../src/host/skillSource';
+import { readStyles } from '../helpers/styles';
 
 const noop = () => undefined;
 
@@ -60,5 +61,18 @@ describe('the tabs of the settings', () => {
     expect(skillSource('C:\\w\\.minimax\\skills\\a', 'C:\\w', '\\')).toBe('project');
     expect(skillSource('C:\\Users\\me\\.claude\\skills\\a', 'C:\\w', '\\')).toBe('user');
     expect(skillSource('C:\\Users\\me\\.minimax\\plugins\\p\\skills\\a', 'C:\\w', '\\')).toBe('plugin');
+  });
+});
+
+// The tabs put a wrapper between .view and the form: without the height
+// chain the form grew past the panel and the settings stopped scrolling.
+describe('the scroll of the settings', () => {
+  it('keeps the height chain through the tabs', () => {
+    const css = readStyles();
+    const rule = (selector: string) => css.match(new RegExp('\n' + selector.replace('.', '\.') + ' \{([^}]*)\}'))?.[1] ?? '';
+    expect(rule('.settings-tabs-wrap')).toMatch(/min-height: 0/);
+    expect(rule('.settings-pane')).toMatch(/min-height: 0/);
+    expect(rule('.settings-pane')).toMatch(/overflow-y: auto/);
+    expect(css).toMatch(/\.settings-pane\.view-hidden \{\s*display: none/);
   });
 });
