@@ -58,3 +58,11 @@ describe('the skills', () => {
     expect((await tool!.execute({ name: 'nope' }, ctx)).content).toContain('The skills: pdf');
   });
 });
+
+describe('a description in a YAML block', () => {
+  it('reads the folded lines and not the marker', () => {
+    const text = '---\nname: gif\ndescription: >\n  Cute stickers\n  from photos.\n---\nBody';
+    expect(parseSkillFile(text).description).toBe('Cute stickers from photos.');
+    expect(parseSkillFile('---\nname: a\ndescription: |-\n  One\n---\n').description).toBe('One');
+  });
+});

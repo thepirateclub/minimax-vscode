@@ -47,12 +47,23 @@ export function parseSkillFile(text: string): { name?: string; description?: str
   if (!match) {
     return { body: text };
   }
+  // A long description is often a YAML block (`description: >` with the
+  // text on the indented lines below) or a plain value wrapped on several
+  // lines: the indented lines belong to the field above, joined by spaces.
   const fields: Record<string, string> = {};
+  let last = '';
   for (const line of (match[1] ?? '').split(/\r?\n/)) {
     const field = /^([A-Za-z_-]+):\s*(.*)$/.exec(line);
     if (field?.[1]) {
-      fields[field[1].toLowerCase()] = (field[2] ?? '').trim().replace(/^(['"])(.*)\1$/, '$2');
+      last = field[1].toLowerCase();
+      const value = (field[2] ?? '').trim();
+      fields[last] = /^[>|][+-]?$/.test(value) ? '' : value;
+    } else if (last && /^\s+\S/.test(line)) {
+      fields[last] = ((fields[last] ?? '') + ' ' + line.trim()).trim();
     }
+  }
+  for (const key of Object.keys(fields)) {
+    fields[key] = (fields[key] ?? '').replace(/^(['"])(.*)\1$/, '$2');
   }
   return {
     ...(fields['name'] ? { name: fields['name'] } : {}),

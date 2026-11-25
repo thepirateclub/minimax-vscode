@@ -75,8 +75,9 @@ export function McpSettings({
       </ul>
       <div className="extras-form">
         <h3 className="extras-title">{STRINGS.mcpAdd}</h3>
-        <input value={name} placeholder={STRINGS.mcpNamePlaceholder} onChange={(event) => setName(event.target.value)} />
+        <input type="text" value={name} placeholder={STRINGS.mcpNamePlaceholder} onChange={(event) => setName(event.target.value)} />
         <input
+          type="text"
           value={target}
           placeholder={STRINGS.mcpTargetPlaceholder}
           onChange={(event) => setTarget(event.target.value)}
