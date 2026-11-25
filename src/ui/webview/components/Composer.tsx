@@ -13,10 +13,13 @@ import type { QueuedMessage } from '../../protocol';
 import { dictationPiece } from '../dictation';
 import { splitRestore } from '../restoreInput';
 import { ComposerInput } from './ComposerInput';
+import { matchSkills, skillSuggestion, slashPrefix, typedSkill, type UiSkill } from '../../skillMentions';
 import {
   createMentionChip,
   insertLineBreak,
   insertMention,
+  insertSkillChip,
+  removeSlashTrigger,
   placeCaretAtEnd,
   readContent,
   removeTrigger,
@@ -79,7 +82,8 @@ export function Composer({
   queue = [],
   onSendQueued,
   onSendAllQueued,
-  onRemoveQueued
+  onRemoveQueued,
+  skills = []
 }: {
   busy: boolean;
   selections: UiSelection[];
@@ -118,9 +122,15 @@ export function Composer({
   onSendQueued?: (id: string) => void;
   onSendAllQueued?: () => void;
   onRemoveQueued?: (id: string) => void;
+  // The skills the host found, the slash of the field suggests them.
+  skills?: UiSkill[];
 }) {
 
   const [active, setActive] = useState(0);
+  // The skills after a slash: the panel finds them itself, the host sent
+  // the list. They take the place of the files in the list.
+  const [skillItems, setSkillItems] = useState<UiSuggestion[]>([]);
+  const shown = skillItems.length > 0 ? skillItems : suggestions;
   const [empty, setEmpty] = useState(true);
   const editorRef = useRef<HTMLDivElement>(null);
   const lastReset = useRef(resetToken);
@@ -233,8 +243,25 @@ export function Composer({
     const content = readContent(root);
     setEmpty(content.text.trim().length === 0);
     onContentChange?.({ text: content.text, mentions: content.mentions });
-    const prefix = triggerPrefix(visibleBeforeCaret(root));
-    onSuggest(prefix);
+    const before = visibleBeforeCaret(root);
+    // A name of a skill typed in full and closed with a space is a chip.
+    const typed = typedSkill(before, skills);
+    if (typed) {
+      removeSlashTrigger();
+      insertSkillChip(root, typed);
+      setSkillItems([]);
+      report();
+      return;
+    }
+    const slash = slashPrefix(before);
+    const matched = slash === undefined ? [] : matchSkills(skills, slash).map(skillSuggestion);
+    setSkillItems(matched);
+    if (matched.length > 0) {
+      setActive(0);
+      onSuggest(undefined);
+      return;
+    }
+    onSuggest(triggerPrefix(before));
   };
 
   const pick = (item: UiSuggestion): void => {
@@ -242,8 +269,14 @@ export function Composer({
     if (!root) {
       return;
     }
-    removeTrigger();
-    insertMention(root, item.path);
+    if (item.source === 'skill') {
+      removeSlashTrigger();
+      insertSkillChip(root, item.path);
+      setSkillItems([]);
+    } else {
+      removeTrigger();
+      insertMention(root, item.path);
+    }
     onSuggest(undefined);
     setActive(0);
     report();
@@ -266,30 +299,32 @@ export function Composer({
 
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
     // Escape leaves the field of the goal, the draft stays.
-    if (goalMode && suggestions.length === 0 && event.key === 'Escape') {
+    if (goalMode && shown.length === 0 && event.key === 'Escape') {
       event.preventDefault();
       onGoalMode?.(false);
       return;
     }
-    if (suggestions.length > 0) {
+    if (shown.length > 0) {
       if (event.key === 'ArrowDown') {
         event.preventDefault();
-        setActive((value) => (value + 1) % suggestions.length);
+        setActive((value) => (value + 1) % shown.length);
         return;
       }
       if (event.key === 'ArrowUp') {
         event.preventDefault();
-        setActive((value) => (value - 1 + suggestions.length) % suggestions.length);
+        setActive((value) => (value - 1 + shown.length) % shown.length);
         return;
       }
       if (event.key === 'Escape') {
         event.preventDefault();
         onSuggest(undefined);
+        setSkillItems([]);
         return;
       }
-      if (event.key === 'Enter' && !event.shiftKey) {
+      // Tab takes the suggestion like Enter, as in the editor.
+      if ((event.key === 'Enter' && !event.shiftKey) || event.key === 'Tab') {
         event.preventDefault();
-        const item = suggestions[active];
+        const item = shown[active];
         if (item) {
           pick(item);
         }
@@ -323,7 +358,7 @@ export function Composer({
 
   return (
     <ComposerInput
-      suggestions={suggestions}
+      suggestions={shown}
       active={active}
       onPick={pick}
       selections={selections}

@@ -1,3 +1,4 @@
+import type { ExtrasToExt, ExtrasToWeb } from './extrasProtocol';
 import type { GoalState, TodoItem } from '../agent/state';
 import type { EffortLevel } from '../api/types';
 import type { AgentMode, BaseUrlPreset, ModelInfo } from '../config/models';
@@ -94,7 +95,10 @@ export interface UiSuggestion {
   id: string;
   path: string;
   label: string;
-  source: 'open' | 'workspace';
+  // A skill comes from the panel itself, after a slash.
+  source: 'open' | 'workspace' | 'skill';
+  // The description of a skill under its name.
+  detail?: string;
 }
 
 // The status of a repeated request: the connection to MiniMax is lost.
@@ -210,6 +214,7 @@ export interface UiState {
 }
 
 export type ExtToWeb =
+  | ExtrasToWeb
   | { type: 'init'; state: UiState }
   | { type: 'user_message'; id: string; text: string; at: number }
   | { type: 'assistant_start'; id: string; at: number }
@@ -267,6 +272,7 @@ export type ExtToWeb =
   | { type: 'voice_text'; text: string };
 
 export type WebToExt =
+  | ExtrasToExt
   | { type: 'ready' }
   | { type: 'send'; text: string; mentions: string[]; selections: UiSelection[] }
   // One message of the queue goes out now.

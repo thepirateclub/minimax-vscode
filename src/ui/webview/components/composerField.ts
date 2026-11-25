@@ -27,6 +27,14 @@ export function walk(parent: Node, result: WalkResult): void {
       continue;
     }
     const element = child as HTMLElement;
+    // The chip of a skill stays `/name` in the text, the host finds the skill
+    // by it; it is not a file of the request.
+    if (element.classList.contains('mention-skill')) {
+      const name = '/' + (element.dataset.skill ?? '');
+      result.visible += name;
+      result.text += name;
+      continue;
+    }
     if (element.classList.contains('mention')) {
       const path = element.dataset.path ?? '';
       const label = element.dataset.label ?? path;
@@ -104,7 +112,29 @@ export function createMentionChip(path: string): HTMLElement {
 }
 
 export function insertMention(root: HTMLElement, path: string): void {
-  const chip = createMentionChip(path);
+  insertChip(root, createMentionChip(path));
+}
+
+// The chip of a skill: the name of the skill with its slash, the cross
+// removes it like the chip of a file.
+export function createSkillChip(name: string): HTMLElement {
+  const chip = createMentionChip(name);
+  chip.className = 'mention mention-skill';
+  delete chip.dataset.path;
+  chip.dataset.skill = name;
+  chip.title = 'Skill ' + name;
+  const label = chip.querySelector('.mention-label');
+  if (label) {
+    label.textContent = '/' + name;
+  }
+  return chip;
+}
+
+export function insertSkillChip(root: HTMLElement, name: string): void {
+  insertChip(root, createSkillChip(name));
+}
+
+function insertChip(root: HTMLElement, chip: HTMLElement): void {
 
   const selection = window.getSelection();
   if (selection && selection.rangeCount > 0 && root.contains(selection.getRangeAt(0).startContainer)) {
@@ -121,6 +151,36 @@ export function insertMention(root: HTMLElement, path: string): void {
   }
   root.appendChild(chip);
   root.appendChild(document.createTextNode(' '));
+}
+
+// The typed `/name` of a skill is cut out like the trigger of a file; a
+// name typed in full comes with the space that closed it.
+export function removeSlashTrigger(): void {
+  cutBeforeCaret(/(?:^|\s)(\/[\w.-]*\s?)$/);
+}
+
+function cutBeforeCaret(pattern: RegExp): void {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0) {
+    return;
+  }
+  const range = selection.getRangeAt(0);
+  const node = range.startContainer;
+  if (node.nodeType !== Node.TEXT_NODE) {
+    return;
+  }
+  const text = node.textContent ?? '';
+  const offset = range.startOffset;
+  const match = pattern.exec(text.slice(0, offset));
+  if (!match) {
+    return;
+  }
+  const start = offset - (match[1]?.length ?? 0);
+  node.textContent = text.slice(0, start) + text.slice(offset);
+  range.setStart(node, start);
+  range.collapse(true);
+  selection.removeAllRanges();
+  selection.addRange(range);
 }
 
 // The typed trigger is cut out of the text node that holds the caret.

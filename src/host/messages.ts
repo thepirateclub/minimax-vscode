@@ -1,3 +1,4 @@
+import { handleExtrasMessage } from './extras';
 import type { MiniMaxController } from '../extension';
 import type { WebToExt } from '../ui/protocol';
 import { sendQueued, sendAllQueued, removeQueued } from './queue';
@@ -9,6 +10,17 @@ import { updateSetting, pickFiles, postSettings, saveSettings, storeApiKey, clea
 import { undoLastChange } from './commands';
 
 export async function handleWebviewMessage(host: MiniMaxController, message: WebToExt): Promise<void> {
+  if (
+    message.type === 'request_extras' ||
+    message.type === 'open_skill' ||
+    message.type === 'mcp_restart' ||
+    message.type === 'mcp_open_settings' ||
+    message.type === 'mcp_add' ||
+    message.type === 'mcp_remove'
+  ) {
+    await handleExtrasMessage(host, message);
+    return;
+  }
   if (message.type === 'ready') {
     // The panel has just loaded, it holds nothing of the chat yet.
     await host.sendInit(true);
