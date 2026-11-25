@@ -37,5 +37,8 @@ export interface ToolEntry {
   // A side effect tool changes the workspace or runs a command, plan mode
   // hides those tools and refuses to run them.
   sideEffect: boolean;
+  // The tool exists only while this says so: a setting of the user turns it
+  // on. The registry hides it from the model and refuses to run it.
+  available?: () => boolean;
   execute(input: Record<string, unknown>, ctx: ToolContext): Promise<ToolExecutionResult>;
 }

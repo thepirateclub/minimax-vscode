@@ -13,6 +13,7 @@ import { createTaskFileTools } from './tasks';
 import { createTerminalTools } from './terminal';
 import { createTodoTools } from './todo';
 import { createSkillTools } from './skills';
+import { createWebTools, type WebToolOptions } from './web';
 import type { Skill } from '../skills/skills';
 import type { ToolEntry } from './types';
 
@@ -30,6 +31,8 @@ export interface AllToolDeps {
   diagnostics?: DiagnosticsProvider;
   // The skills of the project and of the user, absent in the tests.
   skills?: (workspaceRoot: string) => Promise<Skill[]>;
+  // The web search and the vision model of the M Plan, absent in the tests.
+  web?: WebToolOptions;
 }
 
 export function createAllTools(deps: AllToolDeps): ToolEntry[] {
@@ -45,6 +48,7 @@ export function createAllTools(deps: AllToolDeps): ToolEntry[] {
     ...createContainerTools(),
     ...createGoalTools(),
     ...createTaskTools({ spawn: deps.spawn }),
-    ...createSkillTools({ skills: deps.skills ?? (async () => []) })
+    ...createSkillTools({ skills: deps.skills ?? (async () => []) }),
+    ...createWebTools(deps.web ?? { connection: async () => undefined, webSearchEnabled: () => false })
   ];
 }

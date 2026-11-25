@@ -164,6 +164,14 @@ const TOOL_LINES: Array<{ name: string; line: string }> = [
   {
     name: 'read_skill',
     line: '- read_skill(name, file?) - read a skill of the Skills section before a task it covers, and the files of the skill'
+  },
+  {
+    name: 'web_search',
+    line: '- web_search(query) - search the web: the documentation of a library, an error message, anything newer than your knowledge'
+  },
+  {
+    name: 'understand_image',
+    line: '- understand_image(prompt, image) - look at a PNG, JPEG or WebP image of the workspace or a https address and answer the prompt about it'
   }
 ];
 

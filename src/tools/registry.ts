@@ -19,6 +19,9 @@ export class ToolRegistry {
 
   // Plan mode is read-only, only code mode may use the tools with a side effect.
   isAllowed(entry: ToolEntry, mode: AgentMode): boolean {
+    if (entry.available && !entry.available()) {
+      return false;
+    }
     return mode === 'code' || !entry.sideEffect;
   }
 

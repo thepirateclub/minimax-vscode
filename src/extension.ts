@@ -113,7 +113,15 @@ export class MiniMaxController {
       spawn: async (request, ctx, progress) =>
         await spawnTask(this, request, ctx, progress),
       diagnostics: editorDiagnostics(),
-      skills: async (root) => await discoverSkills(root)
+      skills: async (root) => await discoverSkills(root),
+      web: {
+        connection: async () => {
+          const key = await getApiKey(this.context.secrets);
+          const settings = getSettings();
+          return key ? { baseUrl: resolveBaseUrl(settings.baseUrl, settings.customBaseUrl), apiKey: key } : undefined;
+        },
+        webSearchEnabled: () => getSettings().enableWebSearch
+      }
     })) {
       this.registry.register(tool);
     }

@@ -325,7 +325,8 @@
         },
         "minimax.enableWebSearch": {
           "type": "boolean",
-          "default": false
+          "default": false,
+          "description": "The agent searches the web with the M Plan key (the web_search tool). The queries go to MiniMax."
         },
         "minimax.rulesEnabled": {
           "type": "boolean",

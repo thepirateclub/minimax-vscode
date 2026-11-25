@@ -327,6 +327,12 @@ export const DESCRIBERS: Record<string, Describer> = {
       summary: ''
     };
   },
+  web_search: ({ input }) => {
+    return { icon: <IconSearch />, title: STRINGS.toolWebSearch + ' ' + text(input['query']), summary: '' };
+  },
+  understand_image: ({ input }) => {
+    return { icon: <IconRead />, title: STRINGS.toolUnderstandImage + ' ' + text(input['image']), summary: '' };
+  },
   get_goal: ({}) => {
     return { icon: <IconCheck />, title: STRINGS.toolGetGoal, summary: '' };
   },

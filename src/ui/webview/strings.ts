@@ -120,6 +120,8 @@ export const STRINGS = {
   toolTodoDone: 'done',
   toolGetGoal: 'Read goal',
   toolReadSkill: 'Read skill',
+  toolWebSearch: 'Search the web',
+  toolUnderstandImage: 'Look at',
   toolGoalComplete: 'Mark goal complete',
   toolGoalBlocked: 'Mark goal blocked',
   toolUpdateGoal: 'Update goal',
