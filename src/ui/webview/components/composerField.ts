@@ -31,7 +31,10 @@ export function walk(parent: Node, result: WalkResult): void {
     // by it; it is not a file of the request.
     if (element.classList.contains('mention-skill')) {
       const name = '/' + (element.dataset.skill ?? '');
-      result.visible += name;
+      // The triggers read the visible text: a chip is one object there, not
+      // `/name`, or the chip reads as a typed skill again and the field
+      // turns it into a new chip without end.
+      result.visible += SKILL_CHIP_MARK;
       result.text += name;
       continue;
     }
@@ -64,6 +67,9 @@ export function readContent(root: HTMLElement): EditorContent & { visible: strin
 
 // The visible text before the caret drives the "@" trigger, a chip counts as
 // its own label so a path never looks like a fresh trigger.
+// The place of a skill chip in the visible text: the object mark of Unicode.
+export const SKILL_CHIP_MARK = '￼';
+
 export function visibleBeforeCaret(root: HTMLElement): string {
   const selection = window.getSelection();
   if (!selection || selection.rangeCount === 0) {

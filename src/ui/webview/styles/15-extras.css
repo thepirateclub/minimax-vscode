@@ -4,7 +4,15 @@
   color: var(--accent);
 }
 
+/* The name of a skill keeps its place, the description shrinks: a long
+   description squeezed the name down to nothing. */
+.suggestion-path:has(+ .suggestion-detail) {
+  flex: 0 1 auto;
+  max-width: 50%;
+}
+
 .suggestion-detail {
+  flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
