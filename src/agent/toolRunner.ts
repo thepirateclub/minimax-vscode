@@ -53,6 +53,27 @@ export function todoCheck(todos: readonly TodoItem[], sinceWrite: number): strin
   );
 }
 
+// The notes stood empty after 500 actions: one line of the prompt did not
+// make the model write them. After NOTE_EVERY reading actions without a
+// note the last result asks it to keep what it found.
+export const NOTE_EVERY = 12;
+
+// The tools that only read the project: their results are what a note keeps.
+export function isReadingCall(name: string, sideEffect: boolean): boolean {
+  return !sideEffect && !name.startsWith('note_') && name !== 'todo_write' && name !== 'get_goal' && name !== 'update_goal';
+}
+
+export function noteCheck(sinceNote: number): string | undefined {
+  if (sinceNote < NOTE_EVERY) {
+    return undefined;
+  }
+  return (
+    '\n\n[Notes: ' + sinceNote + ' reads since your last note. The old results leave the context soon. ' +
+    'Keep what you found with note_write now: the facts, the paths with line numbers, the differences, the open questions. ' +
+    'One note per topic, for example note_write("dropLoot: web vs native", ...). Then continue.]'
+  );
+}
+
 export function signatureOf(name: string, input: Record<string, unknown>): string {
   return name + ':' + JSON.stringify(input);
 }

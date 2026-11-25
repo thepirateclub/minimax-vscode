@@ -13,7 +13,7 @@ import {
   forgetReadCalls,
   MAX_IDENTICAL_CALLS,
   previewOf,
-  signatureOf, progressCheck, todoCheck } from './toolRunner';
+  signatureOf, progressCheck, todoCheck, noteCheck, isReadingCall } from './toolRunner';
 import { streamWithRetry } from './retry';
 import type { AgentOptions, AgentRunResult } from './types';
 export { DEFAULT_MAX_RETRIES, retryDelay } from './retry';
@@ -67,6 +67,8 @@ export class Agent {
     let actions = 0;
     // The actions since the last todo_write, for the reminder of the list.
     let sinceTodo = 0;
+    // The reading actions since the last note_write, for the reminder of the notes.
+    let sinceNote = 0;
     // The answers in a row whose call of a tool came as text.
     let leaks = 0;
     let usage: Usage = { inputTokens: 0, outputTokens: 0 };
@@ -300,7 +302,14 @@ export class Agent {
       if (reminder) {
         sinceTodo = 0;
       }
-      const check = (progressCheck(actions, actions + toolUses.length) ?? '') + (reminder ?? '');
+      const main = (this.options.depth ?? 0) === 0;
+      const reads = toolUses.filter((use) => isReadingCall(use.name, this.options.registry.get(use.name)?.sideEffect ?? true)).length;
+      sinceNote = toolUses.some((use) => use.name === 'note_write') ? 0 : sinceNote + reads;
+      const noteReminder = main && this.options.registry.get('note_write') ? noteCheck(sinceNote) : undefined;
+      if (noteReminder) {
+        sinceNote = 0;
+      }
+      const check = (progressCheck(actions, actions + toolUses.length) ?? '') + (reminder ?? '') + (noteReminder ?? '');
       actions += toolUses.length;
       const last = results[results.length - 1];
       if (check && last && last.type === 'tool_result') {
