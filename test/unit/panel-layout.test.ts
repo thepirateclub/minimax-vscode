@@ -247,7 +247,7 @@ describe('panel layout', () => {
     expect(head).toMatch(/column-gap:\s*6px/);
     // The words of the head and the counter stand on one baseline.
     expect(rule('.section-title')).toMatch(/align-self:\s*baseline/);
-    expect(rule('.tool-steps-count')).toMatch(/align-self:\s*baseline/);
+    expect(rule('.tool-steps-tail')).toMatch(/align-self:\s*baseline/);
     // The chevron and the icon stand in the middle of the row.
     expect(rule('.section-toggle .chevron')).toMatch(/align-self:\s*center/);
     // The group of the actions does not hang in the margin of the panel.

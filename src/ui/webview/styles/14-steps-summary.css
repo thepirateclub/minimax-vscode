@@ -11,11 +11,24 @@
   color: var(--muted);
 }
 
-/* The counter of the group stands on the right edge of the head, on the
-   baseline of the title. */
-.tool-steps-count {
+/* The span of the group and its counter stand on the right edge of the
+   head, on the baseline of the title. */
+.tool-steps-tail {
   grid-column: 5;
   align-self: baseline;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.tool-steps-span {
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.tool-steps-count {
   color: var(--muted);
   font-size: var(--fs-xs);
   font-variant-numeric: tabular-nums;
@@ -25,6 +38,49 @@
   position: relative;
   padding: 2px 0 4px;
   padding-left: var(--nest);
+}
+
+/* The timeline: every card is a point on the guide line. The node sits on
+   the line (6.5px from the edge of the body, the card starts at --nest) in
+   the middle of the title row, a ring of the color of the panel cuts the
+   line around it. The color of the node is the result of the action. */
+.timeline-item {
+  position: relative;
+}
+
+.timeline-node {
+  position: absolute;
+  left: calc(6.5px - var(--nest) - 6px);
+  top: calc(var(--control-h) / 2 - 6px);
+  box-sizing: border-box;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--bg);
+  border-radius: 50%;
+  background: var(--muted);
+  z-index: 1;
+}
+
+.timeline-done .timeline-node {
+  background: var(--ok);
+}
+
+.timeline-failed .timeline-node {
+  background: var(--err);
+}
+
+.timeline-running .timeline-node {
+  animation: mm-pulse 1s ease-in-out infinite;
+}
+
+/* The node already shows the result, the dot of the card stays for the
+   reader of the screen only. */
+.timeline-item .tool-tail .tool-dot {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
 }
 
 .tool-steps-failed .tool-steps-head {

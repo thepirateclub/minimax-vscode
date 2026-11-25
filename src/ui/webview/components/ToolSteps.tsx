@@ -5,6 +5,8 @@ import { STRINGS } from '../strings';
 import { actionPreview } from './toolDescriptions';
 import { SectionPreview } from './SectionPreview';
 import { ToolCard } from './ToolCard';
+import { formatSpan, stepSpan, timelineState } from '../timeline';
+import { fullStamp } from '../../format';
 
 // The actions of one step of the agent. The step is folded by default, the
 // header of it stays visible: the reader sees that the agent worked and
@@ -21,6 +23,8 @@ export function ToolSteps({
   const failed = step.tools.some((item) => item.tool?.isError === true);
   // The last action of the group: the folded step says what it did last.
   const last = step.tools[step.tools.length - 1]?.tool;
+  // When the work of the group started and ended, the head names it.
+  const span = stepSpan(step.tools);
   return (
     <div className={'tool-steps' + (failed ? ' tool-steps-failed' : '')}>
       <div className="section-head tool-steps-head">
@@ -45,18 +49,32 @@ export function ToolSteps({
             onOpen={() => setOpen(true)}
           />
         ) : null}
-        <span className="tool-steps-count">{step.tools.length}</span>
+        <span className="tool-steps-tail">
+          {span ? (
+            <span
+              className="tool-steps-span"
+              title={fullStamp(span.start) + (span.end !== undefined ? ' – ' + fullStamp(span.end) : '')}
+            >
+              {formatSpan(span)}
+            </span>
+          ) : null}
+          <span className="tool-steps-count">{step.tools.length}</span>
+        </span>
       </div>
       {open ? (
         <div className="tool-steps-body">
           {step.tools.map((message) =>
             message.tool ? (
-              <ToolCard
-                key={message.id}
-                tool={message.tool}
-                collapsed={collapsed}
-                {...(message.at !== undefined ? { at: message.at } : {})}
-              />
+              // A point of the timeline: the node on the guide line carries
+              // the state of the action, the card its words and its moment.
+              <div key={message.id} className={'timeline-item timeline-' + timelineState(message)}>
+                <span className="timeline-node" aria-hidden="true" />
+                <ToolCard
+                  tool={message.tool}
+                  collapsed={collapsed}
+                  {...(message.at !== undefined ? { at: message.at } : {})}
+                />
+              </div>
             ) : null
           )}
         </div>

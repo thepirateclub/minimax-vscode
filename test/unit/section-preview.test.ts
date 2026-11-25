@@ -136,7 +136,7 @@ describe('the folded sections of the chat', () => {
     expect(rule('.section-head')).toMatch(
       /grid-template-columns:\s*14px 14px auto minmax\(0, 1fr\) auto/
     );
-    expect(rule('.tool-steps-count')).toMatch(/grid-column:\s*5/);
+    expect(rule('.tool-steps-tail')).toMatch(/grid-column:\s*5/);
     const text = rule('.section-preview-text');
     expect(text).toMatch(/white-space:\s*nowrap/);
     expect(text).toMatch(/text-overflow:\s*ellipsis/);
