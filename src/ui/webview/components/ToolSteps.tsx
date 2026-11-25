@@ -7,6 +7,7 @@ import { SectionPreview } from './SectionPreview';
 import { ToolCard } from './ToolCard';
 import { formatSpan, stepSpan, timelineState } from '../timeline';
 import { fullStamp } from '../../format';
+import { CARDS_PAGE, formatStepSummary, SUMMARY_FROM, summarizeStep } from '../stepSummary';
 
 // The actions of one step of the agent. The step is folded by default, the
 // header of it stays visible: the reader sees that the agent worked and
@@ -25,6 +26,12 @@ export function ToolSteps({
   const last = step.tools[step.tools.length - 1]?.tool;
   // When the work of the group started and ended, the head names it.
   const span = stepSpan(step.tools);
+  // A long group reads by what it did, and draws its last cards only: a turn
+  // of a thousand actions froze the panel and told nothing.
+  const [shown, setShown] = useState(CARDS_PAGE);
+  const long = step.tools.length >= SUMMARY_FROM;
+  const visible = step.tools.slice(-shown);
+  const hidden = step.tools.length - visible.length;
   return (
     <div className={'tool-steps' + (failed ? ' tool-steps-failed' : '')}>
       <div className="section-head tool-steps-head">
@@ -63,7 +70,13 @@ export function ToolSteps({
       </div>
       {open ? (
         <div className="tool-steps-body">
-          {step.tools.map((message) =>
+          {long ? <div className="tool-steps-summary">{formatStepSummary(summarizeStep(step.tools))}</div> : null}
+          {hidden > 0 ? (
+            <button className="secondary tool-steps-more" onClick={() => setShown(shown + CARDS_PAGE * 4)}>
+              {STRINGS.showEarlierActions.replace('{count}', String(hidden))}
+            </button>
+          ) : null}
+          {visible.map((message) =>
             message.tool ? (
               // A point of the timeline: the node on the guide line carries
               // the state of the action, the card its words and its moment.

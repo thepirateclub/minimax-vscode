@@ -120,6 +120,7 @@ export const STRINGS = {
   toolTodoDone: 'done',
   toolGetGoal: 'Read goal',
   toolReadSkill: 'Read skill',
+  showEarlierActions: 'Show {count} earlier actions',
   toolWebSearch: 'Search the web',
   toolUnderstandImage: 'Look at',
   toolGoalComplete: 'Mark goal complete',

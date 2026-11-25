@@ -83,6 +83,20 @@
   clip-path: inset(50%);
 }
 
+/* The summary of a long group: what the actions did, in one line over the
+   cards. The button of the earlier cards stands under it. */
+.tool-steps-summary {
+  padding: 2px 0 4px;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.tool-steps-more {
+  margin: 0 0 4px;
+  font-size: var(--fs-xs);
+}
+
 .tool-steps-failed .tool-steps-head {
   color: var(--err);
 }

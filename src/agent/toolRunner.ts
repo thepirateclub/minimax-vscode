@@ -7,6 +7,22 @@ import type { DiffPreview } from '../ui/approvals';
 // and the preview of a change.
 export const MAX_IDENTICAL_CALLS = 3;
 
+// A turn of hundreds of actions told the reader nothing until its end. Every
+// PROGRESS_EVERY actions the model is asked for a short note: what is done,
+// what is left. The note is text, the panel shows it between the groups of
+// the actions, so a long turn reads as steps.
+export const PROGRESS_EVERY = 25;
+
+export function progressCheck(before: number, after: number): string | undefined {
+  if (Math.floor(after / PROGRESS_EVERY) <= Math.floor(before / PROGRESS_EVERY)) {
+    return undefined;
+  }
+  return (
+    '\n\n[Progress check: ' + after + ' actions in this turn. Before the next tool call, write the user 2-4 short lines: ' +
+    'what is done, what is left, and whether the plan changed. Then continue the work.]'
+  );
+}
+
 export function signatureOf(name: string, input: Record<string, unknown>): string {
   return name + ':' + JSON.stringify(input);
 }

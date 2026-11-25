@@ -11,8 +11,7 @@ import {
   forgetReadCalls,
   MAX_IDENTICAL_CALLS,
   previewOf,
-  signatureOf
-} from './toolRunner';
+  signatureOf, progressCheck } from './toolRunner';
 import { streamWithRetry } from './retry';
 import type { AgentOptions, AgentRunResult } from './types';
 export { DEFAULT_MAX_RETRIES, retryDelay } from './retry';
@@ -59,6 +58,8 @@ export class Agent {
     }
     const requestIndex = messages.length - 1;
     const identicalCalls = new Map<string, number>();
+    // The actions of the turn, the check of the progress counts them.
+    let actions = 0;
     let usage: Usage = { inputTokens: 0, outputTokens: 0 };
 
     for (let iteration = 0; iteration < this.options.maxIterations; iteration++) {
@@ -274,6 +275,14 @@ export class Agent {
         }
       }
 
+      // The note rides on the last result: a text block next to the results
+      // breaks the protocol of MiniMax (2013).
+      const check = progressCheck(actions, actions + toolUses.length);
+      actions += toolUses.length;
+      const last = results[results.length - 1];
+      if (check && last && last.type === 'tool_result') {
+        last.content = (typeof last.content === 'string' ? last.content : JSON.stringify(last.content)) + check;
+      }
       messages.push({ role: 'user', content: results });
     }
 

@@ -189,6 +189,18 @@ export const MESSAGES: UiMessage[] = stamped([
       durationMs: 182
     }
   },
+  { id: 'long-text', role: 'assistant', text: 'Reading the whole project now.' },
+  // A long group: a turn of many actions shows its summary and its last cards.
+  ...Array.from({ length: 64 }, (_, i): UiMessage => ({
+    id: 'long-' + i,
+    role: 'tool',
+    tool:
+      i % 9 === 4
+        ? { id: 'long-' + i, name: 'edit_file', input: { path: 'src/f' + i + '.ts' }, diff: { path: 'src/f' + i + '.ts', lines: [{ type: 'add', text: 'a' }, { type: 'add', text: 'b' }, { type: 'remove', text: 'c' }] }, durationMs: 40 }
+        : i % 13 === 7
+          ? { id: 'long-' + i, name: 'run_terminal', input: { command: 'npm test' }, content: 'ok', isError: i === 20, durationMs: 1200 }
+          : { id: 'long-' + i, name: 'read_file', input: { path: 'src/f' + i + '.ts' }, content: '1: x', durationMs: 3 }
+  })),
   { id: 'n1', role: 'notice', text: 'Cannot open src/missing.ts: the file does not exist.' },
   {
     id: 'ap1',
