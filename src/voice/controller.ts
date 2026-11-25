@@ -1,3 +1,4 @@
+import { can, defineMachine, step } from '../fsm/machine';
 import type { SpeechClient } from '../api/speech';
 import type { ExtToWeb, VoiceState } from '../ui/protocol';
 import { BYTES_PER_SECOND, quietestCut, wavFromPcm } from './pcm';
@@ -49,6 +50,18 @@ const MIN_TAIL = 0.3 * BYTES_PER_SECOND;
 // seconds the open window of the recording is transcribed again and the live
 // text in the field is replaced. A long window is closed in a pause, its text
 // is kept, and a new window starts.
+// The states of the voice input and the steps between them. A failure
+// from any state ends at idle, the panel shows the reason as a notice.
+export type VoiceEvent = 'start' | 'stop' | 'done' | 'cancel' | 'fail';
+
+export const voiceMachine = defineMachine<VoiceState, VoiceEvent>('voice', 'idle', [
+  { from: 'idle', on: 'start', to: 'recording' },
+  { from: 'recording', on: 'stop', to: 'transcribing' },
+  { from: 'transcribing', on: 'done', to: 'idle' },
+  { from: ['recording', 'transcribing'], on: 'cancel', to: 'idle' },
+  { from: ['idle', 'recording', 'transcribing'], on: 'fail', to: 'idle' }
+]);
+
 export class VoiceController {
   private recorder: VoiceRecorder | undefined;
   private state: VoiceState = 'idle';
@@ -70,7 +83,7 @@ export class VoiceController {
   }
 
   async start(): Promise<void> {
-    if (this.state !== 'idle') {
+    if (!can(voiceMachine, this.state, 'start')) {
       return;
     }
     // The key is checked first: a minute of speech without a key is lost.
@@ -89,7 +102,7 @@ export class VoiceController {
       this.vocabulary = parseVocabulary(config.vocabulary ?? []);
       this.committed = [];
       this.windowStart = 0;
-      this.setState('recording');
+      this.fire('start');
       this.stopTimer = this.deps.every(TICK_MS, () => this.tick());
     } catch (error) {
       this.recorder = undefined;
@@ -99,13 +112,13 @@ export class VoiceController {
 
   async stop(): Promise<void> {
     const recorder = this.recorder;
-    if (this.state !== 'recording' || !recorder) {
+    if (!recorder || !can(voiceMachine, this.state, 'stop')) {
       return;
     }
     this.stopTimer?.();
     this.stopTimer = undefined;
     this.recorder = undefined;
-    this.setState('transcribing');
+    this.fire('stop');
     try {
       // The live request that runs now ends first, the final one follows.
       await this.inFlight;
@@ -116,7 +129,7 @@ export class VoiceController {
       }
       // The final text replaces the live one, an empty text clears it.
       this.deps.post({ type: 'voice_text', text: this.text() });
-      this.setState('idle');
+      this.fire('done');
     } catch (error) {
       this.deps.post({ type: 'voice_text', text: this.text() });
       this.fail(messageOf(error));
@@ -126,14 +139,14 @@ export class VoiceController {
   cancel(): void {
     this.stopTimer?.();
     this.stopTimer = undefined;
-    const running = this.recorder !== undefined || this.state !== 'idle';
+    const running = can(voiceMachine, this.state, 'cancel');
     this.recorder?.cancel();
     this.recorder = undefined;
     this.committed = [];
     if (running) {
       this.deps.post({ type: 'voice_text', text: '' });
+      this.fire('cancel');
     }
-    this.setState('idle');
   }
 
   // One step of the live text. A step never overlaps the previous one: a slow
@@ -193,14 +206,19 @@ export class VoiceController {
     this.deps.post({ type: 'voice_partial', text });
   }
 
-  private setState(state: VoiceState): void {
-    this.state = state;
-    this.deps.post({ type: 'voice_state', state });
+  // One step of the machine of the voice, the panel learns the new state.
+  // A step the table does not know leaves the state as it is.
+  private fire(event: VoiceEvent): void {
+    const result = step(voiceMachine, this.state, event);
+    if (result.ok) {
+      this.state = result.state;
+      this.deps.post({ type: 'voice_state', state: result.state });
+    }
   }
 
   private fail(message: string): void {
     this.deps.post({ type: 'notice', kind: 'error', message });
-    this.setState('idle');
+    this.fire('fail');
   }
 }
 

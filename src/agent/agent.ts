@@ -15,22 +15,12 @@ import {
   previewOf,
   signatureOf, progressCheck, todoCheck, noteCheck, isReadingCall } from './toolRunner';
 import { streamWithRetry } from './retry';
-import { deltaOf, IdleState } from './assistant';
-import type { AssistantState } from './assistant';
+import { applyDelta, assistantMachine, deltasOf } from './assistant';
+import type { AssistantMessageState } from './assistant';
 import type { AgentOptions, AgentRunResult } from './types';
 export { DEFAULT_MAX_RETRIES, retryDelay } from './retry';
-export {
-  deltaOf,
-  Delta,
-  AnswerDelta,
-  ReasoningDelta,
-  AssistantState,
-  IdleState,
-  AnswerState,
-  ReasoningState,
-  MixedState,
-} from './assistant';
-export type { AssistantStep } from './assistant';
+export { assistantMachine, applyDelta, deltasOf } from './assistant';
+export type { AssistantDelta, AssistantMessageState, DeltaKind } from './assistant';
 export type { AgentEvent, AgentOptions, AgentRunOptions, AgentRunResult } from './types';
 import type { ToolStateUpdate } from './state';
 import type { ChangedFile } from '../tools/types';
@@ -48,7 +38,7 @@ export class Agent {
   private readonly controller = new AbortController();
   // The state of the machine of the message of the assistant: the process
   // changes it by the result of the step.
-  private assistantState: AssistantState = new IdleState();
+  private assistantState: AssistantMessageState = assistantMachine.initial;
 
   constructor(options: AgentOptions) {
     this.options = options;
@@ -92,7 +82,7 @@ export class Agent {
 
     for (let iteration = 0; iteration < this.options.maxIterations; iteration++) {
       // A new turn of the model: the message of the assistant starts anew.
-      this.assistantState = new IdleState();
+      this.assistantState = assistantMachine.initial;
       // The request carries the old long results of the tools as stubs, the
       // history of the run keeps them whole (src/api/clearResults.ts).
       const request = clearOldToolResults(messages);
@@ -348,14 +338,11 @@ export class Agent {
   // The process of the message of the assistant: the machine changes its
   // state by the result of the step, the events of the step go to the panel.
   private applyAssistant(event: StreamEvent): void {
-    const delta = deltaOf(event);
-    if (!delta) {
-      return;
-    }
-    const step = this.assistantState.apply(delta);
-    this.assistantState = step.state;
-    for (const item of step.events) {
-      this.options.onEvent(item);
+    for (const delta of deltasOf(event)) {
+      const result = applyDelta(this.assistantState, delta);
+      this.assistantState = result.state;
+      result.events.forEach((item) => this.options.onEvent(item));
     }
   }
+
 }
