@@ -1,4 +1,5 @@
 import { discoverSkills, readSkillText } from '../skills/skills';
+import { selectionBlock } from '../agent/editorPrompts';
 import { mentionedSkills } from '../ui/skillMentions';
 import type { MiniMaxController } from '../extension';
 import type { RuntimeSession } from './runtime';
@@ -346,11 +347,7 @@ export async function buildPromptText(host: MiniMaxController, text: string,
     }
   }
   for (const selection of selections) {
-    const header =
-      'Selected code from ' +
-      selection.path +
-      (selection.detail ? ' (' + selection.detail + ')' : '');
-    blocks.push(header + ':\n' + (selection.content ?? ''));
+    blocks.push(selectionBlock(selection));
   }
   if (blocks.length === 0) {
     return text;

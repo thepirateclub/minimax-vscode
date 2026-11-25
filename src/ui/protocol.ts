@@ -98,6 +98,8 @@ export interface UiSelection {
   label: string;
   detail?: string;
   content?: string;
+  // The annotation of the reader about this piece of code.
+  note?: string;
 }
 
 export interface UiSuggestion {

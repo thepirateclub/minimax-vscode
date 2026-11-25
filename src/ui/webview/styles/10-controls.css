@@ -166,6 +166,15 @@
   font-size: var(--fs-xs);
 }
 
+/* the note of an annotation: what the reader asks about this piece */
+.selection-note {
+  font-style: italic;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 200px;
+}
+
 /* a small cross that removes a chip or a saved chat */
 .selection-remove,
 .session-delete {
@@ -195,4 +204,4 @@
   color: var(--fg);
   background: var(--hover);
 }
-
+
