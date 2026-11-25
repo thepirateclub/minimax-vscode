@@ -39,14 +39,29 @@ export function normalizeTodos(input: unknown): TodoItem[] {
       priority: PRIORITIES.includes(priority) ? priority : 'medium'
     });
   }
-  return items;
+  return orderByPriority(items);
+}
+
+// The priority is the order of the work: the list stands very high first,
+// the order of the model stays inside one priority. Before, the priority
+// only drew an arrow and the tasks went in the order they were written.
+export function orderByPriority(items: TodoItem[]): TodoItem[] {
+  return items
+    .map((item, index) => ({ item, index }))
+    .sort((a, b) => PRIORITIES.indexOf(a.item.priority) - PRIORITIES.indexOf(b.item.priority) || a.index - b.index)
+    .map(({ item }) => item);
+}
+
+// The task to take next: the first one in the order that is not done.
+export function nextTodo(items: TodoItem[]): TodoItem | undefined {
+  return items.find((item) => item.status === 'in_progress') ?? items.find((item) => item.status === 'pending');
 }
 
 export function createTodoTools(): ToolEntry[] {
   const todoWrite: ToolEntry = {
     name: 'todo_write',
     description:
-      'Write the list of tasks of the session. The list is replaced by the new one, so send every task every time. Use it to show the plan and the progress to the user.',
+      'Write the list of tasks of the session. The list is replaced by the new one, so send every task every time. Use it to show the plan and the progress to the user. The priority is the order of the work: the list is kept ordered by priority, very_high first, and you take the first task that is not completed.',
     approval: 'never',
     sideEffect: false,
     inputSchema: {
@@ -67,7 +82,7 @@ export function createTodoTools(): ToolEntry[] {
               priority: {
                 type: 'string',
                 enum: ['very_high', 'high', 'medium', 'low'],
-                description: 'How urgent the task is.'
+                description: 'How urgent the task is. A higher priority is done earlier.'
               }
             },
             required: ['content']
@@ -97,13 +112,15 @@ export function createTodoTools(): ToolEntry[] {
       const todos = normalizeTodos(raw);
       const state: ToolStateUpdate = { kind: 'todos', todos };
       const done = todos.filter((item) => item.status === 'completed').length;
+      const next = nextTodo(todos);
       return {
         content:
           'The list of tasks has ' +
           todos.length +
           ' items, ' +
           done +
-          ' of them are done.',
+          ' of them are done.' +
+          (next ? ' Next by priority: ' + next.content + '.' : ''),
         state
       };
     }
