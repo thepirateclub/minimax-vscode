@@ -25,3 +25,5 @@ dist/preview/**
 .worktrees/**
 analysis/**
 scripts/**
+reports/**
+research_notes/**
