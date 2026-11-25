@@ -88,6 +88,14 @@ function renderHeader(version: string, quota?: UiQuota): string {
 }
 
 describe('panel layout', () => {
+  // An inline ::before is text for the caret: the caret stood after the
+  // words of the placeholder until the first key.
+  it('keeps the placeholder out of the flow of the text, the caret stands at the start', () => {
+    expect(rule('.composer-input.is-empty::before')).toMatch(/position:\s*absolute/);
+    expect(rule('.composer-input.is-empty::before')).toMatch(/pointer-events:\s*none/);
+    expect(rule('.composer-input')).toMatch(/position:\s*relative/);
+  });
+
   // The limits of the M Plan stand in the header: the 5-hour window and the
   // week, between the graph and the count of the tokens.
   it('shows the limits as two bars with the share left', () => {

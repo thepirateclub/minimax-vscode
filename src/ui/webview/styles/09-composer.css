@@ -36,6 +36,8 @@
   /* The room on the right belongs to the paperclip. */
   padding: 6px 32px 2px 8px;
   outline: none;
+  /* The anchor of the placeholder. */
+  position: relative;
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -46,9 +48,17 @@
   color: var(--muted);
 }
 
-/* the placeholder lives in the attribute, the field itself stays empty */
+/* The placeholder lives in the attribute, the field itself stays empty. It
+   stands out of the flow of the text: an inline ::before is text for the
+   caret, the caret stood after the words of the placeholder until the first
+   key. Out of the flow the caret stands at the start of the field, over the
+   placeholder, and the placeholder goes with the first character. */
 .composer-input.is-empty::before {
   content: attr(data-placeholder);
+  position: absolute;
+  top: 6px;
+  left: 8px;
+  right: 32px;
   color: var(--muted);
   pointer-events: none;
 }
