@@ -6,6 +6,17 @@ A VS Code extension with a full coding agent powered by MiniMax models. The agen
 
 ![The MiniMax agent panel in VS Code](docs/work_chat.png)
 
+## How the project was written
+
+Most of the project was written with the help of MiniMax models. The shares are counted from the repository history:
+
+| Model | Lines of code | Share |
+| --- | --- | --- |
+| MiniMax | 90 723 | 93.9% |
+| Claude Opus 5.5 | 5 930 | 6.1% |
+
+The lines come from `git log --numstat`: in a commit with co-authors the lines are split equally between the author and the co-authors. By commits the picture is the same, 299 credits for MiniMax against 59 for Claude Opus 5.5.
+
 ## Features
 
 - Chat with MiniMax M3.1 Flash and MiniMax M3 in the right-hand VS Code panel (Secondary Side Bar)
