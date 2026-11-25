@@ -1,3 +1,5 @@
+import { notesFor } from './host/notes';
+import type { Notes } from './notes/sqlite';
 import { createMcpState, startMcp, stopMcp } from './host/mcp';
 import { discoverSkills } from './skills/skills';
 import { toUiQuota } from './ui/quotaMeter';
@@ -71,6 +73,8 @@ export class MiniMaxController {
   quota: QuotaSnapshot | undefined;
   // The running MCP servers and their tools.
   readonly mcp = createMcpState();
+  // The notes of the agent, one store per workspace folder.
+  readonly notes = new Map<string, Promise<Notes>>();
   // When every action started, the duration goes to the panel.
   readonly toolStarted = new Map<string, number>();
   // The voice input: ffmpeg records, MiniMax asr-1.0 transcribes.
@@ -124,7 +128,8 @@ export class MiniMaxController {
           return key ? { baseUrl: resolveBaseUrl(settings.baseUrl, settings.customBaseUrl), apiKey: key } : undefined;
         },
         webSearchEnabled: () => getSettings().enableWebSearch
-      }
+      },
+      notes: async (root) => await notesFor(this, root)
     })) {
       this.registry.register(tool);
     }

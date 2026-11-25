@@ -333,6 +333,24 @@ export const DESCRIBERS: Record<string, Describer> = {
   understand_image: ({ input }) => {
     return { icon: <IconRead />, title: STRINGS.toolUnderstandImage + ' ' + text(input['image']), summary: '' };
   },
+  note_write: ({ input }) => ({
+    icon: <IconWrite />,
+    title: (text(input['content']).length > 0 ? STRINGS.toolNoteWrite : STRINGS.toolNoteDelete) + ' ' + text(input['key']),
+    summary: ''
+  }),
+  note_read: ({ input }) => ({
+    icon: <IconRead />,
+    title: STRINGS.toolNoteRead + ' ' + (Array.isArray(input['keys']) ? input['keys'].map(String).join(', ') : ''),
+    summary: ''
+  }),
+  note_search: ({ input }) => ({ icon: <IconSearch />, title: STRINGS.toolNoteSearch + ' ' + text(input['query']), summary: '' }),
+  read_symbol: ({ input }) => ({
+    icon: <IconRead />,
+    title:
+      STRINGS.toolReadSymbol + ' ' + text(input['path']) + ' ' +
+      (Array.isArray(input['names']) ? input['names'].map(String).join(', ') : ''),
+    summary: ''
+  }),
   get_goal: ({}) => {
     return { icon: <IconCheck />, title: STRINGS.toolGetGoal, summary: '' };
   },

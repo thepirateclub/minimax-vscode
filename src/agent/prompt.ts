@@ -162,6 +162,22 @@ const TOOL_LINES: Array<{ name: string; line: string }> = [
       '- task(description, prompt, role?) - start a sub-agent that works on its own and answers with a report, the role is "explore" (reads), "worker" (changes files) or "verifier" (checks the work and runs the tests of the project)'
   },
   {
+    name: 'note_write',
+    line: '- note_write(key, content) - keep a note of the work in .minimax/agent of the project, an empty content deletes it'
+  },
+  {
+    name: 'note_read',
+    line: '- note_read(keys) - read several notes by their keys'
+  },
+  {
+    name: 'note_search',
+    line: '- note_search(query) - find notes by the words of their key or text'
+  },
+  {
+    name: 'read_symbol',
+    line: '- read_symbol(path, names) - read the bodies of functions, methods, classes and constants of a file by their names, with line numbers'
+  },
+  {
     name: 'read_skill',
     line: '- read_skill(name, file?) - read a skill of the Skills section before a task it covers, and the files of the skill'
   },
@@ -226,6 +242,11 @@ export function buildSystemPrompt(context: PromptContext): string {
     '- Never run a git command in the terminal, the git tools do the same work and read the output of git in the code: git_status, git_diff, git_log, git_show, git_branch, git_blame, git_stage, git_commit, git_branch_create, git_checkout, git_merge, git_tag, git_worktree_list, git_worktree_add, git_worktree_remove.',
     '- When the work has more than one step, keep the tasks of the project in its file with tasks_update: add a task when the plan starts and mark it as done with the action complete when it is done. Update the status of the tasks as the work goes, not at the end of it. Use todo_write as well, it is the list of the session that the reader sees over the chat.',
     '- After a tool returns, use its output. Never guess the content of a file you have not read.',
+    '- Keep your scratch in your notes: a piece of code you study, a finding, a plan, a list of places to change goes to note_write, never to a file of the project such as tmp/ or notes.txt. Read the notes back with note_read and note_search instead of reading such files again.',
+    '- Read the functions, the methods and the classes you need with read_symbol, several names in one call, instead of cutting them out of a file into another file.',
+    plan
+      ? '- Your notes live in .minimax/agent/ of the project. On the first turn of a chat, read .gitignore and tell the user if it does not ignore .minimax/agent/.'
+      : '- Your notes live in .minimax/agent/ of the project. As the first action of a chat, read .gitignore and check that it ignores .minimax/agent/; if it does not, add the line .minimax/agent/ to it with edit_file before you write any note.',
     '- Report what you changed and what you verified. State plainly when something failed.',
     '- Answer in the language of the user request.',
     '',

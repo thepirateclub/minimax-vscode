@@ -1,3 +1,5 @@
+import { notesFor } from './notes';
+import { renderNotes } from '../notes/store';
 import { discoverSkills, renderSkills } from '../skills/skills';
 import type { MiniMaxController } from '../extension';
 import type { RuntimeSession } from './runtime';
@@ -77,6 +79,12 @@ export async function sessionContext(host: MiniMaxController, runtime: RuntimeSe
   const skills = root ? renderSkills(await discoverSkills(root).catch(() => [])) : '';
   if (skills.length > 0) {
     parts.push(skills);
+  }
+  // The notes of the agent: their keys, the text comes with note_read.
+  const notes = root ? await notesFor(host, root).then((store) => store?.list() ?? []).catch(() => []) : [];
+  const noteSection = renderNotes(notes);
+  if (noteSection.length > 0) {
+    parts.push(noteSection);
   }
   const tasks = renderTasksContext(runtime.todos);
   if (tasks.length > 0) {

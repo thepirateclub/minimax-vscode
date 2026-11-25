@@ -14,6 +14,7 @@ import { createTerminalTools } from './terminal';
 import { createTodoTools } from './todo';
 import { createSkillTools } from './skills';
 import { createWebTools, type WebToolOptions } from './web';
+import { createNoteTools, type NoteToolOptions } from './notes';
 import type { Skill } from '../skills/skills';
 import type { ToolEntry } from './types';
 
@@ -33,6 +34,8 @@ export interface AllToolDeps {
   skills?: (workspaceRoot: string) => Promise<Skill[]>;
   // The web search and the vision model of the M Plan, absent in the tests.
   web?: WebToolOptions;
+  // The notes of the agent in .minimax/agent, absent in the tests.
+  notes?: NoteToolOptions['notes'];
 }
 
 export function createAllTools(deps: AllToolDeps): ToolEntry[] {
@@ -49,6 +52,7 @@ export function createAllTools(deps: AllToolDeps): ToolEntry[] {
     ...createGoalTools(),
     ...createTaskTools({ spawn: deps.spawn }),
     ...createSkillTools({ skills: deps.skills ?? (async () => []) }),
-    ...createWebTools(deps.web ?? { connection: async () => undefined, webSearchEnabled: () => false })
+    ...createWebTools(deps.web ?? { connection: async () => undefined, webSearchEnabled: () => false }),
+    ...createNoteTools({ notes: deps.notes ?? (async () => undefined) })
   ];
 }
