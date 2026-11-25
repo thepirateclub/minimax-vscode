@@ -60,3 +60,22 @@ describe('parseAgentLog', () => {
     expect(parseAgentLog(['{"tool":'])[0]).toMatchObject({ name: '{"tool":', state: 'running' });
   });
 });
+
+// The rows of a sub-agent stand on the same timeline as the cards: the
+// start carries its moment, the end its duration.
+describe('the moments of the actions of a sub-agent', () => {
+  it('reads the moment of the start and the duration of the end', () => {
+    expect(
+      parseAgentLog(['{"tool":"read_file","input":{"path":"a.ts"},"at":1000}', 'read_file done 250ms'])
+    ).toEqual([
+      { name: 'read_file', target: '', input: { path: 'a.ts' }, at: 1000, durationMs: 250, state: 'done', added: 0, removed: 0 }
+    ]);
+  });
+
+  it('reads the end with a duration as an end and not as a target', () => {
+    expect(parseAgentLog(['{"tool":"git_status","input":{}}', 'git_status failed 12ms'])[0]).toMatchObject({
+      state: 'failed',
+      durationMs: 12
+    });
+  });
+});

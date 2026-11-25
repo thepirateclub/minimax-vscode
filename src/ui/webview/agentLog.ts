@@ -12,6 +12,9 @@ export interface AgentLogRow {
   target: string;
   // The input of the action without its payload, absent in an old chat.
   input?: Record<string, unknown>;
+  // When the action started and how long it took, absent in an old chat.
+  at?: number;
+  durationMs?: number;
   state: AgentLogState;
   added: number;
   removed: number;
@@ -37,7 +40,15 @@ export function parseAgentLog(lines: readonly string[]): AgentLogRow[] {
     }
     const start = parseStart(line);
     if (start) {
-      open = { name: start.tool, target: '', input: start.input, state: 'running', added: 0, removed: 0 };
+      open = {
+        name: start.tool,
+        target: '',
+        input: start.input,
+        ...(start.at !== undefined ? { at: start.at } : {}),
+        state: 'running',
+        added: 0,
+        removed: 0
+      };
       last = undefined;
       rows.push(open);
       continue;
@@ -47,8 +58,13 @@ export function parseAgentLog(lines: readonly string[]): AgentLogRow[] {
     const rest = space === -1 ? '' : line.slice(space + 1);
     // An end line closes the open action of the same tool, otherwise the
     // word is the target of a new action (a file can be named done).
-    if (open && open.name === name && (rest === 'done' || rest === 'failed')) {
-      open.state = rest;
+    // The end may carry the duration: `name done 250ms`.
+    const end = /^(done|failed)(?: (\d+)ms)?$/.exec(rest);
+    if (open && open.name === name && end) {
+      open.state = end[1] === 'done' ? 'done' : 'failed';
+      if (end[2] !== undefined) {
+        open.durationMs = Number(end[2]);
+      }
       last = open;
       open = undefined;
       continue;
@@ -60,7 +76,7 @@ export function parseAgentLog(lines: readonly string[]): AgentLogRow[] {
   return rows;
 }
 
-function parseStart(line: string): { tool: string; input: Record<string, unknown> } | undefined {
+function parseStart(line: string): { tool: string; input: Record<string, unknown>; at?: number } | undefined {
   if (!line.startsWith('{')) {
     return undefined;
   }
@@ -76,7 +92,12 @@ function parseStart(line: string): { tool: string; input: Record<string, unknown
       return undefined;
     }
     // The check above makes the input a plain object of the json.
-    return { tool, input: input as Record<string, unknown> };
+    const at = record['at'];
+    return {
+      tool,
+      input: input as Record<string, unknown>,
+      ...(typeof at === 'number' ? { at } : {})
+    };
   } catch {
     return undefined;
   }

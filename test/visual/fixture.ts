@@ -5,8 +5,13 @@ import type { UiMessage, UiSessionSummary, UiUsageTurn } from '../../src/ui/prot
 const README = Array.from({ length: 14 }, (_, i) => `${i + 1}: ${i % 3 === 0 ? 'import { join } from \'node:path\';' : i % 3 === 1 ? 'export function run(args: string[]): number {' : '  return args.length; // count'}`).join('\n');
 
 // The start of an action of a sub-agent, the form of src/host/child.ts.
+// The actions of the child started yesterday at 14:02, one every 15 seconds.
+let childStep = 0;
 function start(tool: string, input: Record<string, string>): string {
-  return JSON.stringify({ tool, input });
+  const at = new Date();
+  at.setDate(at.getDate() - 1);
+  at.setHours(14, 2, 0, 0);
+  return JSON.stringify({ tool, input, at: at.getTime() + childStep++ * 15_000 });
 }
 
 // The moments of the chat: it started yesterday at 14:00, a message every
@@ -93,15 +98,15 @@ export const MESSAGES: UiMessage[] = stamped([
       // The journal in the form of the host (src/host/child.ts).
       progress: [
         start('list_files', { path: 'src/ui' }),
-        'list_files done',
+        'list_files done 1840ms',
         start('search_code', { query: 'formatCount', path: 'src' }),
-        'search_code done',
+        'search_code done 1840ms',
         start('read_file', { path: 'src/ui/statusBar.ts' }),
-        'read_file done',
+        'read_file done 1840ms',
         start('read_file', { path: 'src/ui/webview/components/Header.tsx' }),
-        'read_file failed',
+        'read_file failed 1840ms',
         start('edit_file', { path: 'src/ui/format.ts' }),
-        'edit_file done',
+        'edit_file done 1840ms',
         '+ export const B = 1e9;',
         '- export const M = 1e6;',
         '+ export const M = 1e6;',

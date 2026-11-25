@@ -43,6 +43,11 @@ export function registryForRole(host: MiniMaxController, role: TaskRole): ToolRe
 }
 
 
+// The starts of the actions of the children: the end line of the journal
+// carries the duration, the rows stand on the timeline like the cards.
+const childStarted = new Map<string, number>();
+
+
 export function handleChildEvent(host: MiniMaxController, runtime: RuntimeSession,
   event: AgentEvent,
   progress: (line: string) => void): void {
@@ -54,11 +59,16 @@ export function handleChildEvent(host: MiniMaxController, runtime: RuntimeSessio
     // The start of the action carries its input without the payload: the
     // panel names the action like a card of the parent. The content of a
     // file is not a line of the journal.
-    progress(JSON.stringify({ tool: event.name, input: actionInput(event.input) }));
+    const at = Date.now();
+    childStarted.set(event.id, at);
+    progress(JSON.stringify({ tool: event.name, input: actionInput(event.input), at }));
     return;
   }
   if (event.type === 'tool_end') {
-    progress(event.name + (event.isError ? ' failed' : ' done'));
+    const started = childStarted.get(event.id);
+    childStarted.delete(event.id);
+    const duration = started === undefined ? '' : ' ' + Math.max(0, Date.now() - started) + 'ms';
+    progress(event.name + (event.isError ? ' failed' : ' done') + duration);
     // The change of the child must not be lost: the lines of the diff go
     // into the journal of the call.
     if (event.diff) {

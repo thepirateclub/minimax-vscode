@@ -2,6 +2,7 @@ import { renderMarkdown } from '../markdown';
 import { parseAgentLog, type AgentLogRow } from '../agentLog';
 import { STRINGS } from '../strings';
 import { describe } from './toolDescriptions';
+import { formatDuration, formatStamp, fullStamp } from '../../format';
 
 // The card of a sub-agent: the actions of the child on the top, the answer
 // of the child under it. The actions are the rows of the feed in small: the
@@ -47,7 +48,15 @@ function AgentLogItem({ row }: { row: AgentLogRow }) {
         ? STRINGS.toolFailed
         : STRINGS.toolDone;
   return (
-    <li className={'agent-log-row' + (row.state === 'failed' ? ' agent-log-failed' : '')}>
+    // A point of the timeline, the same as a card of the group of actions:
+    // the node on the guide line carries the state, the tail the moment.
+    <li
+      className={
+        'agent-log-row timeline-item timeline-' + row.state +
+        (row.state === 'failed' ? ' agent-log-failed' : '')
+      }
+    >
+      <span className="timeline-node" aria-hidden="true" />
       {view ? <span className="tool-icon">{view.icon}</span> : null}
       <span className="agent-log-title" title={view?.title}>
         {view ? view.title : STRINGS.toolFailed}
@@ -57,11 +66,23 @@ function AgentLogItem({ row }: { row: AgentLogRow }) {
       {row.removed > 0 ? (
         <span className="tool-stat tool-stat-remove">-{row.removed}</span>
       ) : null}
-      <span
-        className={'tool-dot tool-dot-' + row.state}
-        title={status}
-        aria-label={status}
-      />
+      <span className="tool-tail">
+        {row.at !== undefined ? (
+          <span className="tool-stamp" title={STRINGS.startedAt + ' ' + fullStamp(row.at)}>
+            {formatStamp(row.at)}
+          </span>
+        ) : null}
+        {row.durationMs !== undefined ? (
+          <span className="tool-time" title={STRINGS.toolElapsed}>
+            {formatDuration(row.durationMs)}
+          </span>
+        ) : null}
+        <span
+          className={'tool-dot tool-dot-' + row.state}
+          title={status}
+          aria-label={status}
+        />
+      </span>
     </li>
   );
 }
