@@ -1,3 +1,4 @@
+import type { TodoItem } from './state';
 import type { Usage } from '../api/types';
 import type { ToolRegistry } from '../tools/registry';
 import { buildPreview } from '../tools/preview';
@@ -20,6 +21,35 @@ export function progressCheck(before: number, after: number): string | undefined
   return (
     '\n\n[Progress check: ' + after + ' actions in this turn. Before the next tool call, write the user 2-4 short lines: ' +
     'what is done, what is left, and whether the plan changed. Then continue the work.]'
+  );
+}
+
+// The model forgot its list of tasks: the step was done long ago and still
+// stood open. After TODO_EVERY actions without todo_write, while a task is
+// open, the last result reminds it of the current task.
+export const TODO_EVERY = 6;
+
+export function todoCheck(todos: readonly TodoItem[], sinceWrite: number): string | undefined {
+  if (sinceWrite < TODO_EVERY) {
+    return undefined;
+  }
+  const done = todos.filter((item) => item.status === 'completed').length;
+  const working = todos.find((item) => item.status === 'in_progress');
+  if (working) {
+    return (
+      '\n\n[Task list: ' + done + ' of ' + todos.length + ' done, the current task is "' + working.content + '". ' +
+      'If it is finished, mark it completed with todo_write now and set the next task in_progress: the user follows the list.]'
+    );
+  }
+  // No task stands in progress: the reader does not see where the work is.
+  const next = todos.find((item) => item.status === 'pending');
+  if (!next) {
+    return undefined;
+  }
+  return (
+    '\n\n[Task list: ' + done + ' of ' + todos.length + ' done and no task is in_progress. ' +
+    'Call todo_write now: mark the finished tasks completed and set the task you work on in_progress, next by priority is "' +
+    next.content + '".]'
   );
 }
 

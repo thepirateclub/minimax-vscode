@@ -61,7 +61,7 @@ export function createTodoTools(): ToolEntry[] {
   const todoWrite: ToolEntry = {
     name: 'todo_write',
     description:
-      'Write the list of tasks of the session. The list is replaced by the new one, so send every task every time. Use it to show the plan and the progress to the user. The priority is the order of the work: the list is kept ordered by priority, very_high first, and you take the first task that is not completed.',
+      'Write the list of tasks of the session. The list is replaced by the new one, so send every task every time. Use it to show the plan and the progress to the user. The priority is the order of the work: the list is kept ordered by priority, very_high first, and you take the first task that is not completed. Keep exactly one task in_progress: set it in_progress when you start it, and mark it completed right after it is done, not at the end of the work.',
     approval: 'never',
     sideEffect: false,
     inputSchema: {
@@ -120,7 +120,10 @@ export function createTodoTools(): ToolEntry[] {
           ' items, ' +
           done +
           ' of them are done.' +
-          (next ? ' Next by priority: ' + next.content + '.' : ''),
+          (next ? ' Next by priority: ' + next.content + '.' : '') +
+          // The model left the list without a current task: the reader did
+          // not see where the work stood.
+          (next && next.status === 'pending' ? ' No task is in_progress: set the task you work on in_progress.' : ''),
         state
       };
     }
