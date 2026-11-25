@@ -1,6 +1,9 @@
 import type { MiniMaxController } from '../extension';
 import type { RuntimeSession } from './runtime';
 import type { UiSelection } from '../ui/protocol';
+import { moveQueued } from './queueMachine';
+export { moveQueued, queueMachine } from './queueMachine';
+export type { QueueEvent } from './queueMachine';
 import { persist } from './sessions';
 import { postFor } from './channel';
 import { runTurn } from './turn';
@@ -19,11 +22,9 @@ export function sendQueued(host: MiniMaxController, id: string): void {
     return;
   }
   const item = runtime.queue[index]!;
-  if (item.state === 'sending') {
+  if (!moveQueued(item, 'retry')) {
     return;
   }
-  item.state = 'waiting';
-  item.error = undefined;
   runtime.queue.splice(index, 1);
   runtime.queue.unshift(item);
   runtime.queuePaused = false;
@@ -46,11 +47,8 @@ export function sendAllQueued(host: MiniMaxController): void {
     return;
   }
   runtime.queuePaused = false;
-  for (const item of runtime.queue) {
-    if (item.state === 'error') {
-      item.state = 'waiting';
-      item.error = undefined;
-    }
+  for (const item of runtime.queue.filter((queued) => queued.state === 'error')) {
+    moveQueued(item, 'retry');
   }
   postQueue(host, runtime);
   void pumpQueue(host, runtime);
@@ -66,6 +64,7 @@ export function removeQueued(host: MiniMaxController, id: string): void {
   if (index === -1) {
     return;
   }
+  // A message that goes out now belongs to the turn, it is not removed.
   if (runtime.queue[index]!.state === 'sending') {
     return;
   }
@@ -124,7 +123,7 @@ export async function pumpQueue(host: MiniMaxController, runtime: RuntimeSession
   if (!next) {
     return;
   }
-  next.state = 'sending';
+  moveQueued(next, 'send');
   postQueue(host, runtime);
   await runTurn(host, runtime, next.text, next.mentions, next.selections, next);
 }

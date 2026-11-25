@@ -1,3 +1,4 @@
+import { moveStatus } from '../ui/statusMachine';
 import type { MiniMaxController } from '../extension';
 import type { AgentState, ExtToWeb } from '../ui/protocol';
 import type { RuntimeSession } from './runtime';
@@ -14,6 +15,13 @@ export function setState(host: MiniMaxController, state: AgentState, runtime?: R
   // background do not write into the open one, and the chat keeps its
   // own dot for the moment the reader opens it again.
   const owner = runtime ?? host.activeSession();
+  // The state goes through the machine of the status: an unreachable one is
+  // a defect of the host, it is logged and the state stays.
+  const move = moveStatus(owner?.state ?? host.agentState, state);
+  if (!move.ok) {
+    host.logger.error(move.reason);
+    return;
+  }
   if (owner) {
     owner.state = state;
   }

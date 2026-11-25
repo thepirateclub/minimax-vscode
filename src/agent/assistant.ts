@@ -1,129 +1,57 @@
 import type { StreamEvent } from '../api/types';
 import type { AgentEvent } from './types';
+import { defineMachine, step } from '../fsm/machine';
 
-// The step of the process: the events of the panel and the state that comes
-// next.
-export interface AssistantStep {
-  events: AgentEvent[];
-  state: AssistantState;
+// The message of the assistant in the panel as a state machine. The
+// message starts empty, the answer and the reasoning join it. The first
+// delta of a turn opens the message (`assistant_start`): the text of the
+// next answer goes to its own bubble.
+
+export type AssistantMessageState = 'empty' | 'answer' | 'reasoning' | 'mixed';
+export type DeltaKind = 'answer' | 'reasoning';
+
+export const assistantMachine = defineMachine<AssistantMessageState, DeltaKind>('assistant message', 'empty', [
+  { from: 'empty', on: 'answer', to: 'answer' },
+  { from: 'empty', on: 'reasoning', to: 'reasoning' },
+  { from: 'answer', on: 'answer', to: 'answer' },
+  { from: 'answer', on: 'reasoning', to: 'mixed' },
+  { from: 'reasoning', on: 'reasoning', to: 'reasoning' },
+  { from: 'reasoning', on: 'answer', to: 'mixed' },
+  { from: 'mixed', on: 'answer', to: 'mixed' },
+  { from: 'mixed', on: 'reasoning', to: 'mixed' }
+]);
+
+export interface AssistantDelta {
+  kind: DeltaKind;
+  text: string;
 }
 
-// The delta of the answer: the answer of the model or its reasoning. The
-// delta knows the event of the panel and how it joins the message.
-export abstract class Delta {
-  constructor(readonly text: string) {}
-
-  // The event of the panel for this delta.
-  abstract event(): AgentEvent;
-
-  // The state of the message when this delta joins the given one.
-  abstract joined(state: AssistantState): AssistantState;
+// The deltas of a stream event: the answer and the reasoning reach the
+// panel, a delta without text is none. A list, so the caller walks it and
+// checks nothing.
+export function deltasOf(event: StreamEvent): AssistantDelta[] {
+  if (event.type === 'text_delta' && event.text) {
+    return [{ kind: 'answer', text: event.text }];
+  }
+  if (event.type === 'thinking_delta' && event.text) {
+    return [{ kind: 'reasoning', text: event.text }];
+  }
+  return [];
 }
 
-// The answer of the model.
-export class AnswerDelta extends Delta {
-  override event(): AgentEvent {
-    return { type: 'assistant_text', text: this.text };
-  }
-
-  override joined(state: AssistantState): AssistantState {
-    return state.withAnswer();
-  }
+function deltaEvent(delta: AssistantDelta): AgentEvent {
+  return delta.kind === 'answer'
+    ? { type: 'assistant_text', text: delta.text }
+    : { type: 'assistant_thinking', text: delta.text };
 }
 
-// The reasoning of the model.
-export class ReasoningDelta extends Delta {
-  override event(): AgentEvent {
-    return { type: 'assistant_thinking', text: this.text };
-  }
-
-  override joined(state: AssistantState): AssistantState {
-    return state.withReasoning();
-  }
-}
-
-// The state of the message of the assistant in the panel. The state knows
-// what it does with a delta and which state comes next: the conditions live
-// in the states and not in the process.
-export abstract class AssistantState {
-  // A delta of the answer: the events of the panel and the state that comes
-  // next.
-  apply(delta: Delta): AssistantStep {
-    return { events: this.events(delta), state: delta.joined(this) };
-  }
-
-  // The events of the panel for a delta of the opened message.
-  protected events(delta: Delta): AgentEvent[] {
-    return [delta.event()];
-  }
-
-  // The state of the message when the answer joins it.
-  abstract withAnswer(): AssistantState;
-
-  // The state of the message when the reasoning joins it.
-  abstract withReasoning(): AssistantState;
-}
-
-// The message of the turn is not created yet.
-export class IdleState extends AssistantState {
-  protected override events(delta: Delta): AgentEvent[] {
-    // The message of the assistant starts with the first delta of the turn:
-    // the text of the next answer goes to its own bubble.
-    return [{ type: 'assistant_start' }, delta.event()];
-  }
-
-  override withAnswer(): AssistantState {
-    return new AnswerState();
-  }
-
-  override withReasoning(): AssistantState {
-    return new ReasoningState();
-  }
-}
-
-// The message holds the answer.
-export class AnswerState extends AssistantState {
-  override withAnswer(): AssistantState {
-    return this;
-  }
-
-  override withReasoning(): AssistantState {
-    return new MixedState();
-  }
-}
-
-// The message holds the reasoning.
-export class ReasoningState extends AssistantState {
-  override withAnswer(): AssistantState {
-    return new MixedState();
-  }
-
-  override withReasoning(): AssistantState {
-    return this;
-  }
-}
-
-// The message holds the reasoning and the answer.
-export class MixedState extends AssistantState {
-  override withAnswer(): AssistantState {
-    return this;
-  }
-
-  override withReasoning(): AssistantState {
-    return this;
-  }
-}
-
-// The factory of the deltas: the stream comes as a union of events, the
-// machine works with the objects. Only the answer and the reasoning reach
-// the panel, a delta without text is no delta at all.
-export function deltaOf(event: StreamEvent): Delta | null {
-  switch (event.type) {
-    case 'text_delta':
-      return event.text ? new AnswerDelta(event.text) : null;
-    case 'thinking_delta':
-      return event.text ? new ReasoningDelta(event.text) : null;
-    default:
-      return null;
-  }
+// One delta: the state after it and the events of the panel. The table
+// covers every pair, the step always goes.
+export function applyDelta(
+  state: AssistantMessageState,
+  delta: AssistantDelta
+): { state: AssistantMessageState; events: AgentEvent[] } {
+  const next = step(assistantMachine, state, delta.kind);
+  const events: AgentEvent[] = state === 'empty' ? [{ type: 'assistant_start' }, deltaEvent(delta)] : [deltaEvent(delta)];
+  return { state: next.state, events };
 }

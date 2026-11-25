@@ -5,7 +5,7 @@ import type { MiniMaxController } from '../extension';
 import type { RuntimeSession } from './runtime';
 import type { UiSelection, QueuedMessage } from '../ui/protocol';
 import type { TurnAnchor } from '../agent/turns';
-import { enqueue, postQueue, pumpQueue } from './queue';
+import { enqueue, moveQueued, postQueue, pumpQueue } from './queue';
 import { setState } from './channel';
 import { persist, startNewSession, postHistory } from './sessions';
 import { stopNotice } from '../agent/stopReason';
@@ -75,8 +75,7 @@ export async function runTurn(host: MiniMaxController, runtime: RuntimeSession,
     // user does not lose it.
     host.panel.post({ type: 'restore_input', text, mentions, selections });
     if (queued) {
-      queued.state = 'error';
-      queued.error = 'The budget of the goal is exhausted.';
+      moveQueued(queued, 'fail', 'The budget of the goal is exhausted.');
       postQueue(host, runtime);
     }
     return;
@@ -85,8 +84,7 @@ export async function runTurn(host: MiniMaxController, runtime: RuntimeSession,
   if (!agent) {
     runtime.busy = false;
     if (queued) {
-      queued.state = 'error';
-      queued.error = 'No API key, the request did not go out.';
+      moveQueued(queued, 'fail', 'No API key, the request did not go out.');
       postQueue(host, runtime);
     }
     return;
@@ -149,14 +147,12 @@ export async function runTurn(host: MiniMaxController, runtime: RuntimeSession,
       if (runtime.turnStopped) {
         // The user stopped the turn, the message waits for the next
         // command. The queue is on hold until the reader asks for it.
-        queued.state = 'waiting';
-        queued.error = undefined;
+        moveQueued(queued, 'stop');
         runtime.queuePaused = !runtime.sendNow;
       } else if (runtime.errorReported) {
-        queued.state = 'error';
-        queued.error = runtime.lastError;
+        moveQueued(queued, 'fail', runtime.lastError);
       } else {
-        queued.state = 'done';
+        moveQueued(queued, 'sent');
       }
       postQueue(host, runtime);
     }
