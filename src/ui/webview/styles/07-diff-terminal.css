@@ -233,6 +233,33 @@
   overflow-wrap: anywhere;
 }
 
+/* The code of a block of the REPL stands where the command of a terminal
+   stands: on the ground of the head, with the colors of its language. A
+   long block scrolls, the output under it stays in sight. The room on the
+   right belongs to the copy button. */
+.repl-code {
+  margin: 0;
+  max-height: 240px;
+  overflow: auto;
+  padding: 6px 32px 6px 8px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  font-family: var(--mono);
+  font-size: var(--fs-sm);
+  line-height: var(--lh);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.repl-code-line {
+  display: block;
+}
+
+.repl .term-head .tool-copy {
+  top: 4px;
+  transform: none;
+}
+
 .term-line-error {
   color: var(--err);
 }

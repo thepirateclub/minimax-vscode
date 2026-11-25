@@ -178,6 +178,17 @@ export const MESSAGES: UiMessage[] = stamped([
     role: 'tool',
     tool: { id: 't6', name: 'run_terminal', input: { command: 'npm run typecheck' }, running: true }
   },
+  {
+    id: 't-repl',
+    role: 'tool',
+    tool: {
+      id: 't-repl',
+      name: 'repl_python',
+      input: { code: 'import json\nrows = json.load(open("package.json"))\nprint(rows["version"])\nlen(rows["contributes"]["configuration"]["properties"])' },
+      content: '0.24.0\n[stderr] DeprecationWarning: open() without encoding\n41',
+      durationMs: 182
+    }
+  },
   { id: 'n1', role: 'notice', text: 'Cannot open src/missing.ts: the file does not exist.' },
   {
     id: 'ap1',

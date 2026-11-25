@@ -13,6 +13,7 @@ import { todoItems } from '../todoItems';
 import { DiffView } from './DiffView';
 import { FileReadView } from './FileReadView';
 import { TerminalView } from './TerminalView';
+import { ReplView } from './ReplView';
 import { CopyButton } from './CopyButton';
 import { formatDuration, formatStamp, fullStamp } from '../../format';
 import { describe } from './toolDescriptions';
@@ -111,6 +112,13 @@ export function ToolCard({
           ) : tool.name === 'run_terminal' || tool.name === 'run_cmd' ? (
             <TerminalView
               command={String(tool.input['command'] ?? '')}
+              content={tool.content ?? ''}
+              running={tool.running === true}
+            />
+          ) : tool.name === 'repl_node' || tool.name === 'repl_python' ? (
+            <ReplView
+              toolName={tool.name}
+              code={String(tool.input['code'] ?? '')}
               content={tool.content ?? ''}
               running={tool.running === true}
             />

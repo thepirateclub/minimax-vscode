@@ -28,6 +28,9 @@ interface ReplWaiter {
 interface ReplProcess {
   child: ChildProcessWithoutNullStreams;
   buffer: string;
+  // What the process wrote to stderr past the bootstrap: a native module, a
+  // child process. It goes with the next answer.
+  stderr: string;
   waiters: ReplWaiter[];
   dead: boolean;
 }
@@ -145,8 +148,23 @@ function drain(proc: ReplProcess): void {
       return;
     }
     clearTimeout(waiter.timer);
-    waiter.resolve(parseReplPayload(payload));
+    waiter.resolve(withStderr(parseReplPayload(payload), proc));
   }
+}
+
+const MAX_STDERR_CHARS = 10_000;
+
+function withStderr(payload: ReplPayload, proc: ReplProcess): ReplPayload {
+  const text = proc.stderr.trim();
+  proc.stderr = '';
+  if (text.length === 0) {
+    return payload;
+  }
+  const marked = text
+    .split(/\r?\n/)
+    .map((line) => '[stderr] ' + line)
+    .join('\n');
+  return { ...payload, output: payload.output.length > 0 ? payload.output + '\n' + marked : marked };
 }
 
 function startProcess(
@@ -166,11 +184,17 @@ function startProcess(
       MINIMAX_REPL_ERROR_MARK: REPL_ERROR_MARK
     }
   });
-  const proc: ReplProcess = { child, buffer: '', waiters: [], dead: false };
+  const proc: ReplProcess = { child, buffer: '', stderr: '', waiters: [], dead: false };
   child.stdout.setEncoding('utf8');
   child.stdout.on('data', (chunk: string) => {
     proc.buffer += chunk;
     drain(proc);
+  });
+  // The pipe of stderr is read always: a full pipe stops the process, and the
+  // block waits for its timeout.
+  child.stderr.setEncoding('utf8');
+  child.stderr.on('data', (chunk: string) => {
+    proc.stderr = (proc.stderr + chunk).slice(-MAX_STDERR_CHARS);
   });
   child.on('error', () => {
     stopProcess(proc);

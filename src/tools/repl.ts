@@ -9,7 +9,7 @@ export function createReplTools(): ToolEntry[] {
   const node: ToolEntry = {
     name: 'repl_node',
     description:
-      'Run JavaScript in a persistent Node.js REPL that belongs to this chat. The process stays alive between the calls, so the variables, the functions and the imports of the previous call are still there. The code runs in the workspace root. Use it to try an idea quickly, to look at the data of the project or to keep a state between the steps of the work. The tool returns the output of the code and the value of the last expression.',
+      'Run JavaScript in a persistent Node.js REPL that belongs to this chat. The process stays alive between the calls, so the variables, the functions and the imports of the previous call are still there. The code runs in the workspace root. Use it to try an idea quickly, to look at the data of the project or to keep a state between the steps of the work. The tool returns the output of the code and the value of the last expression. Top-level await works, a promise on the last line is awaited, and a block may declare the same const or let again.',
     approval: 'always',
     // Код выполняется, инструмент меняет систему.
     sideEffect: true,
