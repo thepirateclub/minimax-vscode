@@ -207,7 +207,7 @@ export function renderTasksContext(todos: TodoItem[]): string {
     return '';
   }
   return [
-    'Tasks:',
+    'Tasks: ordered by priority, take the first one that is not completed.',
     ...todos.map(
       (item) => '- [' + item.status + '] ' + item.content + ' (' + item.priority + ')'
     )

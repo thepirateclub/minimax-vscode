@@ -154,7 +154,9 @@ describe('extension activation', () => {
     const body = JSON.parse(state.bodies[2]!) as { system: string };
     expect(body.system).toContain('Tasks:');
     expect(body.system).toContain('- [pending] Read the parser (high)');
-    expect(body.system).toContain('\nTasks:\n- [pending] Read the parser (high)');
+    expect(body.system).toContain(
+      '\nTasks: ordered by priority, take the first one that is not completed.\n- [pending] Read the parser (high)'
+    );
   });
 
   it('keeps the goal of the session in the state of the host', async () => {

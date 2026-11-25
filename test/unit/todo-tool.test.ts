@@ -95,3 +95,26 @@ describe('the list of tasks', () => {
     });
   });
 });
+
+// The priority is the order of the work, not an arrow only.
+describe('the order of the tasks', () => {
+  it('stands very high first and keeps the order inside one priority', () => {
+    const todos = normalizeTodos([
+      { content: 'a', priority: 'medium' },
+      { content: 'b', priority: 'high' },
+      { content: 'c', priority: 'medium' },
+      { content: 'd', priority: 'very_high' },
+      { content: 'e', priority: 'low' }
+    ]);
+    expect(todos.map((item) => item.content)).toEqual(['d', 'b', 'a', 'c', 'e']);
+  });
+
+  it('names the next task by priority in the result', async () => {
+    const [tool] = createTodoTools();
+    const result = await tool!.execute(
+      { todos: [{ content: 'later', priority: 'low' }, { content: 'first', priority: 'high' }, { content: 'done', priority: 'very_high', status: 'completed' }] },
+      {} as never
+    );
+    expect(result.content).toContain('Next by priority: first.');
+  });
+});
