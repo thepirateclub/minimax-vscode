@@ -11,6 +11,7 @@ README.en.md
 .env.*
 docs/**
 AGENTS.md
+.minimax/**
 esbuild.mjs
 tsconfig.json
 test/**
