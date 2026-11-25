@@ -338,6 +338,10 @@ The key is taken from `MINIMAX_API_KEY` in the environment or from `.env.local` 
 - The original of the file is saved before the write, it can be rolled back.
 - The API key lives only in the secret storage of VS Code, it gets neither into the webview nor into the logs.
 
+## Contributing
+
+The rules of the project live in [AGENTS.md](AGENTS.md), the order of work and the requirements for commits are described in [CONTRIBUTING.md](CONTRIBUTING.md). What is worth closing quietly is written in [SECURITY.md](SECURITY.md). The history of the versions with a description of every release is kept in [CHANGELOG.md](CHANGELOG.md).
+
 ## License
 
 MIT

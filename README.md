@@ -340,7 +340,7 @@ npm run test:live
 
 ## Вклад в проект
 
-Правила проекта лежат в [AGENTS.md](AGENTS.md), порядок работы и требования к коммитам описаны в [CONTRIBUTING.md](CONTRIBUTING.md). О находках, которые стоит закрыть тихо, написано в [SECURITY.md](SECURITY.md).
+Правила проекта лежат в [AGENTS.md](AGENTS.md), порядок работы и требования к коммитам описаны в [CONTRIBUTING.md](CONTRIBUTING.md). О находках, которые стоит закрыть тихо, написано в [SECURITY.md](SECURITY.md). История версий с описанием каждого релиза ведётся в [CHANGELOG.md](CHANGELOG.md).
 
 ## Лицензия
 
