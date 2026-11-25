@@ -90,6 +90,8 @@ const STATE: UiState = {
   state: busy || params.get('steps') === '1' ? 'streaming' : 'idle',
   tokens: 184_320,
   usage: USAGE,
+  // The limits of the M Plan: plenty left in the window, the week asks for care.
+  quota: { fiveHour: 64, weekly: 22, resetsAt: Date.now() + 2 * 3_600_000 + 14 * 60_000 },
   hasApiKey: params.get('nokey') !== '1',
   theme: themeKind,
   fontSize: 13,

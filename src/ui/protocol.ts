@@ -163,6 +163,8 @@ export interface UiUsageTurn {
   cache: number;
 }
 
+import type { UiQuota } from './quotaMeter';
+
 export interface UiState {
   sessions: UiSessionSummary[];
   activeSessionId: string | undefined;
@@ -179,6 +181,8 @@ export interface UiState {
   state: AgentState;
   tokens: number;
   usage: UiUsageTurn[];
+  // The limits of the M Plan, absent until the first answer of the server.
+  quota?: UiQuota;
   hasApiKey: boolean;
   theme: ThemeKind;
   // The size of the font of the panel in pixels.
@@ -228,6 +232,7 @@ export type ExtToWeb =
   | { type: 'status'; state: AgentState; tokens?: number }
   | { type: 'theme'; kind: ThemeKind }
   | { type: 'usage'; turns: UiUsageTurn[] }
+  | { type: 'quota'; quota: UiQuota }
   // The list of tasks of the session, the model writes it.
   | { type: 'todos'; todos: TodoItem[] }
   // The goal of the session, the host owns it.

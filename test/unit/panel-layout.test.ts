@@ -1,3 +1,4 @@
+import type { UiQuota } from '../../src/ui/quotaMeter';
 import { describe, expect, it } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -64,7 +65,7 @@ function renderComposer(
   );
 }
 
-function renderHeader(version: string): string {
+function renderHeader(version: string, quota?: UiQuota): string {
   return renderToStaticMarkup(
     createElement(Header, {
       tab: 'chat',
@@ -72,6 +73,7 @@ function renderHeader(version: string): string {
       state: 'idle',
       tokens: 0,
       usage: [],
+      quota,
       hasApiKey: true,
       sessions: [],
       activeSessionId: undefined,
@@ -86,6 +88,22 @@ function renderHeader(version: string): string {
 }
 
 describe('panel layout', () => {
+  // The limits of the M Plan stand in the header: the 5-hour window and the
+  // week, between the graph and the count of the tokens.
+  it('shows the limits as two bars with the share left', () => {
+    const markup = renderHeader('0.1.0', { fiveHour: 72, weekly: 8 });
+    expect(markup).toContain('quota-meter quota-ok');
+    expect(markup).toContain('width:72%');
+    expect(markup).toContain('quota-meter quota-low');
+    expect(markup).toContain('8%');
+    const graph = markup.indexOf('usage-graph');
+    const quota = markup.indexOf('class="quota"');
+    expect(quota).toBeGreaterThan(-1);
+    expect(markup.indexOf('class="tokens"')).toBeGreaterThan(quota);
+    expect(graph === -1 || graph < quota).toBe(true);
+    expect(renderHeader('0.1.0')).not.toContain('quota');
+  });
+
   it('shows the version of the panel', () => {
     const markup = renderHeader('0.1.0');
     expect(markup).toContain('v0.1.0');

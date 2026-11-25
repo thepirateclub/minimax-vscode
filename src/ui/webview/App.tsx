@@ -201,6 +201,7 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
         state={state.state}
         tokens={state.tokens}
         usage={state.usage}
+        quota={state.quota}
         hasApiKey={state.hasApiKey}
         sessions={state.sessions}
         activeSessionId={state.activeSessionId}

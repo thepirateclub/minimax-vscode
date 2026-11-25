@@ -1,6 +1,8 @@
 import type { AgentState, UiSessionSummary, UiUsageTurn } from '../../protocol';
 import { formatCount } from '../../format';
 import { UsageGraph } from './UsageGraph';
+import { QuotaMeter } from './QuotaMeter';
+import type { UiQuota } from '../../quotaMeter';
 import { SessionMenu } from './SessionMenu';
 import { IconPlus } from '../icons';
 import { STRINGS } from '../strings';
@@ -13,6 +15,7 @@ export function Header({
   state,
   tokens,
   usage,
+  quota,
   hasApiKey,
   sessions,
   activeSessionId,
@@ -28,6 +31,7 @@ export function Header({
   state: AgentState;
   tokens: number;
   usage: UiUsageTurn[];
+  quota: UiQuota | undefined;
   hasApiKey: boolean;
   sessions: UiSessionSummary[];
   activeSessionId: string | undefined;
@@ -86,6 +90,7 @@ export function Header({
           panel does not jump when the tab changes. */}
       <div className="header-row">
         <UsageGraph turns={usage} />
+        <QuotaMeter quota={quota} />
         <span className="tokens">
           {formatCount(tokens)} {STRINGS.tokens}
         </span>

@@ -175,4 +175,52 @@
 .view-hidden {
   display: none;
 }
-
+
+/* The limits of the M Plan: two thin bars between the graph and the count.
+   The fill is the share left, a quiet color while there is enough, the
+   warning at a quarter, the failure at a tenth. */
+.quota {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.quota-meter {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.quota-track {
+  position: relative;
+  width: 32px;
+  height: 4px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--muted) 25%, transparent);
+  overflow: hidden;
+}
+
+.quota-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  background: color-mix(in srgb, var(--fg) 60%, transparent);
+}
+
+.quota-warn .quota-fill {
+  background: var(--warn);
+}
+
+.quota-low .quota-fill {
+  background: var(--err);
+}
+
+.quota-low .quota-value {
+  color: var(--err);
+}

@@ -1,3 +1,4 @@
+import { toUiQuota } from '../ui/quotaMeter';
 import type { MiniMaxController } from '../extension';
 import { buildPrompt, effortFor, thinkingMode } from './setup';
 import { buildUsageRows } from '../ui/usageRows';
@@ -114,6 +115,7 @@ export async function refreshQuota(host: MiniMaxController): Promise<void> {
       apiKey: key
     });
     host.statusBar.setQuota(host.quota);
+    host.panel.post({ type: 'quota', quota: toUiQuota(host.quota) });
     host.statusBar.setUsage(host.ledger.lastDay());
   } catch (error) {
     host.logger.error('the quota request failed', error);

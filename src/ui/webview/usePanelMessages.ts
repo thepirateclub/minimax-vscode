@@ -174,6 +174,10 @@ export function usePanelMessages(
         setState((prev) => ({ ...prev, theme: message.kind }));
         return;
       }
+      if (message.type === 'quota') {
+        setState((prev) => ({ ...prev, quota: message.quota }));
+        return;
+      }
       if (message.type === 'usage') {
         setState((prev) => ({ ...prev, usage: message.turns }));
         return;

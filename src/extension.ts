@@ -1,3 +1,4 @@
+import { toUiQuota } from './ui/quotaMeter';
 import { isAbsolute } from 'node:path';
 import { HttpSpeechClient } from './api/speech';
 import { getSettings, onSettingsChanged } from './config/settings';
@@ -335,6 +336,7 @@ export class MiniMaxController {
               error: item.error
             }))
           : [],
+        ...(this.quota ? { quota: toUiQuota(this.quota) } : {}),
         hasApiKey: Boolean(key),
         theme: themeKind(),
         fontSize: settings.fontSize,
