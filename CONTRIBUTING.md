@@ -49,6 +49,23 @@ The key comes from `MINIMAX_API_KEY` in the environment or from `.env.local` in 
 5. The commit text follows the rules of Conventional Commits, the line is in Russian, in the imperative: `feat(панель): список изменённых файлов показывает добавленные`.
 6. The version in `package.json` goes up by semver: a patch for a fix, a minor for a new capability. The number lands in the name of the `.vsix` and in the badge of the panel.
 
+## The publishing
+
+The extension reaches the Visual Studio Marketplace through Trusted Publishing: the workflow asks GitHub for an OIDC token and the Marketplace exchanges it for a session token. No PAT is stored in the repository.
+
+The policy on the Marketplace side points at the workflow file `.github/workflows/publish.yml`:
+
+| Field | Value |
+| --- | --- |
+| Policy name | Publish MiniMax Agent |
+| Provider | GitHub Actions |
+| Repository owner | thepirateclub |
+| Repository | minimax-vscode |
+| Workflow | publish.yml |
+| Environment | empty, the workflow does not use a GitHub environment |
+
+A tag of the form `v*` starts the workflow: it checks the types, runs the tests and publishes the extension. The `Release` workflow builds the `.vsix` and keeps it as an artifact of the run.
+
 ## The security
 
 The API key never reaches the repository, the logs or the webview. If you find a way to make it leak, that is a bug worth a report, and the details of the report stay out of the public issue.
