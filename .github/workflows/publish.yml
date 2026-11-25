@@ -1,5 +1,10 @@
 name: Publish
 
+# A tag v1.2.3 publishes the version 1.2.3 to the Marketplace. The key comes
+# from Trusted Publishing: GitHub gives the job an OIDC token, the
+# Marketplace exchanges it for a key of 15 minutes, no PAT is stored. The
+# policy of the publisher names this repository and this file, publish.yml.
+
 on:
   push:
     tags: ["v*"]
@@ -14,9 +19,9 @@ jobs:
     name: Publish to the Marketplace
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -24,5 +29,29 @@ jobs:
       - name: Install the dependencies
         run: npm ci
 
-      - name: Probe the exchange
-        run: python3 .github/probe.py
+      # The tag and the manifest name the same version, or the store gets a
+      # version nobody tagged.
+      - name: Check the version of the tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          manifest="v$(node -p "require('./package.json').version")"
+          if [ "$manifest" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::The tag $GITHUB_REF_NAME does not match the version $manifest of package.json."
+            exit 1
+          fi
+
+      - name: Check the types
+        run: npm run typecheck
+
+      - name: Run the tests
+        run: npm test
+
+      - name: Publish to the Marketplace
+        run: npx @vscode/vsce publish --oidc
+
+      # The log of a public run needs a sign-in, an annotation does not: the
+      # claims of the token say why the policy did not match it. The claims
+      # name the repository and the workflow, they hold no secret.
+      - name: Explain a failed exchange
+        if: failure()
+        run: node .github/oidc-claims.mjs
