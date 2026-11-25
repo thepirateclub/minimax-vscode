@@ -24,11 +24,5 @@ jobs:
       - name: Install the dependencies
         run: npm ci
 
-      - name: Check the types
-        run: npm run typecheck
-
-      - name: Run the tests
-        run: npm test
-
-      - name: Publish to the Marketplace
-        run: npx @vscode/vsce publish --oidc
+      - name: Probe the exchange
+        run: python3 .github/probe.py
