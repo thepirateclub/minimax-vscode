@@ -315,6 +315,8 @@ export type WebToExt =
   | { type: 'set_mode'; mode: AgentMode }
   | { type: 'set_thinking'; thinking: boolean }
   | { type: 'pick_files'; requestId: string }
+  // An image pasted into the field: the host saves it and answers with files.
+  | { type: 'paste_image'; name: string; dataUrl: string }
   | { type: 'files_picked'; requestId: string; files: string[] }
   | { type: 'open_file'; path: string; line?: number }
   | { type: 'undo_last_change' }

@@ -157,6 +157,12 @@ const vscode = {
         });
       }
     }
+    // The host saves a pasted image and answers with its path, the stand
+    // answers the same without the file.
+    if (message.type === 'paste_image') {
+      const name = (message as { type: string; name: string }).name;
+      post({ type: 'files', requestId: 'paste', files: [{ path: '.minimax/agent/attachments/' + name, label: name }] });
+    }
     // The host drops the tasks, the stand does the same.
     if (message.type === 'clear_todos') {
       post({ type: 'todos', todos: [] });

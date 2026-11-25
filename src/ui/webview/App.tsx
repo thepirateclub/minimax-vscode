@@ -323,6 +323,7 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
           onGoalMode={setGoalMode}
           onStop={() => vscode.postMessage({ type: 'stop' })}
           onPickFiles={() => vscode.postMessage({ type: 'pick_files', requestId: 'attach' })}
+          onPasteImage={(name, dataUrl) => vscode.postMessage({ type: 'paste_image', name, dataUrl })}
           onRemoveSelection={(id) =>
             setSelections((prev) => prev.filter((item) => item.id !== id))
           }

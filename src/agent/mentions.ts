@@ -7,6 +7,11 @@ const MAX_PATH_LENGTH = 260;
 const MAX_FILES = 5;
 const MAX_LINES = 400;
 const MAX_CHARS = 60_000;
+const IMAGE = /\.(?:png|jpe?g|webp|gif|bmp)$/i;
+
+export function imageNote(path: string): string {
+  return '[An image the user attached. You do not see images in the chat: look at it with read_image(path: "' + path + '"), crop a region of it to read small details.]';
+}
 
 export function extractMentionPaths(text: string): string[] {
   const paths: string[] = [];
@@ -47,6 +52,12 @@ export async function readMentionedFiles(
     try {
       const info = await stat(target);
       if (!info.isFile()) {
+        continue;
+      }
+      // An image is not text: its bytes read as utf8 were noise. The model
+      // reads the image with the tool instead.
+      if (IMAGE.test(path)) {
+        files.push({ path, content: imageNote(path) });
         continue;
       }
       files.push({ path, content: capContent(await readFile(target, 'utf8')) });
