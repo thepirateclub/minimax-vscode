@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { matchSkills, mentionedSkills, slashPrefix, typedSkill, type UiSkill } from '../../src/ui/skillMentions';
+import { SKILL_CHIP_MARK } from '../../src/ui/webview/components/composerField';
 
 const SKILLS: UiSkill[] = [
   { name: 'pdf', description: 'Make a PDF', source: 'user', file: '/h/.claude/skills/pdf/SKILL.md' },
@@ -33,5 +34,15 @@ describe('the skills in the field', () => {
     expect(mentionedSkills('/review the diff, then /pdf.', ['pdf', 'review'])).toEqual(['review', 'pdf']);
     expect(mentionedSkills('see src/pdf and /unknown', ['pdf'])).toEqual([]);
     expect(mentionedSkills('/pdf /pdf', ['pdf'])).toEqual(['pdf']);
+  });
+});
+
+// The chip of a skill is one object in the visible text, so the field does
+// not read it as a typed name again: that loop froze the editor window.
+describe('a skill chip in the visible text', () => {
+  it('is not a typed skill and not a slash', () => {
+    const skills = [{ name: 'review', description: 'Review', source: 'user' as const, file: 'x' }];
+    expect(typedSkill(SKILL_CHIP_MARK + ' ', skills)).toBeUndefined();
+    expect(slashPrefix('text ' + SKILL_CHIP_MARK + ' ')).toBeUndefined();
   });
 });

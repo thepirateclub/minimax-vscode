@@ -235,7 +235,7 @@ export function Composer({
     report();
   }, [dictation?.token]);
 
-  const report = (): void => {
+  const report = (makeChip = true): void => {
     const root = editorRef.current;
     if (!root) {
       return;
@@ -245,12 +245,13 @@ export function Composer({
     onContentChange?.({ text: content.text, mentions: content.mentions });
     const before = visibleBeforeCaret(root);
     // A name of a skill typed in full and closed with a space is a chip.
-    const typed = typedSkill(before, skills);
+    // One chip per report: the second pass only reads the field again.
+    const typed = makeChip ? typedSkill(before, skills) : undefined;
     if (typed) {
       removeSlashTrigger();
       insertSkillChip(root, typed);
       setSkillItems([]);
-      report();
+      report(false);
       return;
     }
     const slash = slashPrefix(before);
@@ -366,7 +367,7 @@ export function Composer({
       editorRef={editorRef}
       empty={empty}
       goalMode={goalMode}
-      onInput={report}
+      onInput={() => report()}
       onKeyDown={handleKeyDown}
       onMouseDown={handleMouseDown}
       onPickFiles={onPickFiles}
