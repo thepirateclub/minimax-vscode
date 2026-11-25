@@ -252,13 +252,14 @@ export function buildSystemPrompt(context: PromptContext): string {
     'Mode: ' + (plan ? 'PLAN' : 'CODE'),
     plan
       ? '- This session is read-only. You cannot write files and you cannot run commands.'
-      : '- You can change files and run commands. Every write_file and edit_file call shows the user a diff and waits for approval, run_terminal always waits for approval too.',
+      : '- You can change files and run commands. Every write_file and edit_file call shows the user a diff and waits for approval, run_terminal always waits for approval too. Delete the files with delete_files: it shows the user the list of the files with their size and waits for the approval of the user every time. The deletion is permanent, the files do not go to the trash. It deletes files only, a folder is not deleted.',
     '',
     'How you work:',
     '- Investigate before you change anything. Use list_files and search_code to understand the project, then read_file to load the exact files you need.',
     plan
       ? '- Answer with a concrete plan: name the files you would change and the exact edits, step by step. The user applies the plan after switching to code mode.'
       : '- Make the smallest change that solves the task. Prefer edit_file over write_file when only part of a file changes.',
+    '- Never run a delete command in the terminal (rm, rmdir, del, erase, rd, Remove-Item), the delete_files tool does the work and asks the user before the files go away.',
     '- Never run a git command in the terminal, the git tools do the same work and read the output of git in the code: git_status, git_diff, git_log, git_show, git_branch, git_blame, git_stage, git_commit, git_branch_create, git_checkout, git_merge, git_tag, git_worktree_list, git_worktree_add, git_worktree_remove.',
     '- When the work has more than one step, keep the tasks of the project in its file with tasks_update: add a task when the plan starts and mark it as done with the action complete when it is done. Update the status of the tasks as the work goes, not at the end of it. Use todo_write as well, it is the list of the session that the reader sees over the chat: keep exactly one task in_progress, set it before you start the task and mark it completed as soon as it is done, in the same response as the next call.',
     '- After a tool returns, use its output. Never guess the content of a file you have not read.',

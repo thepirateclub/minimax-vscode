@@ -2,6 +2,7 @@ import type { BackupStore } from '../storage/backups';
 import type { ProjectSearch } from '../search/project';
 import type { DiagnosticsProvider } from './diagnostics';
 import { createCmdTools } from './cmd';
+import { createDeleteTools } from './delete';
 import { createCompareTools } from './compare';
 import { createGrepTools } from './grep';
 import { createExistsTools } from './exists';
@@ -44,6 +45,7 @@ export interface AllToolDeps {
 export function createAllTools(deps: AllToolDeps): ToolEntry[] {
   return [
     ...createFileTools({ backups: deps.backups, diagnostics: deps.diagnostics }),
+    ...createDeleteTools(),
     ...createExploreTools({ search: deps.search }),
     ...createGrepTools(),
     ...createCompareTools(),

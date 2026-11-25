@@ -1,4 +1,5 @@
 import { cutMiddle, dropExitEcho, posixScript, powershellScript, splitLeadingCd, stripAnsi, tailLines } from './commandOutput';
+import { deleteToolFor } from './deleteCommand';
 import { SCRATCH_REFUSAL, writesScratch } from './scratch';
 import { exec, execFile, type ExecFileException } from 'node:child_process';
 import { isAbsolute, relative, resolve } from 'node:path';
@@ -154,6 +155,18 @@ export function createTerminalTools(): ToolEntry[] {
       }
       if (writesScratch(command)) {
         return { content: '[stderr] ' + SCRATCH_REFUSAL, isError: true };
+      }
+      // The delete commands have a tool of their own: the tool shows the
+      // files to the reader before they go away.
+      const deleteTool = deleteToolFor(command);
+      if (deleteTool) {
+        return {
+          content:
+            '[stderr] The delete commands do not run in the shell, use the ' +
+            deleteTool +
+            ' tool instead, it shows the files to the user before it deletes them.',
+          isError: true
+        };
       }
       const gitTool = gitToolFor(command);
       if (gitTool) {

@@ -36,11 +36,20 @@ export interface UiChangedFile {
   status: 'added' | 'modified' | 'deleted' | 'renamed';
 }
 
+// A file of a deletion: the reader sees the list of the files before he
+// answers the card of the confirmation.
+export interface UiApprovalFile {
+  path: string;
+  bytes?: number;
+}
+
 export interface UiApproval {
   id: string;
   name: string;
   input: Record<string, unknown>;
   preview?: { path: string; lines: UiDiffLine[] };
+  // The files of a deletion, empty for the other tools.
+  files?: UiApprovalFile[];
 }
 
 // The kind of a notice: a note, a warning or a failure.

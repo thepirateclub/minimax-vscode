@@ -223,6 +223,12 @@ export const MESSAGES: UiMessage[] = stamped([
     id: 'ap2',
     role: 'assistant',
     approval: { id: 'ap2', name: 'run_terminal', input: { command: 'npm run typecheck && npm test' } }
+  },
+  {
+    id: 'ap3',
+    role: 'assistant',
+    approval: { id: 'ap3', name: 'delete_files', input: { paths: ['src/ui/format.ts', 'src/ui/strings.ts'] },
+      files: [{ path: 'src/ui/format.ts', bytes: 4096 }, { path: 'src/ui/strings.ts', bytes: 8192 }] }
   }
 ]);
 

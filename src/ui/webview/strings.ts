@@ -33,6 +33,10 @@ export const STRINGS = {
   toolRead: 'Read',
   toolWrite: 'Write',
   toolEdit: 'Edit',
+  toolDelete: 'Delete',
+  toolFile: 'file',
+  approvalDeleteWarning:
+    'The deletion is permanent: the files do not go to the trash.',
   toolSearch: 'Find',
   toolList: 'List',
   toolTerminal: 'Run',
@@ -208,7 +212,8 @@ export const STRINGS = {
   codeHide: 'Hide code',
   search: 'Search',
   autoApprove: 'Approve without asking',
-  autoApproveHint: 'Tools from this list run without a confirmation dialog.',
+  autoApproveHint:
+    'Tools from this list run without a confirmation dialog. The deletion of the files always asks, no rule of the list covers it.',
   rules: 'Use project rules',
   rulesHint: 'Reads AGENTS.md, CLAUDE.md and other rule files into the system prompt.',
   webSearch: 'Web search',

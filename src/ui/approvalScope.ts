@@ -17,6 +17,15 @@ const RUNNERS = new Set([
 // would pass a rule of `npm test` otherwise.
 const SHELL_OPERATORS = /[;&|`<>\r\n]|\$\(/;
 
+// The tools that ask the reader every time. A rule of the reader never
+// covers them: the deletion of a file is never silent. The list lives here
+// because the panel and the host read it without the tools of the extension.
+export const ALWAYS_CONFIRM_TOOLS = ['delete_files'];
+
+export function alwaysConfirms(toolName: string): boolean {
+  return ALWAYS_CONFIRM_TOOLS.includes(toolName);
+}
+
 export function ruleFor(toolName: string, input: Record<string, unknown>): string {
   if (COMMAND_TOOLS.includes(toolName)) {
     const prefix = commandPrefix(String(input['command'] ?? ''));

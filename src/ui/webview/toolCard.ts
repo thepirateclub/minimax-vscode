@@ -1,6 +1,7 @@
 import type { ExtToWeb, UiMessage } from '../protocol';
 import { STRINGS } from './strings';
 import { text } from './value';
+import { filePaths } from './components/toolCardHelpers';
 
 export interface ToolStep {
   // The id of the step, it is the id of the first card of it.
@@ -138,6 +139,15 @@ export function approvalTitle(name: string, input: Record<string, unknown>): str
   }
   if (name === 'edit_file' && path.length > 0) {
     return STRINGS.toolEdit + ' ' + path + '?';
+  }
+  if (name === 'delete_files') {
+    const paths = filePaths(input);
+    if (paths.length > 1) {
+      return STRINGS.toolDelete + ' ' + paths.length + ' ' + STRINGS.toolFiles + '?';
+    }
+    if (paths.length === 1) {
+      return STRINGS.toolDelete + ' ' + paths[0] + '?';
+    }
   }
   if (name === 'run_terminal') {
     return STRINGS.approveCommand;

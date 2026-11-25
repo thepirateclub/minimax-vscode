@@ -31,6 +31,32 @@ export function formatDuration(milliseconds: number): string {
   return minutes + 'm ' + rest + 's';
 }
 
+// The size of a file in bytes: the reader sees how much goes away.
+const BYTE_UNITS = [
+  { limit: 1024 * 1024 * 1024, suffix: ' GB' },
+  { limit: 1024 * 1024, suffix: ' MB' },
+  { limit: 1024, suffix: ' KB' }
+];
+
+export function formatBytes(value: number): string {
+  if (!Number.isFinite(value) || value < 0) {
+    return '0 B';
+  }
+  if (value < 1024) {
+    return Math.round(value) + ' B';
+  }
+  for (const unit of BYTE_UNITS) {
+    if (value < unit.limit) {
+      continue;
+    }
+    const scaled = value / unit.limit;
+    const text =
+      scaled < 10 ? scaled.toFixed(1).replace(/\.0$/, '') : String(Math.round(scaled));
+    return text + unit.suffix;
+  }
+  return Math.round(value) + ' B';
+}
+
 export function formatCount(value: number): string {
   if (!Number.isFinite(value)) {
     return '0';

@@ -3,6 +3,7 @@ import type { AnthropicMessage } from '../api/types';
 import { Agent } from './agent';
 import type { AgentRunOptions } from './types';
 import { buildPreview } from '../tools/preview';
+import { approvalFiles } from '../tools/delete';
 import { ApprovalGate, type ApprovalDecision } from '../ui/approvals';
 import type { UiApproval } from '../ui/protocol';
 
@@ -139,6 +140,12 @@ export class AgentSession {
     const approval: UiApproval = { id, name: toolName, input };
     if (preview) {
       approval.preview = { path: preview.path, lines: preview.lines };
+    }
+    // The card of a deletion lists the files with their size: the reader
+    // sees what goes away before he answers.
+    const files = await approvalFiles(toolName, input, this.options.workspaceRoot);
+    if (files.length > 0) {
+      approval.files = files;
     }
     return await new Promise<ApprovalDecision>((resolve) => {
       this.pending.set(id, resolve);

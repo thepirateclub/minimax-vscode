@@ -6,6 +6,7 @@ import { countLines, firstLine, readRange, text } from '../toolCardHelpers';
 import { INSPECT_DESCRIBERS } from './inspect';
 import {
   IconCheck,
+  IconDelete,
   IconEdit,
   IconGit,
   IconList,
@@ -84,6 +85,17 @@ export const DESCRIBERS: Record<string, Describer> = {
     return {
       icon: <IconEdit />,
       title: STRINGS.toolEdit + ' ' + (paths[0] ?? ''),
+      summary: firstLine(content)
+    };
+  },
+  delete_files: ({ paths, content }) => {
+    const title =
+      paths.length > 1
+        ? STRINGS.toolDelete + ' ' + paths.length + ' ' + STRINGS.toolFiles
+        : STRINGS.toolDelete + ' ' + (paths[0] ?? '');
+    return {
+      icon: <IconDelete />,
+      title,
       summary: firstLine(content)
     };
   },

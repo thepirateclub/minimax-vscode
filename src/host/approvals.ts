@@ -1,6 +1,7 @@
 import type { MiniMaxController } from '../extension';
 import { ApprovalGate } from '../ui/approvals';
 import { buildPreview } from '../tools/preview';
+import { approvalFiles } from '../tools/delete';
 import { getSettings } from '../config/settings';
 import type { AgentSession } from '../agent/session';
 import type { UiApproval } from '../ui/protocol';
@@ -40,6 +41,12 @@ export async function requestChildApproval(host: MiniMaxController, runtime: Run
   } catch {
     // The preview is optional, a failure of it must not break the
     // approval.
+  }
+  // The card of a deletion lists the files with their size: the reader
+  // sees what goes away before he answers.
+  const files = await approvalFiles(request.toolName, request.input, host.workspaceRoot());
+  if (files.length > 0) {
+    approval.files = files;
   }
   if (signal.aborted) {
     // The turn was stopped while the preview was built, nobody answers.

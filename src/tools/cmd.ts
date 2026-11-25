@@ -2,6 +2,7 @@ import { SCRATCH_REFUSAL, writesScratch } from './scratch';
 import { exec, type ExecException } from 'node:child_process';
 import { resolveWorkspacePath } from '../paths';
 import { gitToolFor } from './terminal';
+import { deleteToolFor } from './deleteCommand';
 import type { ToolEntry } from './types';
 
 export const CMD_DEFAULT_TIMEOUT_MS = 60_000;
@@ -67,6 +68,18 @@ export function createCmdTools(): ToolEntry[] {
       }
       if (writesScratch(command)) {
         return { content: '[stderr] ' + SCRATCH_REFUSAL, isError: true };
+      }
+      // The delete commands have a tool of their own: the tool shows the
+      // files to the reader before they go away.
+      const deleteTool = deleteToolFor(command);
+      if (deleteTool) {
+        return {
+          content:
+            '[stderr] The delete commands do not run in the shell, use the ' +
+            deleteTool +
+            ' tool instead, it shows the files to the user before it deletes them.',
+          isError: true
+        };
       }
       // Команды git не идут в оболочку: у них есть свои инструменты.
       const gitTool = gitToolFor(command);
