@@ -15,6 +15,12 @@ export const SUMMARY_FROM = 10;
 // The cards a long group draws at once; the earlier ones open on a click.
 export const CARDS_PAGE = 50;
 
+// The count of the head of a group, a word with the number: a bare number
+// after the time read as one more figure of the time.
+export function actionCount(count: number): string {
+  return count + (count === 1 ? ' action' : ' actions');
+}
+
 export interface StepSummary {
   reads: number;
   files: number;
