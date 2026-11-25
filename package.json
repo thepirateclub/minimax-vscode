@@ -2,7 +2,7 @@
   "name": "minimax-agent",
   "displayName": "MiniMax Agent",
   "description": "Coding agent for VS Code powered by MiniMax models",
-  "version": "0.42.2",
+  "version": "0.42.3",
   "publisher": "katagarov",
   "license": "MIT",
   "repository": {
