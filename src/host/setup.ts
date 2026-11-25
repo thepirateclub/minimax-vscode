@@ -11,6 +11,7 @@ import { buildSystemPrompt, renderGitContext, renderTasksContext, renderGoalCont
 import { readRepositoryState, summarizeState } from '../git/status';
 import { budgetOver } from '../agent/goalBudget';
 import { renderRepoMap } from '../search/repoMap';
+import { planTurn, withPlan } from '../agent/planner';
 import { searchFor } from './workspace';
 import { AgentSession } from '../agent/session';
 import type { MiniMaxSettings } from '../config/settings';
@@ -187,3 +188,42 @@ export function thinkingMode(_host: MiniMaxController, settings: MiniMaxSettings
   return 'adaptive';
 }
 
+// The planner model writes the plan of the turn, the request of the
+// executor carries it (src/agent/planner.ts). Off by default, only in the
+// code mode and only when the planner is another model. A failed plan leaves
+// the turn without a plan, the reader sees a note.
+export async function planRequest(host: MiniMaxController, runtime: RuntimeSession,
+  request: string,
+  signal: AbortSignal): Promise<string> {
+  const settings = getSettings();
+  const planner = MODELS.find((item) => item.id === settings.plannerModel);
+  if (!planner || settings.mode !== 'code' || planner.id === settings.model) {
+    return request;
+  }
+  const key = await getApiKey(host.context.secrets);
+  if (!key) {
+    return request;
+  }
+  try {
+    const result = await planTurn({
+      client: new HttpMiniMaxClient({ baseUrl: resolveBaseUrl(settings.baseUrl, settings.customBaseUrl), apiKey: key }),
+      model: planner.id,
+      context: await sessionContext(host, runtime),
+      request,
+      ...(planner.supportsEffort ? { effort: 'high' as const } : { thinking: 'adaptive' as const }),
+      signal
+    });
+    handleAgentEvent(host, runtime, { type: 'usage', usage: result.usage });
+    if (result.plan.length > 0) {
+      postFor(host, runtime, { type: 'notice', message: 'Plan by ' + planner.id + ':\n' + result.plan, kind: 'info' });
+    }
+    return withPlan(request, result.plan, planner.id);
+  } catch (error) {
+    if (signal.aborted) {
+      return request;
+    }
+    host.logger.error('the planner failed', error);
+    postFor(host, runtime, { type: 'notice', message: 'The planner failed, the turn goes without a plan.', kind: 'warn' });
+    return request;
+  }
+}

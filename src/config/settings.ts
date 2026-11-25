@@ -5,6 +5,9 @@ export interface MiniMaxSettings {
   baseUrl: BaseUrlPreset;
   customBaseUrl: string;
   model: string;
+  // The model that plans the turn before the model of the chat works, empty
+  // turns the pair off.
+  plannerModel: string;
   effort: EffortLevel;
   mode: AgentMode;
   thinking: boolean;
@@ -66,6 +69,7 @@ export function getSettings(): MiniMaxSettings {
     baseUrl: userValue<BaseUrlPreset>(cfg, 'baseUrl', 'auto'),
     customBaseUrl: userValue<string>(cfg, 'customBaseUrl', ''),
     model: cfg.get<string>('model', 'MiniMax-M3.1-Flash'),
+    plannerModel: cfg.get<string>('plannerModel', ''),
     effort: cfg.get<EffortLevel>('effort', 'max'),
     mode: cfg.get<AgentMode>('mode', 'code'),
     thinking: cfg.get<boolean>('thinking', false),

@@ -10,7 +10,7 @@ import { getSettings } from '../config/settings';
 import { turnOfMessage, findRequestIndex, cutHistory } from '../agent/turns';
 import { readMentionedFiles } from '../agent/mentions';
 import { formatWorkspaceProblems, mentionsProblems } from '../agent/problems';
-import { goalBudgetOk, ensureAgent } from './setup';
+import { goalBudgetOk, ensureAgent, planRequest } from './setup';
 import { refreshQuota } from './commands';
 import * as vscode from 'vscode';
 import { isAbsolute, relative } from 'node:path';
@@ -112,10 +112,13 @@ export async function runTurn(host: MiniMaxController, runtime: RuntimeSession,
         cancellable: true
       },
       async (_progress, token) => {
-        token.onCancellationRequested(() => agent.stop());
-        requestPlace = await agent.send(
-          await buildPromptText(host, text, mentions, selections)
-        );
+        const planning = new AbortController();
+        token.onCancellationRequested(() => {
+          planning.abort();
+          agent.stop();
+        });
+        const prompt = await buildPromptText(host, text, mentions, selections);
+        requestPlace = await agent.send(await planRequest(host, runtime, prompt, planning.signal));
       }
     );
   } catch (error) {

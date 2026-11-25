@@ -2,7 +2,7 @@
   "name": "minimax-agent",
   "displayName": "MiniMax Agent",
   "description": "Coding agent for VS Code powered by MiniMax models",
-  "version": "0.18.1",
+  "version": "0.19.0",
   "publisher": "local",
   "license": "MIT",
   "engines": {
@@ -141,6 +141,21 @@
         "minimax.model": {
           "type": "string",
           "default": "MiniMax-M3.1-Flash"
+        },
+        "minimax.plannerModel": {
+          "type": "string",
+          "default": "",
+          "enum": [
+            "",
+            "MiniMax-M3",
+            "MiniMax-M3.1-Flash"
+          ],
+          "enumDescriptions": [
+            "Off: the model of the chat plans and works alone.",
+            "MiniMax-M3 writes the plan of the turn, the model of the chat does the work.",
+            "MiniMax-M3.1-Flash writes the plan of the turn, the model of the chat does the work."
+          ],
+          "description": "A planner model writes the plan of every turn in the code mode before the model of the chat works. One more request a turn: turn it on when it helps on your tasks."
         },
         "minimax.effort": {
           "type": "string",
