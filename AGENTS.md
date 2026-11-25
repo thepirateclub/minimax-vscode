@@ -201,6 +201,8 @@
 
 Чат и настройки смонтированы одновременно и переключаются классом `view-hidden`, поэтому черновик в поле ввода не теряется при переходе между вкладками.
 
+- Публикация на Marketplace идёт по тегу `vX.Y.Z` через Trusted Publishing (`.github/workflows/publish.yml`): GitHub выдаёт задаче токен OIDC, Marketplace меняет его на ключ на 15 минут, PAT нигде не хранится. Политика издателя `katagarov` называет владельца `thepirateclub`, репозиторий `minimax-vscode` и файл `publish.yml` без environment, переименование файла ломает публикацию. Перед публикацией тег сверяется с версией `package.json`, затем типы и тесты. Обмен отвечал 401 `The token could not be exchanged for the specified publisher`, а журнал публичного запуска без входа не читается, поэтому при сбое шаг `.github/oidc-claims.mjs` печатает claims токена (без самого токена) аннотацией запуска, её видно без входа.
+
 ## Setup commands
 
 - Установить зависимости: `npm install`
