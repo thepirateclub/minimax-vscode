@@ -5,7 +5,14 @@
 import type { UiMessage } from '../protocol';
 import { diffStats } from './diffStats';
 
-const READ = new Set(['read_file', 'list_files', 'read_skill', 'tasks_read', 'understand_image']);
+const READ = new Set([
+  'read_file',
+  'list_files',
+  'read_skill',
+  'tasks_read',
+  'understand_image',
+  'web_fetch'
+]);
 const EDIT = new Set(['write_file', 'edit_file']);
 const RUN = new Set(['run_terminal', 'run_cmd', 'repl_node', 'repl_python']);
 const SEARCH = new Set(['search_code', 'web_search']);

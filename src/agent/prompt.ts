@@ -206,6 +206,11 @@ const TOOL_LINES: Array<{ name: string; line: string }> = [
     line: '- web_search(query) - search the web: the documentation of a library, an error message, anything newer than your knowledge'
   },
   {
+    name: 'web_fetch',
+    line:
+      '- web_fetch(url) - get the content of a page by its address: the text of an html page without the markup, or the file of raw.githubusercontent.com as it is, with its spaces and its lines'
+  },
+  {
     name: 'understand_image',
     line: '- understand_image(prompt, image) - look at a PNG, JPEG or WebP image of the workspace or a https address and answer the prompt about it'
   }

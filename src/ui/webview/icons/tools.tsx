@@ -66,6 +66,18 @@ export function IconSearch(): ReactNode {
   );
 }
 
+// A globe, the agent reads a page of the web.
+export function IconGlobe(): ReactNode {
+  // lucide "globe"
+  return (
+    <Svg>
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20" />
+      <path d="M2 12h20" />
+    </Svg>
+  );
+}
+
 // Lines with dots, the agent lists the files.
 
 export function IconList(): ReactNode {

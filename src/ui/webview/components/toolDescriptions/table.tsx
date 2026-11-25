@@ -9,6 +9,7 @@ import {
   IconDelete,
   IconEdit,
   IconGit,
+  IconGlobe,
   IconList,
   IconModel,
   IconRead,
@@ -344,6 +345,9 @@ export const DESCRIBERS: Record<string, Describer> = {
   },
   web_search: ({ input }) => {
     return { icon: <IconSearch />, title: STRINGS.toolWebSearch + ' ' + text(input['query']), summary: '' };
+  },
+  web_fetch: ({ input }) => {
+    return { icon: <IconGlobe />, title: STRINGS.toolWebFetch + ' ' + text(input['url']), summary: '' };
   },
   understand_image: ({ input }) => {
     return { icon: <IconRead />, title: STRINGS.toolUnderstandImage + ' ' + text(input['image']), summary: '' };

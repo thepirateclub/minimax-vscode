@@ -157,6 +157,7 @@ export const STRINGS = {
   toolReadSymbol: 'Read',
   showEarlierActions: 'Show {count} earlier actions',
   toolWebSearch: 'Search the web',
+  toolWebFetch: 'Fetch page',
   toolUnderstandImage: 'Look at',
   toolGoalComplete: 'Mark goal complete',
   toolGoalBlocked: 'Mark goal blocked',

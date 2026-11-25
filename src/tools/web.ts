@@ -2,6 +2,7 @@ import { readFile, stat } from 'node:fs/promises';
 import { understandImage, webSearch, type CodingPlanOptions } from '../api/codingPlan';
 import { resolveWorkspacePath } from '../paths';
 import { createReadImageTool } from './image/readImage';
+import { createWebFetchTool } from './web/fetch';
 import type { ToolEntry } from './types';
 
 export interface WebToolOptions {
@@ -9,6 +10,9 @@ export interface WebToolOptions {
   connection: () => Promise<Omit<CodingPlanOptions, 'signal'> | undefined>;
   // The search sends the query to MiniMax, the user turns it on.
   webSearchEnabled: () => boolean;
+  // The page of the web_fetch tool comes from the machine of the user, the
+  // tests give it their answer.
+  fetchImpl?: typeof fetch;
 }
 
 const IMAGE_TYPES: Record<string, string> = { png: 'png', jpg: 'jpeg', jpeg: 'jpeg', webp: 'webp' };
@@ -94,5 +98,10 @@ export function createWebTools(options: WebToolOptions): ToolEntry[] {
       }
     }
   };
-  return [search, image, createReadImageTool(options.connection)];
+  return [
+    search,
+    image,
+    createReadImageTool(options.connection),
+    createWebFetchTool({ fetchImpl: options.fetchImpl })
+  ];
 }
