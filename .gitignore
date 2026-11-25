@@ -9,3 +9,13 @@ coverage/
 .vscode-test/
 *.log
 analysis/
+
+# Internal notes of the project, they stay on the machine and never reach the
+# public repository.
+research_notes/
+reports/
+docs/code-review/
+.superpowers/
+.claude/
+.tmp-*/
+.worktrees/

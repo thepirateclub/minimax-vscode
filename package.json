@@ -2,9 +2,24 @@
   "name": "minimax-agent",
   "displayName": "MiniMax Agent",
   "description": "Coding agent for VS Code powered by MiniMax models",
-  "version": "0.41.1",
-  "publisher": "local",
+  "version": "0.42.0",
+  "publisher": "thepirateclub",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/thepirateclub/minimax-vscode.git"
+  },
+  "bugs": {
+    "url": "https://github.com/thepirateclub/minimax-vscode/issues"
+  },
+  "homepage": "https://github.com/thepirateclub/minimax-vscode#readme",
+  "keywords": [
+    "minimax",
+    "ai",
+    "agent",
+    "coding-agent",
+    "vscode"
+  ],
   "engines": {
     "vscode": "^1.106.0"
   },

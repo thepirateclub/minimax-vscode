@@ -1,5 +1,9 @@
 .vscode/**
 .vscode-test/**
+.github/**
+CONTRIBUTING.md
+SECURITY.md
+README.en.md
 .gitignore
 .gitattributes
 .env

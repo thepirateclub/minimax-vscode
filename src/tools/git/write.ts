@@ -133,13 +133,21 @@ const gitBranchCreate: ToolEntry = {
       return failure(baseProblem);
     }
     const checkout = input['checkout'] !== false;
-    // The separator of git goes before the base, the base of the model
-    // cannot be read as an option of the command.
-    const args = checkout ? ['checkout', '-b', name] : ['branch', '--', name];
+    // The separator of git goes after the name and the base, everything
+    // before it is a value and not an option. The plain -- is used and not
+    // the --end-of-options: the old git does not know the second one and
+    // reads it as a path of the checkout, and the plain -- refuses a path
+    // as well, so the model cannot point git at a file to write.
+    const args = checkout
+      ? ['checkout', '-b', name]
+      : ['branch', '--', name];
     if (base.length > 0) {
-      args.push(END_OF_OPTIONS, base);
+      args.push(base);
     }
-    const result = await runGitWithSeparator(repository.base, args, {
+    if (checkout) {
+      args.push('--');
+    }
+    const result = await runGit(repository.base, args, {
       signal: ctx.signal
     });
     if (result.code !== 0) {
@@ -179,9 +187,13 @@ const gitCheckout: ToolEntry = {
     if (problem) {
       return failure(problem);
     }
-    const result = await runGitWithSeparator(
+    // The separator of git goes after the ref. The plain -- is used and
+    // not the --end-of-options: the old git does not know the second one
+    // and reads it as a path of the checkout, and the plain -- refuses a
+    // path, so the model cannot point git at a file to write.
+    const result = await runGit(
       repository.base,
-      ['checkout', END_OF_OPTIONS, ref],
+      ['checkout', ref, '--'],
       { signal: ctx.signal }
     );
     if (result.code !== 0) {

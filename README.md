@@ -1,5 +1,7 @@
 # MiniMax Agent
 
+[English version of this file](README.en.md)
+
 Расширение для Visual Studio Code с полноценным агентом на моделях MiniMax. Агент живёт в боковой панели, ведёт собственную историю диалога и вызывает инструменты по вашему проекту. Каждая запись на диск и каждый запуск команды требуют явного подтверждения.
 
 ## Возможности
@@ -269,7 +271,7 @@ npm run package
 Открыть расширение в VS Code по F5 или поставить собранный файл:
 
 ```bash
-code --install-extension minimax-agent-0.15.17.vsix --force
+code --install-extension minimax-agent-0.42.0.vsix --force
 ```
 
 Имя файла повторяет версию из `package.json`.
@@ -294,6 +296,10 @@ npm run test:live
 - Настройки адреса API (`minimax.customBaseUrl`, `minimax.baseUrl`), списка подтверждений (`minimax.autoApprove`) и пути к ffmpeg (`minimax.ffmpegPath`) имеют область application: репозиторий, который открывает пользователь, не может их переопределить. Адрес API принимается только по https, чужой хост спрашивает подтверждение.
 - Перед записью сохраняется оригинал файла, его можно откатить.
 - API-ключ живёт только в secret storage VS Code, в webview и в логи он не попадает.
+
+## Вклад в проект
+
+Правила проекта лежат в [AGENTS.md](AGENTS.md), порядок работы и требования к коммитам описаны в [CONTRIBUTING.md](CONTRIBUTING.md). О находках, которые стоит закрыть тихо, написано в [SECURITY.md](SECURITY.md).
 
 ## Лицензия
 

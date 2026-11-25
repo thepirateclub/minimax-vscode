@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -111,6 +112,17 @@ describe('the git tools', () => {
     const result = await tool('git_checkout').execute({ ref: branch }, makeContext(root));
     expect(result.isError).toBeFalsy();
     expect((await git(root, 'rev-parse', '--abbrev-ref', 'HEAD')).trim()).toBe(branch);
+  });
+
+  it('does not let the ref of the checkout be a path of the working tree', async () => {
+    const root = await makeRepo();
+    // The checkout of a path takes the file from the index, it would throw
+    // the change of the user away. The ref of the model is a branch or a
+    // commit, a path is refused.
+    await writeFile(join(root, 'app.ts'), 'const a = 2;\n', 'utf8');
+    const result = await tool('git_checkout').execute({ ref: 'app.ts' }, makeContext(root));
+    expect(result.isError).toBe(true);
+    expect(await readFile(join(root, 'app.ts'), 'utf8')).toBe('const a = 2;\n');
   });
 
   it('does not let the ref of the diff be an option of git', async () => {
