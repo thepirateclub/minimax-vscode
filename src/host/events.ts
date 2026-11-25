@@ -1,3 +1,4 @@
+import { closeGoal } from '../agent/stateMachines';
 import { addRequestUsage } from '../ui/usageTurns';
 import type { MiniMaxController } from '../extension';
 import type { RuntimeSession } from './runtime';
@@ -134,8 +135,10 @@ export function handleAgentEvent(host: MiniMaxController, runtime: RuntimeSessio
     }
     if (event.state?.kind === 'goal') {
       const goal = runtime.goal;
-      if (goal) {
-        goal.status = event.state.status;
+      // The tool checked the step, the host takes it by the same table.
+      const move = goal ? closeGoal(goal.status, event.state.status) : undefined;
+      if (goal && move?.ok) {
+        goal.status = move.state;
         postFor(host, runtime, { type: 'goal', goal: { ...goal } });
         // The reason of the model stands in the card of the call: a notice
         // printed it twice and was lost on the reload of the panel, the

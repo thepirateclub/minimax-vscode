@@ -1,3 +1,4 @@
+import { closeGoal } from '../agent/stateMachines';
 import type { GoalOutcome, GoalState, ToolStateUpdate } from '../agent/state';
 import type { ToolEntry } from './types';
 
@@ -97,6 +98,15 @@ export function createGoalTools(): ToolEntry[] {
         return {
           content:
             'The status of the goal is "complete" or "blocked", not "' + status + '".',
+          isError: true
+        };
+      }
+      // The goal moves by its table: a completed goal is not blocked
+      // afterwards, the model hears why.
+      const move = closeGoal(ctx.sessionState.goal.status, status);
+      if (!move.ok) {
+        return {
+          content: 'The goal is ' + ctx.sessionState.goal.status + ', it cannot become ' + status + '.',
           isError: true
         };
       }

@@ -1,3 +1,4 @@
+import { describeTodoChanges, todoChanges } from '../agent/stateMachines';
 import type {
   TodoItem,
   TodoPriority,
@@ -110,6 +111,7 @@ export function createTodoTools(): ToolEntry[] {
         };
       }
       const todos = normalizeTodos(raw);
+      const changes = describeTodoChanges(todoChanges(ctx.sessionState?.todos ?? [], todos));
       const state: ToolStateUpdate = { kind: 'todos', todos };
       const done = todos.filter((item) => item.status === 'completed').length;
       const next = nextTodo(todos);
@@ -121,6 +123,7 @@ export function createTodoTools(): ToolEntry[] {
           done +
           ' of them are done.' +
           (next ? ' Next by priority: ' + next.content + '.' : '') +
+          (changes ? ' ' + changes : '') +
           // The model left the list without a current task: the reader did
           // not see where the work stood.
           (next && next.status === 'pending' ? ' No task is in_progress: set the task you work on in_progress.' : ''),

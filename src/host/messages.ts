@@ -1,3 +1,4 @@
+import { goalMachine, resumeGoal } from '../agent/stateMachines';
 import { handleExtrasMessage } from './extras';
 import type { MiniMaxController } from '../extension';
 import type { WebToExt } from '../ui/protocol';
@@ -173,7 +174,8 @@ export async function handleWebviewMessage(host: MiniMaxController, message: Web
       tokenBudget: message.tokenBudget,
       requestLimit: message.requestLimit,
       secondsLimit: message.secondsLimit,
-      status: 'active',
+      // The same goal is resumed by its table, a new one starts anew.
+      status: previous && previous.objective === objective ? resumeGoal(previous.status) : goalMachine.initial,
       used
     };
     host.panel.post({ type: 'goal', goal: runtime.goal });
