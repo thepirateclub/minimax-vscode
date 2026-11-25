@@ -1,3 +1,4 @@
+import { addRequestUsage } from '../ui/usageTurns';
 import type { MiniMaxController } from '../extension';
 import type { RuntimeSession } from './runtime';
 import { isAbortMessage, stopNotice } from '../agent/stopReason';
@@ -9,7 +10,6 @@ import { persist } from './sessions';
 import { postSummary } from './workspace';
 
 // How many actions the spend graph keeps in the header.
-const MAX_USAGE_TURNS = 24;
 
 export function handleAgentEvent(host: MiniMaxController, runtime: RuntimeSession, event: AgentEvent): void {
   if (event.type === 'assistant_start') {
@@ -149,6 +149,20 @@ export function handleAgentEvent(host: MiniMaxController, runtime: RuntimeSessio
     return;
   }
   if (event.type === 'usage') {
+    // Every request counts at once: the chart, the counter and the ledger
+    // move while the turn runs, the requests of a sub-agent included.
+    host.ledger.add({
+      at: Date.now(),
+      input: event.usage.inputTokens,
+      output: event.usage.outputTokens,
+      cacheRead: event.usage.cacheReadTokens ?? 0,
+      cacheCreation: event.usage.cacheCreationTokens ?? 0
+    });
+    host.statusBar.setUsage(host.ledger.lastDay());
+    const newTurn = runtime.usageTurnAt !== runtime.turnStartedAt || runtime.turnStartedAt === 0;
+    runtime.usageTurnAt = runtime.turnStartedAt;
+    runtime.usage = addRequestUsage(runtime.usage, event.usage, newTurn);
+    postFor(host, runtime, { type: 'usage', turns: runtime.usage });
     const goal = runtime.goal;
     // The spend is counted for every status of the goal, the panel has to
     // show the truth.
@@ -164,24 +178,7 @@ export function handleAgentEvent(host: MiniMaxController, runtime: RuntimeSessio
     return;
   }
   if (event.type === 'done') {
-    host.ledger.add({
-      at: Date.now(),
-      input: event.usage.inputTokens,
-      output: event.usage.outputTokens,
-      cacheRead: event.usage.cacheReadTokens ?? 0,
-      cacheCreation: event.usage.cacheCreationTokens ?? 0
-    });
-    host.statusBar.setUsage(host.ledger.lastDay());
-    runtime.usage.push({
-      input: event.usage.inputTokens,
-      output: event.usage.outputTokens,
-      cache:
-        (event.usage.cacheReadTokens ?? 0) + (event.usage.cacheCreationTokens ?? 0)
-    });
-    if (runtime.usage.length > MAX_USAGE_TURNS) {
-      runtime.usage = runtime.usage.slice(-MAX_USAGE_TURNS);
-    }
-    postFor(host, runtime, { type: 'usage', turns: runtime.usage });
+    // The spend of the turn is already counted request by request.
     // The last message of the step tells how long the step took, and
     // the reason of the stop is named, a silent stop confuses.
     markStepTime(host, runtime);

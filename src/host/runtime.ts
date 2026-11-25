@@ -39,6 +39,8 @@ export interface RuntimeSession {
   // When the turn of this moment started, the panel shows how long it
   // took.
   turnStartedAt: number;
+  // The turn whose bar the chart of the spend grows, by its start.
+  usageTurnAt: number;
   // The tools the reader allowed for the session. The permission of a
   // child belongs to the chat of this session, it must not leak into
   // another chat.

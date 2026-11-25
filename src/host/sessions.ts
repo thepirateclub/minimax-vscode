@@ -104,6 +104,7 @@ export function runtimeFrom(host: MiniMaxController, stored: StoredSession): Run
       ? { ...stored.goal, used: { ...stored.goal.used } }
       : undefined,
     turnStartedAt: 0,
+    usageTurnAt: 0,
     approvedTools: new Set(),
     // A message that was going out when the panel closed waits again.
     queue: (stored.queue ?? []).map((item) => ({
@@ -145,6 +146,7 @@ export function startNewSession(host: MiniMaxController): void {
     todos: [],
     goal: undefined,
     turnStartedAt: 0,
+    usageTurnAt: 0,
     approvedTools: new Set(),
     queue: [],
     queuePaused: false,
