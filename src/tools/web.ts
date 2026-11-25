@@ -1,6 +1,7 @@
 import { readFile, stat } from 'node:fs/promises';
 import { understandImage, webSearch, type CodingPlanOptions } from '../api/codingPlan';
 import { resolveWorkspacePath } from '../paths';
+import { createReadImageTool } from './image/readImage';
 import type { ToolEntry } from './types';
 
 export interface WebToolOptions {
@@ -93,5 +94,5 @@ export function createWebTools(options: WebToolOptions): ToolEntry[] {
       }
     }
   };
-  return [search, image];
+  return [search, image, createReadImageTool(options.connection)];
 }
