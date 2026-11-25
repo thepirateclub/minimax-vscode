@@ -8,6 +8,7 @@ import { dropApprovalCards } from './approvals';
 import { postFor, appendToAssistant, setState, markStepTime } from './channel';
 import { persist } from './sessions';
 import { postSummary } from './workspace';
+import { rememberChangedFiles } from './changedFiles';
 
 // How many actions the spend graph keeps in the header.
 
@@ -113,6 +114,11 @@ export function handleAgentEvent(host: MiniMaxController, runtime: RuntimeSessio
         }
         break;
       }
+    }
+    // The files the tool changed, the list of the panel keeps them: the
+    // state of the repository does not see every file of the work.
+    if (event.changed && event.changed.length > 0) {
+      runtime.changedFiles = rememberChangedFiles(runtime.changedFiles, event.changed);
     }
     if (event.state?.kind === 'todos') {
       runtime.todos = event.state.todos;

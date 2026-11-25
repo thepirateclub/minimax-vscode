@@ -3,6 +3,7 @@ import type { AgentState, UiMessage, UiUsageTurn, QueuedMessage } from '../ui/pr
 import type { AgentSession } from '../agent/session';
 import type { GoalState, TodoItem } from '../agent/state';
 import type { TurnAnchor } from '../agent/turns';
+import type { ChangedFile } from '../tools/types';
 
 // The state of one chat in the extension host. The controller owns it, the
 // modules of the host read and change it: the queue, the approvals, the
@@ -55,4 +56,7 @@ export interface RuntimeSession {
   turnStopped: boolean;
   // The reason of the last failure of the turn.
   lastError: string | undefined;
+  // The files the agent changed in this chat, the panel shows them with
+  // their status.
+  changedFiles: ChangedFile[];
 }

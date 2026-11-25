@@ -17,6 +17,7 @@ import { refreshQuota } from './commands';
 import * as vscode from 'vscode';
 import { isAbsolute, relative } from 'node:path';
 import { planRestore, restoreFiles } from '../storage/backups';
+import { forgetChangedFiles } from './changedFiles';
 
 // The limit of the title of a chat.
 const TITLE_LIMIT = 60;
@@ -231,6 +232,12 @@ async function restoreTurnFiles(host: MiniMaxController, runtime: RuntimeSession
   }
   const { restored, skipped } = await restoreFiles(plans);
   const name = (path: string) => relative(runtime.workspaceRoot, path) || path;
+  // The files that went back to the state before the turn leave the list of
+  // the changed files.
+  runtime.changedFiles = forgetChangedFiles(
+    runtime.changedFiles,
+    plans.filter((plan) => restored.includes(plan.path)).map((plan) => name(plan.path))
+  );
   const parts: string[] = [];
   if (restored.length > 0) {
     parts.push('The files went back to the request: ' + restored.map(name).join(', ') + '.');

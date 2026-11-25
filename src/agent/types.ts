@@ -7,6 +7,7 @@ import type {
 } from '../api/types';
 import type { AgentMode } from '../config/models';
 import type { ToolRegistry } from '../tools/registry';
+import type { ChangedFile } from '../tools/types';
 import type { ApprovalGate, DiffPreview } from '../ui/approvals';
 import type { SessionState, ToolStateUpdate } from './state';
 import type { Logger } from '../logger';
@@ -31,6 +32,9 @@ export type AgentEvent =
       diff?: DiffPreview;
       // The change of the state of the session, the host applies it.
       state?: ToolStateUpdate;
+      // The files the tool changed, the host puts them in the list of the
+      // changed files of the panel.
+      changed?: ChangedFile[];
     }
   | { type: 'approval_resolved'; id: string; approved: boolean }
   | { type: 'tool_progress'; id: string; line: string }

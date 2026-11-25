@@ -11,6 +11,7 @@ import { resolveWorkspacePath } from '../paths';
 import { fileErrorMessage } from '../ui/fileError';
 import type { RuntimeSession } from './runtime';
 import { readChangedFiles } from '../git/changes';
+import { mergeChangedFiles } from './changedFiles';
 import { isAbsolute } from 'node:path';
 import * as vscode from 'vscode';
 
@@ -189,7 +190,13 @@ export async function openFile(host: MiniMaxController, path: string, line?: num
 
 
 export async function postSummary(host: MiniMaxController, runtime: RuntimeSession): Promise<void> {
-  const files = await readChangedFiles(host.workspaceRoot());
+  // The files the agent changed come first, the state of the repository
+  // adds the rest of the working tree. The project of the chat is the
+  // source, not the first folder of the window.
+  const files = mergeChangedFiles(
+    runtime.changedFiles,
+    await readChangedFiles(runtime.workspaceRoot)
+  );
   if (files.length === 0) {
     return;
   }

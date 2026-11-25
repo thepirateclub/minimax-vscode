@@ -195,7 +195,8 @@ export function createDeleteTools(): ToolEntry[] {
             'delete_files failed: ' +
             failed.join(', ') +
             (deleted.length > 0 ? '\nDeleted before the failure: ' + deleted.join(', ') : ''),
-          isError: true
+          isError: true,
+          changed: deleted.map((path) => ({ path, status: 'deleted' }))
         };
       }
       const lines = plan.files.map(
@@ -214,7 +215,8 @@ export function createDeleteTools(): ToolEntry[] {
           ' in total:\n' +
           lines.join('\n') +
           '\nThe deletion is permanent: the files do not go to the trash.',
-        isError: false
+        isError: false,
+        changed: deleted.map((path) => ({ path, status: 'deleted' }))
       };
     }
   };

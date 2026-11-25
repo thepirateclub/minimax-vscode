@@ -93,6 +93,7 @@ export function runtimeFrom(host: MiniMaxController, stored: StoredSession): Run
     state: 'idle',
     deleted: false,
     errorReported: false,
+    changedFiles: [],
     usage: (stored.usage ?? []).map((turn) => ({
       input: turn.input,
       output: turn.output,
@@ -141,6 +142,7 @@ export function startNewSession(host: MiniMaxController): void {
     state: 'idle',
     deleted: false,
     errorReported: false,
+    changedFiles: [],
     usage: [],
     turns: [],
     todos: [],

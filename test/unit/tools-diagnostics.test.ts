@@ -100,7 +100,13 @@ describe('the problems of a file after a change', () => {
     });
     const write = tools.find((tool) => tool.name === 'write_file')!;
     const result = await write.execute({ path: 'd.ts', content: 'x' }, makeContext(root));
-    expect(result).toEqual({ content: 'Wrote d.ts', isError: false });
+    // The write reports the file it changed, the panel shows it with its
+    // status.
+    expect(result).toEqual({
+      content: 'Wrote d.ts',
+      isError: false,
+      changed: [{ path: 'd.ts', status: 'added' }]
+    });
   });
 });
 

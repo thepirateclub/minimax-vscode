@@ -19,6 +19,7 @@ import type { AgentOptions, AgentRunResult } from './types';
 export { DEFAULT_MAX_RETRIES, retryDelay } from './retry';
 export type { AgentEvent, AgentOptions, AgentRunOptions, AgentRunResult } from './types';
 import type { ToolStateUpdate } from './state';
+import type { ChangedFile } from '../tools/types';
 
 // The answers in a row with a call of a tool in the text, then the turn ends.
 const MAX_LEAKS = 2;
@@ -246,6 +247,9 @@ export class Agent {
         let content: string;
         let isError = false;
         let state: ToolStateUpdate | undefined;
+        // The files the tool changed, the panel shows them with their
+        // status.
+        let changed: ChangedFile[] | undefined;
         try {
           const result = await entry.execute(toolUse.input, {
             workspaceRoot: this.options.workspaceRoot,
@@ -269,6 +273,7 @@ export class Agent {
           content = result.content;
           isError = result.isError === true;
           state = result.state;
+          changed = result.changed;
         } catch (error) {
           content = error instanceof Error ? error.message : String(error);
           isError = true;
@@ -281,7 +286,8 @@ export class Agent {
           content,
           isError,
           diff,
-          state
+          state,
+          changed
         });
         results.push({
           type: 'tool_result',

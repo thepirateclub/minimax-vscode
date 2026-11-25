@@ -16,12 +16,24 @@ export interface ToolContext {
   sessionId?: string;
 }
 
+// A file that the tool changed. The panel shows it in the list of the
+// changed files with its status.
+export type ChangedFileStatus = 'added' | 'modified' | 'deleted';
+
+export interface ChangedFile {
+  path: string;
+  status: ChangedFileStatus;
+}
+
 export interface ToolExecutionResult {
   content: string;
   isError?: boolean;
   metadata?: Record<string, unknown>;
   // The change of the state of the session, the host applies it.
   state?: ToolStateUpdate;
+  // The files the tool changed, the host puts them in the list of the
+  // changed files of the panel.
+  changed?: ChangedFile[];
   // The spend of the sub-agents inside the call, it belongs to the same
   // action of the graph of the spend.
   usage?: Usage;

@@ -142,7 +142,15 @@ export function createFileTools(deps: {
         const wrote = 'Wrote ' + String(input['path']);
         return {
           content: await withProblems(wrote, target, deps.diagnostics, ctx.signal),
-          isError: false
+          isError: false,
+          // The panel shows the file with its status: a file that was not
+          // on the disk is added, a replaced one is changed.
+          changed: [
+            {
+              path: String(input['path']),
+              status: previous === null ? 'added' : 'modified'
+            }
+          ]
         };
       } catch (error) {
         return {
@@ -189,7 +197,8 @@ export function createFileTools(deps: {
           (edit.lenient ? ' (old_string matched with the whitespace ignored)' : '');
         return {
           content: await withProblems(edited, target, deps.diagnostics, ctx.signal),
-          isError: false
+          isError: false,
+          changed: [{ path: String(input['path']), status: 'modified' }]
         };
       } catch (error) {
         return {
