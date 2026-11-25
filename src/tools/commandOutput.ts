@@ -56,6 +56,14 @@ export function powershellScript(command: string): string {
   ].join('\n');
 }
 
+// The same on Linux and macOS: a pipe gives the code of its last command,
+// `make | tail` exits 0 when make fails. pipefail fixes it where the shell
+// has it; dash has not, and `set` of an unknown option would end the shell,
+// so the option is tried in a subshell first.
+export function posixScript(command: string): string {
+  return '(set -o pipefail) 2>/dev/null && set -o pipefail\n' + command;
+}
+
 // The tail of the exit code the model added by hand: `; "EXIT=$LASTEXITCODE"`,
 // `; echo $?`. The tool reports the code itself.
 export function dropExitEcho(command: string): string {

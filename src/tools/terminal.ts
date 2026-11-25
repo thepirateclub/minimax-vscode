@@ -1,4 +1,4 @@
-import { cutMiddle, dropExitEcho, powershellScript, splitLeadingCd, stripAnsi, tailLines } from './commandOutput';
+import { cutMiddle, dropExitEcho, posixScript, powershellScript, splitLeadingCd, stripAnsi, tailLines } from './commandOutput';
 import { SCRATCH_REFUSAL, writesScratch } from './scratch';
 import { exec, execFile, type ExecFileException } from 'node:child_process';
 import { isAbsolute, relative, resolve } from 'node:path';
@@ -220,7 +220,7 @@ export function createTerminalTools(): ToolEntry[] {
           return;
         }
         exec(
-          command,
+          posixScript(command),
           { cwd, timeout, maxBuffer: 10 * 1024 * 1024, signal: ctx.signal, windowsHide: true },
           done
         );
