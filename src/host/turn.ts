@@ -151,7 +151,7 @@ export async function runTurn(host: MiniMaxController, runtime: RuntimeSession,
         // command. The queue is on hold until the reader asks for it.
         queued.state = 'waiting';
         queued.error = undefined;
-        runtime.queuePaused = true;
+        runtime.queuePaused = !runtime.sendNow;
       } else if (runtime.errorReported) {
         queued.state = 'error';
         queued.error = runtime.lastError;
@@ -163,6 +163,7 @@ export async function runTurn(host: MiniMaxController, runtime: RuntimeSession,
     persist(host, runtime);
     void refreshQuota(host);
     // The next message of the queue goes out.
+    runtime.sendNow = false;
     void pumpQueue(host, runtime);
   }
 }

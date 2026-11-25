@@ -52,6 +52,9 @@ export interface RuntimeSession {
   // The queue waits until the reader asks for it: the user stopped the
   // turn, the messages stay in the queue.
   queuePaused: boolean;
+  // The reader pressed Send now on a message of the queue while a turn
+  // ran: the turn stops and the queue does not go on hold.
+  sendNow?: boolean;
   // The user stopped the turn of this moment.
   turnStopped: boolean;
   // The reason of the last failure of the turn.

@@ -4,6 +4,7 @@ import type { UiSelection } from '../ui/protocol';
 import { persist } from './sessions';
 import { postFor } from './channel';
 import { runTurn } from './turn';
+import { dropApprovalCards } from './approvals';
 
 // How many messages wait in the queue of a chat.
 const MAX_QUEUE_ITEMS = 30;
@@ -27,6 +28,14 @@ export function sendQueued(host: MiniMaxController, id: string): void {
   runtime.queue.unshift(item);
   runtime.queuePaused = false;
   postQueue(host, runtime);
+  if (runtime.busy) {
+    // Send now does not wait for the turn: the turn stops, and its end
+    // sends the message, which stands first in the queue.
+    runtime.sendNow = true;
+    runtime.agent?.stop();
+    dropApprovalCards(host, runtime, false);
+    return;
+  }
   void pumpQueue(host, runtime);
 }
 
