@@ -174,6 +174,18 @@ const TOOL_LINES: Array<{ name: string; line: string }> = [
     line: '- note_search(query) - find notes by the words of their key or text'
   },
   {
+    name: 'grep',
+    line: '- grep(pattern, path?, glob?, ignore_case?, context?) - search the files with a regular expression and see every match with the lines around it'
+  },
+  {
+    name: 'diff_files',
+    line: '- diff_files(path_a, path_b) - the unified diff of two files of the workspace'
+  },
+  {
+    name: 'compare',
+    line: '- compare(path_a | text_a, path_b | text_b) - the unified diff of two texts, each side a file or a text'
+  },
+  {
     name: 'read_symbol',
     line: '- read_symbol(path, names) - read the bodies of functions, methods, classes and constants of a file by their names, with line numbers'
   },
