@@ -16,6 +16,7 @@ import part11 from './11-suggestions-settings.css';
 import part12 from './12-sessions.css';
 import part13 from './13-markdown.css';
 import part14 from './14-steps-summary.css';
+import part15 from './15-extras.css';
 
 export const styles = [
   part01,
@@ -31,5 +32,6 @@ export const styles = [
   part11,
   part12,
   part13,
-  part14
+  part14,
+  part15
 ].join('\n');

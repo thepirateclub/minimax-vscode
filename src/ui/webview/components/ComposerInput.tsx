@@ -127,9 +127,14 @@ export function ComposerInput(props: {
                 }}
               >
                 <span className={'suggestion-dot source-' + item.source} />
-                <span className="suggestion-path">{item.path}</span>
+                <span className="suggestion-path">{item.source === 'skill' ? '/' + item.path : item.path}</span>
+                {item.detail ? <span className="suggestion-detail">{item.detail}</span> : null}
                 <span className="suggestion-source">
-                  {item.source === 'open' ? STRINGS.openFiles : STRINGS.workspaceFiles}
+                  {item.source === 'skill'
+                    ? STRINGS.skillSource
+                    : item.source === 'open'
+                      ? STRINGS.openFiles
+                      : STRINGS.workspaceFiles}
                 </span>
               </button>
             ))}

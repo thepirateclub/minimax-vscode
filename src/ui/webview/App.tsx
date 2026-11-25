@@ -28,6 +28,8 @@ import { Header, type PanelTab } from './components/Header';
 import { MessageList } from './components/MessageList';
 import { SummaryBar } from './components/SummaryBar';
 import { SettingsView } from './components/SettingsView';
+import { SettingsTabs } from './components/settings/SettingsTabs';
+import { useExtras } from './useExtras';
 import { TaskList } from './components/TaskList';
 import { STRINGS } from './strings';
 
@@ -81,6 +83,7 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
   const [suggestions, setSuggestions] = useState<UiSuggestion[]>([]);
   const [settings, setSettings] = useState<UiSettings | undefined>(undefined);
   const [tab, setTab] = useState<PanelTab>('chat');
+  const extras = useExtras(vscode);
   const [focusToken, setFocusToken] = useState(0);
   const [resetToken, setResetToken] = useState(0);
   const [insert, setInsert] = useState<InsertRequest | undefined>(undefined);
@@ -262,6 +265,7 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
           onClear={() => setSummary([])}
         />
         <Composer
+          skills={extras.skills}
           busy={busy}
           selections={selections}
           focusToken={focusToken}
@@ -336,11 +340,23 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
       </div>
       <div className={'view' + (tab === 'settings' ? '' : ' view-hidden')}>
         {settings ? (
-          <SettingsView
-            settings={settings}
-            onSave={(values) => vscode.postMessage({ type: 'save_settings', values })}
-            onSetApiKey={(key) => vscode.postMessage({ type: 'set_api_key', key })}
-            onClearApiKey={() => vscode.postMessage({ type: 'clear_api_key' })}
+          <SettingsTabs
+            general={
+              <SettingsView
+                settings={settings}
+                onSave={(values) => vscode.postMessage({ type: 'save_settings', values })}
+                onSetApiKey={(key) => vscode.postMessage({ type: 'set_api_key', key })}
+                onClearApiKey={() => vscode.postMessage({ type: 'clear_api_key' })}
+              />
+            }
+            skills={extras.skills}
+            servers={extras.servers}
+            onOpenSkill={(name) => vscode.postMessage({ type: 'open_skill', name })}
+            onRefresh={extras.refresh}
+            onAddServer={(server) => vscode.postMessage({ type: 'mcp_add', ...server })}
+            onRemoveServer={(name) => vscode.postMessage({ type: 'mcp_remove', name })}
+            onRestartMcp={() => vscode.postMessage({ type: 'mcp_restart' })}
+            onOpenSettings={() => vscode.postMessage({ type: 'mcp_open_settings' })}
           />
         ) : (
           <div className="empty">{STRINGS.loading}</div>
