@@ -26,7 +26,7 @@ describe('run_terminal', () => {
     // The model is told the shell is powershell, the syntax it writes has
     // to work: cmd.exe would take this line for noise.
     expect(result.isError).toBeFalsy();
-    expect(result.content.trim()).toMatch(/^ps\d+$/);
+    expect(result.content.trim()).toMatch(/^ps\d+\n\[exit code 0\]$/);
   });
 
   it('captures stdout', async () => {

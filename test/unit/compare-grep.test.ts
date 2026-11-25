@@ -7,6 +7,8 @@ import { diffLines } from '../../src/tools/diff';
 import { createGrepTools, globToRegExp, grepText } from '../../src/tools/grep';
 import { createExistsTools, nearNames } from '../../src/tools/exists';
 import { isScratchPath, writesScratch } from '../../src/tools/scratch';
+import { cutMiddle, dropExitEcho, splitLeadingCd, stripAnsi, tailLines } from '../../src/tools/commandOutput';
+import { parseTerminalOutput } from '../../src/ui/webview/terminalOutput';
 import { missingFileHint } from '../../src/tools/repl/hints';
 import type { ToolContext } from '../../src/tools/types';
 
@@ -154,5 +156,31 @@ describe('the scratch folders of the project', () => {
     expect(writesScratch('Get-Content a | Out-File temp\\b.txt')).toBe(true);
     expect(writesScratch("fs.readFileSync('temp/a.txt')")).toBe(false);
     expect(writesScratch('npm test')).toBe(false);
+  });
+});
+
+// The model wrapped a command in `cd app; ... | Select-Object -Last 20;
+// "EXIT=$LASTEXITCODE"`: the tool does all of it now.
+describe('the output of a command for the model', () => {
+  it('moves a leading cd into cwd and drops the hand-made exit code', () => {
+    expect(splitLeadingCd('cd app; npm run check')).toEqual({ cwd: 'app', command: 'npm run check' });
+    expect(splitLeadingCd('cd "my app" && npm test')).toEqual({ cwd: 'my app', command: 'npm test' });
+    expect(splitLeadingCd('npm test')).toBeUndefined();
+    expect(dropExitEcho('npm run check 2>&1; "EXIT_CHECK=$LASTEXITCODE"')).toBe('npm run check 2>&1');
+    expect(dropExitEcho('npm test; echo $?')).toBe('npm test');
+    expect(dropExitEcho('npm test')).toBe('npm test');
+  });
+
+  it('removes the colors, keeps the tail and cuts the middle', () => {
+    expect(stripAnsi('\u001b[31;1mnpm notice\u001b[0m')).toBe('npm notice');
+    expect(tailLines('a\nb\nc\nd', 2)).toBe('[2 earlier lines are cut]\nc\nd');
+    const cut = cutMiddle('h'.repeat(50) + 't'.repeat(50), 40);
+    expect(cut.startsWith('hhhhhhhh')).toBe(true);
+    expect(cut.endsWith('t'.repeat(32))).toBe(true);
+  });
+
+  it('does not print the exit code twice in the card', () => {
+    const lines = parseTerminalOutput('npm test', 'ok\n[exit code 0]');
+    expect(lines.map((line) => line.text)).toEqual(['npm test', 'ok']);
   });
 });

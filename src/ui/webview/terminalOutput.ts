@@ -10,6 +10,9 @@ export interface TerminalLine {
 const FAILED = /^Command failed with exit code (\d+)/;
 const STDERR = /^\[stderr\]\s?/;
 const NOTE = /^\[(no output|output truncated)\]$/;
+// The tool ends every result with the exit code for the model. The card
+// names the code in its head already, the line is not printed twice.
+const EXIT = /^\[exit code -?\d+\]$/;
 
 // The output of a command is a plain text. The panel marks the lines of a
 // failure, so that the reason of it is read at a glance and the rest stays
@@ -29,6 +32,9 @@ export function parseTerminalOutput(command: string, content: string): TerminalL
     // result. A line of the output that looks the same stays in the output.
     if (index === 0 && FAILED.test(line)) {
       failed = true;
+      continue;
+    }
+    if (index === rows.length - 1 && EXIT.test(line)) {
       continue;
     }
     if (STDERR.test(line)) {
