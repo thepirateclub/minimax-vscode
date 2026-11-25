@@ -46,8 +46,20 @@ jobs:
       - name: Run the tests
         run: npm test
 
+      # Trusted Publishing does not take the immutable subject of GitHub yet:
+      # a repository created after July 15, 2026 gets
+      # repo:owner@id/repo@id, and the exchange answers 401. The personal
+      # token of the secret VSCE_PAT publishes meanwhile; without the secret
+      # the job tries the token-free way.
       - name: Publish to the Marketplace
-        run: npx @vscode/vsce publish --oidc
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: |
+          if [ -n "$VSCE_PAT" ]; then
+            npx @vscode/vsce publish --pat "$VSCE_PAT"
+          else
+            npx @vscode/vsce publish --oidc
+          fi
 
       # The log of a public run needs a sign-in, an annotation does not: the
       # claims of the token say why the policy did not match it. The claims
