@@ -3,6 +3,7 @@ import { collectTextFiles, isIgnoredName, isTextFile, toRelative } from '../file
 import { LexicalIndex } from '../lexical';
 import { chunkContent, cosineSimilarity, fuseRankings, type Passage } from '../semantic';
 import { trigramScore } from '../trigram';
+import { buildRepoMap, isMapFile } from '../repoMap';
 import { bestLinesOf } from './lines';
 import {
   delay,
@@ -31,6 +32,8 @@ export class ProjectSearch {
   // The relative path of the file and the absolute one.
   private readonly files = new Map<string, string>();
   private readonly vectors = new Map<string, VectorEntry>();
+  // The text of the code files, the map of the project reads it.
+  private readonly sources = new Map<string, string>();
   private provider: SemanticProvider | undefined;
   private building: Promise<void> | undefined;
   private built = false;
@@ -81,6 +84,7 @@ export class ProjectSearch {
     this.index.removeDocument(relative);
     this.files.delete(relative);
     this.vectors.delete(relative);
+    this.sources.delete(relative);
     if (!isTextFile(path)) {
       return;
     }
@@ -96,7 +100,14 @@ export class ProjectSearch {
     this.index.clear();
     this.files.clear();
     this.vectors.clear();
+    this.sources.clear();
     await this.ensureIndex();
+  }
+
+  // The files and the names they declare, for the system prompt.
+  async repoMap(): Promise<string> {
+    await this.ensureIndex();
+    return buildRepoMap(this.sources);
   }
 
   async search(
@@ -211,9 +222,13 @@ export class ProjectSearch {
     if (content === undefined) {
       this.index.removeDocument(relative);
       this.files.delete(relative);
+      this.sources.delete(relative);
       return;
     }
     this.files.set(relative, absolute);
+    if (isMapFile(relative)) {
+      this.sources.set(relative, content);
+    }
     this.index.addDocument(relative, content);
   }
 

@@ -9,10 +9,11 @@ import { stopNotice } from '../agent/stopReason';
 import { getSettings } from '../config/settings';
 import { turnOfMessage, findRequestIndex, cutHistory } from '../agent/turns';
 import { readMentionedFiles } from '../agent/mentions';
+import { formatWorkspaceProblems, mentionsProblems } from '../agent/problems';
 import { goalBudgetOk, ensureAgent } from './setup';
 import { refreshQuota } from './commands';
 import * as vscode from 'vscode';
-import { relative } from 'node:path';
+import { isAbsolute, relative } from 'node:path';
 import { planRestore, restoreFiles } from '../storage/backups';
 
 // The limit of the title of a chat.
@@ -319,6 +320,9 @@ export async function buildPromptText(host: MiniMaxController, text: string,
   for (const file of files) {
     blocks.push('Attached file: ' + file.path + '\n' + file.content);
   }
+  if (mentionsProblems(text)) {
+    blocks.push(formatWorkspaceProblems(workspaceDiagnostics(host.workspaceRoot())));
+  }
   for (const selection of selections) {
     const header =
       'Selected code from ' +
@@ -332,3 +336,19 @@ export async function buildPromptText(host: MiniMaxController, text: string,
   return text + '\n\n' + blocks.join('\n\n');
 }
 
+// The Problems of the editor inside the workspace, the paths relative to it.
+function workspaceDiagnostics(root: string): Array<{ path: string; diagnostics: Array<{ severity: number; line: number; message: string; source?: string }> }> {
+  return vscode.languages
+    .getDiagnostics()
+    .map(([uri, items]) => ({ path: relative(root, uri.fsPath).replace(/\\/g, '/'), items }))
+    .filter((file) => root.length > 0 && !file.path.startsWith('..') && !isAbsolute(file.path))
+    .map((file) => ({
+      path: file.path,
+      diagnostics: file.items.map((item) => ({
+        severity: item.severity,
+        line: item.range.start.line,
+        message: item.message,
+        ...(item.source ? { source: item.source } : {})
+      }))
+    }));
+}

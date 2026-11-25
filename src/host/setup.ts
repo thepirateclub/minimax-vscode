@@ -10,6 +10,8 @@ import { buildWorkspaceSnapshot, renderSnapshot } from '../agent/context';
 import { buildSystemPrompt, renderGitContext, renderTasksContext, renderGoalContext } from '../agent/prompt';
 import { readRepositoryState, summarizeState } from '../git/status';
 import { budgetOver } from '../agent/goalBudget';
+import { renderRepoMap } from '../search/repoMap';
+import { searchFor } from './workspace';
 import { AgentSession } from '../agent/session';
 import type { MiniMaxSettings } from '../config/settings';
 import { getApiKey } from '../config/secrets';
@@ -60,6 +62,13 @@ export async function sessionContext(host: MiniMaxController, runtime: RuntimeSe
   const git = await gitContext(host);
   if (git.length > 0) {
     parts.push(git);
+  }
+  // The map of the project: the model knows where a thing lives before it
+  // searches. A failed index leaves the turn without the map, not broken.
+  const root = host.workspaceRoot();
+  const map = root ? await searchFor(host, root).repoMap().catch(() => '') : '';
+  if (map.length > 0) {
+    parts.push(renderRepoMap(map));
   }
   const tasks = renderTasksContext(runtime.todos);
   if (tasks.length > 0) {
