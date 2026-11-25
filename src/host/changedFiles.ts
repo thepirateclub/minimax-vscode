@@ -65,3 +65,17 @@ export function forgetChangedFiles(
   const gone = new Set(paths.map(fileKey));
   return list.filter((file) => !gone.has(fileKey(file.path)));
 }
+
+// The reader closed the list: the files of that moment leave it, the list
+// shows only what changes after. A closed file with a new status is a new
+// change and comes back.
+export function dismissKeys(files: readonly { path: string; status: string }[]): Set<string> {
+  return new Set(files.map((file) => fileKey(file.path) + '|' + file.status));
+}
+
+export function withoutDismissed<T extends { path: string; status: string }>(
+  files: readonly T[],
+  dismissed: ReadonlySet<string>
+): T[] {
+  return files.filter((file) => !dismissed.has(fileKey(file.path) + '|' + file.status));
+}

@@ -62,4 +62,7 @@ export interface RuntimeSession {
   // The files the agent changed in this chat, the panel shows them with
   // their status.
   changedFiles: ChangedFile[];
+  // The files of the list the reader closed: the list shows only what
+  // changes after (`dismissKeys` in changedFiles.ts).
+  dismissedFiles?: Set<string>;
 }

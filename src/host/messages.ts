@@ -6,7 +6,7 @@ import { dropApprovalCard, dropApprovalCards, agentsByPriority } from './approva
 import { alwaysConfirms } from '../ui/approvalScope';
 import { persist, loadOlder, selectSession, deleteSession, startNewSession } from './sessions';
 import { handleSend, retryTurn, rewindTo } from './turn';
-import { postSummary, openFile, sendSuggestions } from './workspace';
+import { dismissSummary, postSummary, openFile, sendSuggestions } from './workspace';
 import { updateSetting, pickFiles, postSettings, saveSettings, storeApiKey, clearApiKey } from './settings';
 import { undoLastChange } from './commands';
 import { savePastedImage } from './pasteImage';
@@ -42,6 +42,10 @@ export async function handleWebviewMessage(host: MiniMaxController, message: Web
   }
   if (message.type === 'send_all_queued') {
     sendAllQueued(host);
+    return;
+  }
+  if (message.type === 'clear_summary') {
+    await dismissSummary(host);
     return;
   }
   if (message.type === 'remove_queued') {

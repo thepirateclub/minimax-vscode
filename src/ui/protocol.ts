@@ -292,6 +292,7 @@ export type WebToExt =
   | { type: 'send_all_queued' }
   // A message leaves the queue.
   | { type: 'remove_queued'; id: string }
+  | { type: 'clear_summary' }
   // The panel asks for the older messages of the chat.
   | { type: 'load_older' }
   | { type: 'stop' }

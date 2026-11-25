@@ -262,7 +262,10 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
         <SummaryBar
           files={summary}
           onOpenFile={(path) => vscode.postMessage({ type: 'open_file', path })}
-          onClear={() => setSummary([])}
+          onClear={() => {
+            setSummary([]);
+            vscode.postMessage({ type: 'clear_summary' });
+          }}
         />
         <Composer
           skills={extras.skills}

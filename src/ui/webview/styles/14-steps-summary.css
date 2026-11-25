@@ -206,8 +206,9 @@
   background: var(--ok);
 }
 
+/* M blue, A green, D red: the colors of the change in the editor */
 .summary-badge-modified {
-  background: var(--muted);
+  background: var(--vscode-charts-blue, #4daafc);
 }
 
 .summary-badge-deleted {
@@ -223,4 +224,4 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
+}
