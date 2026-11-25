@@ -351,6 +351,11 @@ export const DESCRIBERS: Record<string, Describer> = {
       (textOrEmpty(input['glob']) ? ' ' + textOrEmpty(input['glob']) : ''),
     summary: ''
   }),
+  path_exists: ({ input }) => ({
+    icon: <IconSearch />,
+    title: STRINGS.toolPathExists + ' ' + (Array.isArray(input['paths']) ? input['paths'].map(String).join(', ') : text(input['paths'])),
+    summary: ''
+  }),
   diff_files: ({ input }) => ({
     icon: <IconRead />,
     title: STRINGS.toolDiffFiles + ' ' + text(input['path_a']) + ' ↔ ' + text(input['path_b']),

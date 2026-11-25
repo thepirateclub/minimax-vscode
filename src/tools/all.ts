@@ -4,6 +4,7 @@ import type { DiagnosticsProvider } from './diagnostics';
 import { createCmdTools } from './cmd';
 import { createCompareTools } from './compare';
 import { createGrepTools } from './grep';
+import { createExistsTools } from './exists';
 import { createContainerTools } from './containers';
 import { createExploreTools } from './explore';
 import { createFileTools } from './fs';
@@ -46,6 +47,7 @@ export function createAllTools(deps: AllToolDeps): ToolEntry[] {
     ...createExploreTools({ search: deps.search }),
     ...createGrepTools(),
     ...createCompareTools(),
+    ...createExistsTools(),
     ...createGitTools(),
     ...createTerminalTools(),
     ...createCmdTools(),

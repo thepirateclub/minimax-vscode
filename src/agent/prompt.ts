@@ -178,6 +178,10 @@ const TOOL_LINES: Array<{ name: string; line: string }> = [
     line: '- grep(pattern, path?, glob?, ignore_case?, context?) - search the files with a regular expression and see every match with the lines around it'
   },
   {
+    name: 'path_exists',
+    line: '- path_exists(paths) - check whether files and folders exist, several at once; a missing path comes with the similar names of its folder'
+  },
+  {
     name: 'diff_files',
     line: '- diff_files(path_a, path_b) - the unified diff of two files of the workspace'
   },
