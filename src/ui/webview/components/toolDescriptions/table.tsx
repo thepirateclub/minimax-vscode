@@ -319,6 +319,14 @@ export const DESCRIBERS: Record<string, Describer> = {
         : done + '/' + todos.length + ' ' + STRINGS.toolTodoDone
     };
   },
+  read_skill: ({ input }) => {
+    const file = text(input['file']);
+    return {
+      icon: <IconRead />,
+      title: STRINGS.toolReadSkill + ' ' + text(input['name']) + (file ? ' ' + file : ''),
+      summary: ''
+    };
+  },
   get_goal: ({}) => {
     return { icon: <IconCheck />, title: STRINGS.toolGetGoal, summary: '' };
   },

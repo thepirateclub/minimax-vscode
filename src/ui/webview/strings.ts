@@ -119,6 +119,7 @@ export const STRINGS = {
   toolTodo: 'Update tasks',
   toolTodoDone: 'done',
   toolGetGoal: 'Read goal',
+  toolReadSkill: 'Read skill',
   toolGoalComplete: 'Mark goal complete',
   toolGoalBlocked: 'Mark goal blocked',
   toolUpdateGoal: 'Update goal',

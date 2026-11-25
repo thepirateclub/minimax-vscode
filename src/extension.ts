@@ -1,3 +1,4 @@
+import { discoverSkills } from './skills/skills';
 import { toUiQuota } from './ui/quotaMeter';
 import { isAbsolute } from 'node:path';
 import { HttpSpeechClient } from './api/speech';
@@ -111,7 +112,8 @@ export class MiniMaxController {
       search: (root) => searchFor(this, root),
       spawn: async (request, ctx, progress) =>
         await spawnTask(this, request, ctx, progress),
-      diagnostics: editorDiagnostics()
+      diagnostics: editorDiagnostics(),
+      skills: async (root) => await discoverSkills(root)
     })) {
       this.registry.register(tool);
     }

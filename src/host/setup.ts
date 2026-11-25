@@ -1,3 +1,4 @@
+import { discoverSkills, renderSkills } from '../skills/skills';
 import type { MiniMaxController } from '../extension';
 import type { RuntimeSession } from './runtime';
 import type { ToolRegistry } from '../tools/registry';
@@ -70,6 +71,12 @@ export async function sessionContext(host: MiniMaxController, runtime: RuntimeSe
   const map = root ? await searchFor(host, root).repoMap().catch(() => '') : '';
   if (map.length > 0) {
     parts.push(renderRepoMap(map));
+  }
+  // The skills: their names and descriptions, the model reads the body with
+  // read_skill. A broken folder leaves the turn without the section.
+  const skills = root ? renderSkills(await discoverSkills(root).catch(() => [])) : '';
+  if (skills.length > 0) {
+    parts.push(skills);
   }
   const tasks = renderTasksContext(runtime.todos);
   if (tasks.length > 0) {

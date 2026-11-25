@@ -12,6 +12,8 @@ import { createTaskTools, type TaskOptions } from './task';
 import { createTaskFileTools } from './tasks';
 import { createTerminalTools } from './terminal';
 import { createTodoTools } from './todo';
+import { createSkillTools } from './skills';
+import type { Skill } from '../skills/skills';
 import type { ToolEntry } from './types';
 
 // The tools of the agent, one list for the host and for the tests. The list
@@ -26,6 +28,8 @@ export interface AllToolDeps {
   spawn: TaskOptions['spawn'];
   // The problems of a file after a change, absent in the tests.
   diagnostics?: DiagnosticsProvider;
+  // The skills of the project and of the user, absent in the tests.
+  skills?: (workspaceRoot: string) => Promise<Skill[]>;
 }
 
 export function createAllTools(deps: AllToolDeps): ToolEntry[] {
@@ -40,6 +44,7 @@ export function createAllTools(deps: AllToolDeps): ToolEntry[] {
     ...createReplTools(),
     ...createContainerTools(),
     ...createGoalTools(),
-    ...createTaskTools({ spawn: deps.spawn })
+    ...createTaskTools({ spawn: deps.spawn }),
+    ...createSkillTools({ skills: deps.skills ?? (async () => []) })
   ];
 }
