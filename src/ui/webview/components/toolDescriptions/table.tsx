@@ -3,6 +3,7 @@ import type { UiToolCall } from '../../../protocol';
 import { STRINGS } from '../../strings';
 import { todoItems } from '../../todoItems';
 import { countLines, firstLine, readRange, text } from '../toolCardHelpers';
+import { textOrEmpty } from '../../value';
 import {
   IconCheck,
   IconEdit,
@@ -344,6 +345,22 @@ export const DESCRIBERS: Record<string, Describer> = {
     summary: ''
   }),
   note_search: ({ input }) => ({ icon: <IconSearch />, title: STRINGS.toolNoteSearch + ' ' + text(input['query']), summary: '' }),
+  grep: ({ input }) => ({
+    icon: <IconSearch />,
+    title: STRINGS.toolGrep + ' /' + text(input['pattern']) + '/' + (textOrEmpty(input['path']) ? ' ' + textOrEmpty(input['path']) : '') +
+      (textOrEmpty(input['glob']) ? ' ' + textOrEmpty(input['glob']) : ''),
+    summary: ''
+  }),
+  diff_files: ({ input }) => ({
+    icon: <IconRead />,
+    title: STRINGS.toolDiffFiles + ' ' + text(input['path_a']) + ' ↔ ' + text(input['path_b']),
+    summary: ''
+  }),
+  compare: ({ input }) => ({
+    icon: <IconRead />,
+    title: STRINGS.toolCompare + ' ' + (textOrEmpty(input['path_a']) || 'text') + ' ↔ ' + (textOrEmpty(input['path_b']) || 'text'),
+    summary: ''
+  }),
   read_symbol: ({ input }) => ({
     icon: <IconRead />,
     title:

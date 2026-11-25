@@ -1,3 +1,4 @@
+import { missingFileHint } from './hints';
 import { execFile, spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -310,6 +311,10 @@ export async function executeRepl(
   }
   if (payload.error !== undefined) {
     parts.push('[error] ' + payload.error);
+  }
+  const hint = missingFileHint(payload.error ?? payload.output, ctx.workspaceRoot);
+  if (hint) {
+    parts.push(hint);
   }
   const text = parts.join('\n');
   return {
