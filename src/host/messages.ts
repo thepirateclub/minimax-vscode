@@ -9,6 +9,7 @@ import { handleSend, retryTurn, rewindTo } from './turn';
 import { postSummary, openFile, sendSuggestions } from './workspace';
 import { updateSetting, pickFiles, postSettings, saveSettings, storeApiKey, clearApiKey } from './settings';
 import { undoLastChange } from './commands';
+import { savePastedImage } from './pasteImage';
 
 export async function handleWebviewMessage(host: MiniMaxController, message: WebToExt): Promise<void> {
   if (
@@ -217,6 +218,10 @@ export async function handleWebviewMessage(host: MiniMaxController, message: Web
   }
   if (message.type === 'pick_files') {
     await pickFiles(host, message.requestId);
+    return;
+  }
+  if (message.type === 'paste_image') {
+    await savePastedImage(host, message.name, message.dataUrl);
     return;
   }
   if (message.type === 'undo_last_change') {

@@ -292,4 +292,21 @@
 .composer-send.stop:hover {
   color: var(--err);
 }
-
+
+/* The thumbnails of the pasted images stand over the field, the field holds
+   a chip with the name of the file. The <img> inside the text moved the
+   caret and pushed the words aside. */
+.pasted-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pasted-image {
+  display: block;
+  max-width: 120px;
+  max-height: 64px;
+  object-fit: cover;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}

@@ -1,5 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
-import type { KeyboardEvent, MouseEvent } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
 import type { EffortLevel } from '../../../api/types';
 import type { AgentMode, ModelInfo } from '../../../config/models';
 import type {
@@ -8,11 +7,12 @@ import type {
   UiSelection,
   UiSuggestion,
   VoiceState,
+  QueuedMessage,
 } from '../../protocol';
-import type { QueuedMessage } from '../../protocol';
 import { dictationPiece } from '../dictation';
 import { splitRestore } from '../restoreInput';
 import { ComposerInput } from './ComposerInput';
+import { usePastedImages } from './pastedImages';
 import { matchSkills, skillSuggestion, slashPrefix, typedSkill, type UiSkill } from '../../skillMentions';
 import {
   createMentionChip,
@@ -83,7 +83,8 @@ export function Composer({
   onSendQueued,
   onSendAllQueued,
   onRemoveQueued,
-  skills = []
+  skills = [],
+  onPasteImage
 }: {
   busy: boolean;
   selections: UiSelection[];
@@ -124,11 +125,12 @@ export function Composer({
   onRemoveQueued?: (id: string) => void;
   // The skills the host found, the slash of the field suggests them.
   skills?: UiSkill[];
+  // A pasted image goes to the host, it saves the file and answers with the path.
+  onPasteImage?: (name: string, dataUrl: string) => void;
 }) {
-
   const [active, setActive] = useState(0);
-  // The skills after a slash: the panel finds them itself, the host sent
-  // the list. They take the place of the files in the list.
+  const pasted = usePastedImages(onPasteImage);
+  // The skills after a slash take the place of the files in the list.
   const [skillItems, setSkillItems] = useState<UiSuggestion[]>([]);
   const shown = skillItems.length > 0 ? skillItems : suggestions;
   const [empty, setEmpty] = useState(true);
@@ -195,10 +197,9 @@ export function Composer({
     report();
   }, [restore?.token]);
 
-  // The text the microphone hears lives in one span after the draft: every
-  // live update replaces it, the final text turns it into plain text and the
-  // caret follows it. The span cannot be edited, the typing of the reader
-  // goes around it and is not lost on the next update.
+  // The speech lives in one span after the draft: a live update replaces it,
+  // the final text turns it into plain text. The span cannot be edited, the
+  // typing of the reader goes around it.
   useEffect(() => {
     if (!dictation) {
       return;
@@ -243,6 +244,7 @@ export function Composer({
     const content = readContent(root);
     setEmpty(content.text.trim().length === 0);
     onContentChange?.({ text: content.text, mentions: content.mentions });
+    pasted.track(content.mentions);
     const before = visibleBeforeCaret(root);
     // A name of a skill typed in full and closed with a space is a chip.
     // One chip per report: the second pass only reads the field again.
@@ -293,8 +295,7 @@ export function Composer({
       return;
     }
     // A running turn does not hold the requests: the message waits in the
-    // queue of the chat and goes out when the turn is over. A command of the
-    // panel does not reach the model and goes through right away.
+    // queue of the chat, a command of the panel goes through right away.
     onSend(content.text.trim(), content.mentions, selections);
   };
 
@@ -368,6 +369,8 @@ export function Composer({
       empty={empty}
       goalMode={goalMode}
       onInput={() => report()}
+      onPaste={pasted.onPaste(() => report())}
+      images={pasted.images}
       onKeyDown={handleKeyDown}
       onMouseDown={handleMouseDown}
       onPickFiles={onPickFiles}

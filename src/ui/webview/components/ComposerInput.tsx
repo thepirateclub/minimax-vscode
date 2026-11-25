@@ -1,8 +1,9 @@
-import type { KeyboardEvent, MouseEvent, ReactNode } from 'react';
+import type { ClipboardEvent, KeyboardEvent, MouseEvent, ReactNode } from 'react';
 import type { EffortLevel } from '../../../api/types';
 import type { AgentMode, ModelInfo } from '../../../config/models';
 import type { UiQueuedMessage, UiRetryStatus, UiSelection, UiSuggestion, VoiceState } from '../../protocol';
 import { STRINGS } from '../strings';
+import type { PastedImage } from './pastedImages';
 import {
   IconAttach,
   IconClose,
@@ -75,6 +76,9 @@ export function ComposerInput(props: {
   onInput: () => void;
   onKeyDown: (event: KeyboardEvent<HTMLDivElement>) => void;
   onMouseDown: (event: MouseEvent<HTMLDivElement>) => void;
+  onPaste?: (event: ClipboardEvent<HTMLDivElement>) => void;
+  // The thumbnails of the pasted images whose chips are in the field.
+  images?: PastedImage[];
   onPickFiles: () => void;
   model: string;
   models: ModelInfo[];
@@ -100,7 +104,7 @@ export function ComposerInput(props: {
 }): ReactNode {
   const {
     suggestions, active, onPick, selections, onRemoveSelection, editorRef,
-    empty, goalMode, onInput, onKeyDown, onMouseDown, onPickFiles,
+    empty, goalMode, onInput, onKeyDown, onMouseDown, onPaste, images = [], onPickFiles,
     model, models, mode, effort, thinking, voice, busy, queue, retryStatus,
     onSendQueued, onSendAllQueued, onRemoveQueued,
     onModel, onEffort, onMode, onThinking, onGoalMode,
@@ -163,6 +167,13 @@ export function ComposerInput(props: {
             ))}
           </div>
         ) : null}
+        {images.length > 0 ? (
+          <div className="pasted-images">
+            {images.map((image) => (
+              <img key={image.path} className="pasted-image" src={image.src} alt={image.path} title={image.path} />
+            ))}
+          </div>
+        ) : null}
         <QueueBar
           items={queue}
           onSend={(id) => onSendQueued?.(id)}
@@ -190,6 +201,7 @@ export function ComposerInput(props: {
             onInput={onInput}
             onKeyDown={onKeyDown}
             onMouseDown={onMouseDown}
+            onPaste={onPaste}
           />
           <button
             className="composer-attach"
