@@ -15,8 +15,22 @@ import {
   previewOf,
   signatureOf, progressCheck, todoCheck, noteCheck, isReadingCall } from './toolRunner';
 import { streamWithRetry } from './retry';
+import { deltaOf, IdleState } from './assistant';
+import type { AssistantState } from './assistant';
 import type { AgentOptions, AgentRunResult } from './types';
 export { DEFAULT_MAX_RETRIES, retryDelay } from './retry';
+export {
+  deltaOf,
+  Delta,
+  AnswerDelta,
+  ReasoningDelta,
+  AssistantState,
+  IdleState,
+  AnswerState,
+  ReasoningState,
+  MixedState,
+} from './assistant';
+export type { AssistantStep } from './assistant';
 export type { AgentEvent, AgentOptions, AgentRunOptions, AgentRunResult } from './types';
 import type { ToolStateUpdate } from './state';
 import type { ChangedFile } from '../tools/types';
@@ -32,7 +46,9 @@ const MAX_LEAKS = 2;
 export class Agent {
   private readonly options: AgentOptions;
   private readonly controller = new AbortController();
-  private pendingAssistantStart = true;
+  // The state of the machine of the message of the assistant: the process
+  // changes it by the result of the step.
+  private assistantState: AssistantState = new IdleState();
 
   constructor(options: AgentOptions) {
     this.options = options;
@@ -75,11 +91,12 @@ export class Agent {
     let usage: Usage = { inputTokens: 0, outputTokens: 0 };
 
     for (let iteration = 0; iteration < this.options.maxIterations; iteration++) {
-      this.pendingAssistantStart = true;
+      // A new turn of the model: the message of the assistant starts anew.
+      this.assistantState = new IdleState();
       // The request carries the old long results of the tools as stubs, the
       // history of the run keeps them whole (src/api/clearResults.ts).
       const request = clearOldToolResults(messages);
-      const streamed = await streamWithRetry(this.options, this.controller, request, (event) => this.handleEvent(event));
+      const streamed = await streamWithRetry(this.options, this.controller, request, (event) => this.applyAssistant(event));
       const blocks = streamed.blocks;
       usage = addUsage(usage, streamed.usage);
       // The spend of every request goes to the host, the limits of the goal
@@ -328,22 +345,17 @@ export class Agent {
     return { messages, stopReason: 'max_iterations', usage, requestIndex };
   }
 
-  private handleEvent(event: StreamEvent): void {
-    if (event.type === 'text_delta') {
-      this.startAssistantMessage();
-      this.options.onEvent({ type: 'assistant_text', text: event.text });
-    } else if (event.type === 'thinking_delta') {
-      this.startAssistantMessage();
-      this.options.onEvent({ type: 'assistant_thinking', text: event.text });
-    }
-  }
-
-  private startAssistantMessage(): void {
-    if (!this.pendingAssistantStart) {
+  // The process of the message of the assistant: the machine changes its
+  // state by the result of the step, the events of the step go to the panel.
+  private applyAssistant(event: StreamEvent): void {
+    const delta = deltaOf(event);
+    if (!delta) {
       return;
     }
-    this.pendingAssistantStart = false;
-    this.options.onEvent({ type: 'assistant_start' });
+    const step = this.assistantState.apply(delta);
+    this.assistantState = step.state;
+    for (const item of step.events) {
+      this.options.onEvent(item);
+    }
   }
-
 }

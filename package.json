@@ -2,7 +2,7 @@
   "name": "minimax-agent",
   "displayName": "MiniMax Agent",
   "description": "Coding agent for VS Code powered by MiniMax models",
-  "version": "0.42.5",
+  "version": "0.43.1",
   "publisher": "katagarov",
   "license": "MIT",
   "repository": {
@@ -122,6 +122,26 @@
         "category": "MiniMax"
       },
       {
+        "command": "minimax.explainSelection",
+        "title": "Explain Selection",
+        "category": "MiniMax"
+      },
+      {
+        "command": "minimax.annotateSelection",
+        "title": "Annotate Selection for Chat",
+        "category": "MiniMax"
+      },
+      {
+        "command": "minimax.improveSelection",
+        "title": "Improve Selection",
+        "category": "MiniMax"
+      },
+      {
+        "command": "minimax.commentSelection",
+        "title": "Add Comments to Selection",
+        "category": "MiniMax"
+      },
+      {
         "command": "minimax.addFile",
         "title": "Add File to Chat",
         "category": "MiniMax"
@@ -208,6 +228,13 @@
           "type": "boolean",
           "default": false,
           "description": "Collapses the cards of the actions. The card keeps its title, the details open on a click."
+        },
+        "minimax.improvePrompt": {
+          "type": "string",
+          "default": "",
+          "scope": "application",
+          "editPresentation": "multilineText",
+          "markdownDescription": "The instruction of the command **Improve Selection**. The whole file goes with it, the selected lines are marked. Empty: the built-in prompt that improves the region and keeps its behavior."
         },
         "minimax.collapseCode": {
           "type": "boolean",
@@ -363,6 +390,26 @@
           "command": "minimax.addSelection",
           "when": "editorHasSelection",
           "group": "0_minimax@1"
+        },
+        {
+          "command": "minimax.explainSelection",
+          "when": "editorHasSelection",
+          "group": "0_minimax@2"
+        },
+        {
+          "command": "minimax.annotateSelection",
+          "when": "editorHasSelection",
+          "group": "0_minimax@3"
+        },
+        {
+          "command": "minimax.improveSelection",
+          "when": "editorHasSelection && !editorReadonly",
+          "group": "0_minimax@4"
+        },
+        {
+          "command": "minimax.commentSelection",
+          "when": "editorHasSelection && !editorReadonly",
+          "group": "0_minimax@5"
         }
       ],
       "explorer/context": [
@@ -382,6 +429,11 @@
       {
         "command": "minimax.addSelection",
         "key": "ctrl+alt+m",
+        "when": "editorTextFocus && editorHasSelection"
+      },
+      {
+        "command": "minimax.annotateSelection",
+        "key": "ctrl+alt+n",
         "when": "editorTextFocus && editorHasSelection"
       }
     ]

@@ -228,8 +228,10 @@ export function stubFetch(queue: string[], log: FetchLog): void {
       const payload = queue.shift() ?? TEXT_SSE;
       if (payload === 'HOLD') {
         // The turn of the model waits for the test.
-        await new Promise<void>((resolve) => {
+        // The stop of the turn aborts the request, as the real fetch does.
+        await new Promise<void>((resolve, reject) => {
           state.holdResponse = resolve;
+          init?.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
         });
         return new Response(TEXT_SSE, {
           status: 200,

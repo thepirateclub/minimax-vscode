@@ -148,12 +148,15 @@ export function ComposerInput(props: {
           <div className="selections">
             {selections.map((selection) => (
               <span key={selection.id} className="selection">
-                <span className="selection-kind">{STRINGS.selection}</span>
+                <span className="selection-kind">{selection.note ? STRINGS.annotation : STRINGS.selection}</span>
                 <span className="selection-label" title={selection.path}>
                   {selection.label}
                 </span>
                 {selection.detail ? (
                   <span className="selection-detail">{selection.detail}</span>
+                ) : null}
+                {selection.note ? (
+                  <span className="selection-note" title={selection.note}>{selection.note}</span>
                 ) : null}
                 <button
                   className="selection-remove"

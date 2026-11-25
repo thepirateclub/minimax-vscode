@@ -30,7 +30,8 @@ import type { Logger } from './logger';
 import type { QuotaSnapshot } from './api/quota';
 import { applySettings, addApiKey, clearApiKey, setEndpoint, warnAboutTheBaseUrl, selectModel, selectMode, selectEffort } from './host/settings';
 import { showLogs, showUsage, generateCommitMessage, refreshQuota, undoLastChange, refreshContext, prepareIndex, reindex } from './host/commands';
-import { searchFor, addSelectionToChat, addFileToChat } from './host/workspace';
+import { searchFor, addFileToChat } from './host/workspace';
+import { registerEditorActions } from './host/editorActions';
 import type { AgentState } from './ui/protocol';
 
 import { getApiKey } from './config/secrets';
@@ -192,9 +193,7 @@ export class MiniMaxController {
     context.subscriptions.push(
       vscode.commands.registerCommand('minimax.clearApiKey', () => void clearApiKey(this, ))
     );
-    context.subscriptions.push(
-      vscode.commands.registerCommand('minimax.addSelection', () => addSelectionToChat(this, ))
-    );
+    registerEditorActions(this, context);
     context.subscriptions.push(
       vscode.commands.registerCommand('minimax.addFile', (uri?: vscode.Uri) =>
         addFileToChat(this, uri)

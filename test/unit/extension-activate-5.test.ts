@@ -148,6 +148,39 @@ describe('extension activation', () => {
     ]);
   });
 
+  it('sends a message of the queue now: the running turn stops', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.secrets.set('minimax.apiKey', 'test-key');
+    state.responses.push('HOLD', TEXT_SSE);
+    await boot();
+
+    state.receive?.({ type: 'send', text: 'first question', mentions: [], selections: [] });
+    await vi.waitFor(() => {
+      expect(ofType('user_message').length).toBe(1);
+    });
+    state.receive?.({ type: 'send', text: 'urgent question', mentions: [], selections: [] });
+    await vi.waitFor(() => {
+      expect(ofType('queue').pop()?.items).toHaveLength(1);
+    });
+    const item = ofType('queue').pop()!.items[0]!;
+
+    await vi.waitFor(() => {
+      expect(state.holdResponse).toBeDefined();
+    });
+    // The reader does not wait for the turn: the button sends the message now.
+    state.receive?.({ type: 'send_queued', id: item.id });
+    await vi.waitFor(() => {
+      expect(ofType('user_message').map((message) => message.text)).toEqual([
+        'first question',
+        'urgent question'
+      ]);
+    });
+    await vi.waitFor(() => {
+      expect(ofType('queue').pop()!.items[0]?.state).toBe('done');
+    });
+  });
+
   it('tells the panel which version is running', async () => {
     const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
     state.config.set('root', root);

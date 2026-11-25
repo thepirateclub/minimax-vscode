@@ -98,6 +98,8 @@ export interface UiSelection {
   label: string;
   detail?: string;
   content?: string;
+  // The annotation of the reader about this piece of code.
+  note?: string;
 }
 
 export interface UiSuggestion {
@@ -290,6 +292,7 @@ export type WebToExt =
   | { type: 'send_all_queued' }
   // A message leaves the queue.
   | { type: 'remove_queued'; id: string }
+  | { type: 'clear_summary' }
   // The panel asks for the older messages of the chat.
   | { type: 'load_older' }
   | { type: 'stop' }

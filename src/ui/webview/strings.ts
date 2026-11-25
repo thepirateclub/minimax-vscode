@@ -163,6 +163,7 @@ export const STRINGS = {
   toolGoalBlocked: 'Mark goal blocked',
   toolUpdateGoal: 'Update goal',
   selection: 'Selection',
+  annotation: 'Note',
   remove: 'Remove',
   cancel: 'Cancel',
   save: 'Save',

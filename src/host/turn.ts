@@ -1,4 +1,5 @@
 import { discoverSkills, readSkillText } from '../skills/skills';
+import { selectionBlock } from '../agent/editorPrompts';
 import { mentionedSkills } from '../ui/skillMentions';
 import type { MiniMaxController } from '../extension';
 import type { RuntimeSession } from './runtime';
@@ -150,7 +151,7 @@ export async function runTurn(host: MiniMaxController, runtime: RuntimeSession,
         // command. The queue is on hold until the reader asks for it.
         queued.state = 'waiting';
         queued.error = undefined;
-        runtime.queuePaused = true;
+        runtime.queuePaused = !runtime.sendNow;
       } else if (runtime.errorReported) {
         queued.state = 'error';
         queued.error = runtime.lastError;
@@ -162,6 +163,7 @@ export async function runTurn(host: MiniMaxController, runtime: RuntimeSession,
     persist(host, runtime);
     void refreshQuota(host);
     // The next message of the queue goes out.
+    runtime.sendNow = false;
     void pumpQueue(host, runtime);
   }
 }
@@ -346,11 +348,7 @@ export async function buildPromptText(host: MiniMaxController, text: string,
     }
   }
   for (const selection of selections) {
-    const header =
-      'Selected code from ' +
-      selection.path +
-      (selection.detail ? ' (' + selection.detail + ')' : '');
-    blocks.push(header + ':\n' + (selection.content ?? ''));
+    blocks.push(selectionBlock(selection));
   }
   if (blocks.length === 0) {
     return text;

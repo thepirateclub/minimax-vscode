@@ -52,6 +52,9 @@ export interface RuntimeSession {
   // The queue waits until the reader asks for it: the user stopped the
   // turn, the messages stay in the queue.
   queuePaused: boolean;
+  // The reader pressed Send now on a message of the queue while a turn
+  // ran: the turn stops and the queue does not go on hold.
+  sendNow?: boolean;
   // The user stopped the turn of this moment.
   turnStopped: boolean;
   // The reason of the last failure of the turn.
@@ -59,4 +62,7 @@ export interface RuntimeSession {
   // The files the agent changed in this chat, the panel shows them with
   // their status.
   changedFiles: ChangedFile[];
+  // The files of the list the reader closed: the list shows only what
+  // changes after (`dismissKeys` in changedFiles.ts).
+  dismissedFiles?: Set<string>;
 }
