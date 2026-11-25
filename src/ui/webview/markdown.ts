@@ -1,3 +1,4 @@
+import { stripLeakedCalls } from '../../api/leakedCalls';
 import MarkdownIt from 'markdown-it';
 import type { CommandHint } from './commandHistory';
 import { describeCodeBlock, type CodeSource } from './codeBlock';
@@ -171,6 +172,8 @@ export function renderMarkdown(
   sources: CodeSource[] = [],
   options: MarkdownOptions = { collapseCode: false }
 ): string {
+  // A call of a tool that slipped into the text is litter, not the answer.
+  text = stripLeakedCalls(text);
   const collapse = options.collapseCode === true;
   const command = options.command?.command ?? '';
   const key =

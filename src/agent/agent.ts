@@ -1,3 +1,5 @@
+import { findLeakedCall, leakedCallNotice } from '../api/leakedCalls';
+
 import { clearOldToolResults } from '../api/clearResults';
 import { balanceHistory } from '../api/history';
 import type {
@@ -17,6 +19,9 @@ import type { AgentOptions, AgentRunResult } from './types';
 export { DEFAULT_MAX_RETRIES, retryDelay } from './retry';
 export type { AgentEvent, AgentOptions, AgentRunOptions, AgentRunResult } from './types';
 import type { ToolStateUpdate } from './state';
+
+// The answers in a row with a call of a tool in the text, then the turn ends.
+const MAX_LEAKS = 2;
 
 
 
@@ -60,6 +65,8 @@ export class Agent {
     const identicalCalls = new Map<string, number>();
     // The actions of the turn, the check of the progress counts them.
     let actions = 0;
+    // The answers in a row whose call of a tool came as text.
+    let leaks = 0;
     let usage: Usage = { inputTokens: 0, outputTokens: 0 };
 
     for (let iteration = 0; iteration < this.options.maxIterations; iteration++) {
@@ -81,6 +88,15 @@ export class Agent {
           block.type === 'tool_use'
       );
       if (toolUses.length === 0) {
+        // The call came as text and did not run: the model is told so and
+        // calls again. Two such answers in a row end the turn as they are.
+        const text = blocks.map((block) => (block.type === 'text' ? block.text : '')).join('');
+        const leak = findLeakedCall(text);
+        if (leak && leaks < MAX_LEAKS) {
+          leaks += 1;
+          messages.push({ role: 'user', content: [{ type: 'text', text: leakedCallNotice(leak) }] });
+          continue;
+        }
         this.options.onEvent({ type: 'done', stopReason: streamed.stopReason, usage });
         return { messages, stopReason: streamed.stopReason, usage, requestIndex };
       }
