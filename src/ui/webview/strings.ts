@@ -122,6 +122,7 @@ export const STRINGS = {
   toolReadSkill: 'Read skill',
   skillSource: 'Skill',
   toolGrep: 'Grep',
+  toolReadImage: 'View image',
   toolPathExists: 'Check',
   toolDiffFiles: 'Diff',
   toolCompare: 'Compare',

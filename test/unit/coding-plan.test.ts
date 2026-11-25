@@ -65,8 +65,8 @@ describe('the coding plan endpoints', () => {
     for (const tool of createWebTools({ connection: async () => undefined, webSearchEnabled: () => enabled })) {
       registry.register(tool);
     }
-    expect(registry.toAnthropicTools('code').map((tool) => tool.name)).toEqual(['understand_image']);
+    expect(registry.toAnthropicTools('code').map((tool) => tool.name)).toEqual(['understand_image', 'read_image']);
     enabled = true;
-    expect(registry.toAnthropicTools('plan').map((tool) => tool.name)).toEqual(['web_search', 'understand_image']);
+    expect(registry.toAnthropicTools('plan').map((tool) => tool.name)).toEqual(['web_search', 'understand_image', 'read_image']);
   });
 });

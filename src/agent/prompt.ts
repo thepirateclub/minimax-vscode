@@ -178,6 +178,10 @@ const TOOL_LINES: Array<{ name: string; line: string }> = [
     line: '- grep(pattern, path?, glob?, ignore_case?, context?) - search the files with a regular expression and see every match with the lines around it'
   },
   {
+    name: 'read_image',
+    line: '- read_image(path, prompt?, crop?, scale?, info_only?) - read an image of the project: its size, and what it shows through the vision model; crop {x, y, width, height} looks at a region of a PNG and scale 2-4 enlarges it, never crop and save images in the REPL for this'
+  },
+  {
     name: 'path_exists',
     line: '- path_exists(paths) - check whether files and folders exist, several at once; a missing path comes with the similar names of its folder'
   },
