@@ -116,5 +116,6 @@ describe('the order of the tasks', () => {
       {} as never
     );
     expect(result.content).toContain('Next by priority: first.');
+    expect(result.content).toContain('No task is in_progress');
   });
 });
