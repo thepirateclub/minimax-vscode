@@ -1,5 +1,6 @@
 import type { ToolEntry } from '../types';
 import { htmlToText } from './html';
+import { refuseAddress, resolveHost, type Resolve } from './address';
 
 // The page comes from the machine of the user: the key of the M Plan is not
 // needed, nothing is changed on the disk and nobody is asked. The tool only
@@ -39,7 +40,15 @@ export interface WebFetchOptions {
   timeoutMs?: number;
   // How much of the answer may come to the model.
   maxBytes?: number;
+  // The resolver of the names for the guard of the local network. The real
+  // DNS with the real network; a test with a fake network checks only the
+  // literal addresses.
+  resolve?: Resolve;
 }
+
+// A public page may redirect to the local network: every hop is checked.
+const MAX_REDIRECTS = 5;
+const REDIRECTS = new Set([301, 302, 303, 307, 308]);
 
 export interface FetchedPage {
   // The address after the redirects.
@@ -154,6 +163,7 @@ export async function fetchPage(
     signal: AbortSignal;
     timeoutMs: number;
     maxBytes: number;
+    resolve?: Resolve;
   }
 ): Promise<FetchedPage> {
   if (options.signal.aborted) {
@@ -168,13 +178,34 @@ export async function fetchPage(
   const onAbort = () => controller.abort();
   options.signal.addEventListener('abort', onAbort, { once: true });
   try {
-    const response = await options.fetchImpl(url, {
-      signal: controller.signal,
-      headers: {
-        'User-Agent': 'MiniMax-Agent',
-        Accept: 'text/html,application/xhtml+xml,text/plain,application/json;q=0.9,*/*;q=0.8'
+    let current = url;
+    let response: Response;
+    for (let hop = 0; ; hop++) {
+      const refused = await refuseAddress(current, options.resolve);
+      if (refused) {
+        throw new Error(refused);
       }
-    });
+      // The turn may be cancelled while the name is resolved.
+      if (options.signal.aborted) {
+        throw new Error('the turn was cancelled');
+      }
+      response = await options.fetchImpl(current, {
+        signal: controller.signal,
+        redirect: 'manual',
+        headers: {
+          'User-Agent': 'MiniMax-Agent',
+          Accept: 'text/html,application/xhtml+xml,text/plain,application/json;q=0.9,*/*;q=0.8'
+        }
+      });
+      const location = response.headers.get('location');
+      if (!REDIRECTS.has(response.status) || !location) {
+        break;
+      }
+      if (hop >= MAX_REDIRECTS) {
+        throw new Error('the address redirects more than ' + MAX_REDIRECTS + ' times');
+      }
+      current = new URL(location, current).toString();
+    }
     if (!response.ok) {
       const status = response.status + (response.statusText ? ' ' + response.statusText : '');
       throw new Error('the server answered ' + status);
@@ -191,7 +222,7 @@ export async function fetchPage(
       );
     }
     const body = await readLimited(response, options.maxBytes);
-    return { url: response.url || url, contentType, bytes: body.bytes, body: body.text };
+    return { url: response.url || current, contentType, bytes: body.bytes, body: body.text };
   } catch (error) {
     if (timedOut) {
       const limit =
@@ -215,6 +246,7 @@ export function createWebFetchTool(options: WebFetchOptions = {}): ToolEntry {
   const fetchImpl = options.fetchImpl ?? fetch;
   const timeoutMs = options.timeoutMs ?? WEB_FETCH_TIMEOUT_MS;
   const maxBytes = options.maxBytes ?? WEB_FETCH_MAX_BYTES;
+  const resolve = options.resolve ?? (options.fetchImpl ? undefined : resolveHost);
   return {
     name: 'web_fetch',
     description:
@@ -250,7 +282,8 @@ export function createWebFetchTool(options: WebFetchOptions = {}): ToolEntry {
           fetchImpl,
           signal: ctx.signal,
           timeoutMs,
-          maxBytes
+          maxBytes,
+          resolve
         });
       } catch (error) {
         return failure(error);
