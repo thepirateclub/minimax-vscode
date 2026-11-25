@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { createCompareTools, formatUnified } from '../../src/tools/compare';
 import { diffLines } from '../../src/tools/diff';
 import { createGrepTools, globToRegExp, grepText } from '../../src/tools/grep';
+import { createExistsTools, nearNames } from '../../src/tools/exists';
 import { missingFileHint } from '../../src/tools/repl/hints';
 import type { ToolContext } from '../../src/tools/types';
 
@@ -76,5 +77,26 @@ describe('the hint of a missing file in the REPL', () => {
     expect(hint).toContain('workspace root C:\\w');
     expect(missingFileHint("FileNotFoundError: [Errno 2] No such file or directory: 'x.txt'", '/w')).toContain('x.txt');
     expect(missingFileHint('TypeError: x is not a function', '/w')).toBeUndefined();
+  });
+});
+
+// The check of a path is a tool: a file, a folder or missing with the names
+// that look like it.
+describe('path_exists', () => {
+  it('names a file, a folder and a missing path with its neighbours', async () => {
+    const root = await workspace();
+    const [exists] = createExistsTools();
+    const result = await exists!.execute({ paths: ['src/a.ts', 'src', 'src/A.TS.bak', 'src/c.ts', 'gone/x.ts', '../out'] }, ctx(root));
+    const lines = result.content.split('\n');
+    expect(lines[0]).toMatch(/^src\/a\.ts: file, \d+ B, changed /);
+    expect(lines[1]).toBe('src: folder, 2 entries');
+    expect(lines[3]).toBe('src/c.ts: missing');
+    expect(lines[4]).toBe('gone/x.ts: missing, its folder is missing too');
+    expect(lines[5]).toMatch(/^\.\.\/out: refused/);
+  });
+
+  it('finds the names that look like the missing one', () => {
+    expect(nearNames('Readme.md', ['README.md', 'src'])).toEqual(['README.md']);
+    expect(nearNames('parser.ts', ['parser.test.ts', 'lexer.ts'])).toEqual(['parser.test.ts']);
   });
 });
