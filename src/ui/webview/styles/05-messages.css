@@ -112,7 +112,7 @@
 /* The words of the user sit on a quiet plate. A fill in the color of the
    button made the question louder than the answer. */
 .bubble.user-bubble {
-  max-width: 92%;
+  max-width: 100%;
   /* The arrow takes its place, the words of the request give way. */
   min-width: 0;
   background: var(--vscode-textBlockQuote-background, rgba(128, 128, 128, 0.12));

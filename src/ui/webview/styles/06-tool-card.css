@@ -90,6 +90,10 @@
   align-items: flex-end;
   gap: 2px;
   min-width: 0;
+  /* The limit of the request lives here, not on the bubble: the stack
+     takes the width of its words, a percentage of the bubble counted from
+     it made a short request wrap after every word. */
+  max-width: 92%;
 }
 
 /* A failed action is marked with a straight bar in the color of the failed
