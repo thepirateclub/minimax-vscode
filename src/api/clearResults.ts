@@ -57,7 +57,7 @@ function stub(call: AnthropicToolUseBlock | undefined, length: number): string {
     name +
     ' is cleared, ' +
     length +
-    ' characters. Call the tool again if you need it.]'
+    ' characters. Call the tool again if you need it, and keep what you found with note_write before it is cleared.]'
   );
 }
 

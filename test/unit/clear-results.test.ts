@@ -32,7 +32,7 @@ describe('clearOldToolResults', () => {
     const shown = results(clearOldToolResults(history));
     expect(shown.slice(2).every((content) => content === LONG)).toBe(true);
     expect(shown[0]).toBe(
-      '[The old result of read_file f0.ts is cleared, 2000 characters. Call the tool again if you need it.]'
+      '[The old result of read_file f0.ts is cleared, 2000 characters. Call the tool again if you need it, and keep what you found with note_write before it is cleared.]'
     );
     expect(shown[1]).toContain('read_file f1.ts');
   });

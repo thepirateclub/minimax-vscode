@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PROGRESS_EVERY, TODO_EVERY, todoCheck } from '../../src/agent/toolRunner';
+import { isReadingCall, NOTE_EVERY, noteCheck, PROGRESS_EVERY, TODO_EVERY, todoCheck } from '../../src/agent/toolRunner';
 import type { StreamEvent } from '../../src/api/types';
 import { FakeClient, makeAgent, textResponse } from '../helpers/agentFixture';
 
@@ -64,5 +64,17 @@ describe('the reminder of the list of tasks', () => {
   it('is silent when the list is done or empty', () => {
     expect(todoCheck([], TODO_EVERY)).toBeUndefined();
     expect(todoCheck([{ ...todos[0]! }], TODO_EVERY)).toBeUndefined();
+  });
+});
+
+// The notes stood empty after 500 actions: the model is reminded of them.
+describe('the reminder of the notes', () => {
+  it('waits for NOTE_EVERY reads and counts only the reading tools', () => {
+    expect(noteCheck(NOTE_EVERY - 1)).toBeUndefined();
+    expect(noteCheck(NOTE_EVERY)).toContain('note_write');
+    expect(isReadingCall('read_file', false)).toBe(true);
+    expect(isReadingCall('note_read', false)).toBe(false);
+    expect(isReadingCall('todo_write', false)).toBe(false);
+    expect(isReadingCall('write_file', true)).toBe(false);
   });
 });
