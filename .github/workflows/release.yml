@@ -1,18 +1,32 @@
 name: Release
 
+# A tag v1.2.3 makes the GitHub release of the version: the .vsix to install
+# by hand and the notes of the version from CHANGELOG.md. The run of a tag
+# that already has a release replaces its file, so a run may be repeated.
+
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "The tag of the release, for example v0.42.5"
+        required: true
 
 permissions:
   contents: write
 
 jobs:
-  package:
-    name: Build the vsix
+  release:
+    name: Make the GitHub release
     runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
 
       - uses: actions/setup-node@v5
         with:
@@ -25,8 +39,18 @@ jobs:
       - name: Build the package
         run: npm run package
 
-      - name: Publish the package
-        uses: actions/upload-artifact@v4
-        with:
-          name: minimax-agent
-          path: "*.vsix"
+      - name: Write the notes of the version
+        run: node .github/release-notes.mjs "$TAG" > release-notes.md
+
+      - name: Publish the release
+        run: |
+          version="${TAG#v}"
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release upload "$TAG" minimax-agent-*.vsix --clobber
+            gh release edit "$TAG" --notes-file release-notes.md
+          else
+            gh release create "$TAG" minimax-agent-*.vsix \
+              --title "MiniMax Agent $version" \
+              --notes-file release-notes.md \
+              --verify-tag
+          fi
