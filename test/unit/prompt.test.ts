@@ -29,6 +29,12 @@ describe('system prompt', () => {
     expect(prompt).toMatch(/fenced code block/i);
   });
 
+  it('asks the model to plan a few steps and batch the calls', () => {
+    const prompt = buildSystemPrompt(context);
+    expect(prompt).toContain('write a short list of the next 2-5 steps');
+    expect(prompt).toContain('all the independent tool calls of that list in one response');
+  });
+
   it('asks the model to name the file of a quoted snippet', () => {
     const prompt = buildSystemPrompt(context);
     expect(prompt).toMatch(/path of the file/i);

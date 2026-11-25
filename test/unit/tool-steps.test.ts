@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { groupToolSteps } from '../../src/ui/webview/toolCard';
+import { GROUP_FROM, groupBySteps, groupToolSteps } from '../../src/ui/webview/toolCard';
 import type { UiMessage } from '../../src/ui/protocol';
 
 function toolMessage(id: string): UiMessage {
@@ -28,7 +28,7 @@ function emptyAssistantMessage(id: string): UiMessage {
 
 describe('the grouping of the actions by step', () => {
   it('puts the actions of one request into one step', () => {
-    const items = groupToolSteps([
+    const items = groupBySteps([
       userMessage('u1'),
       assistantMessage('a1'),
       toolMessage('t1'),
@@ -43,7 +43,7 @@ describe('the grouping of the actions by step', () => {
   });
 
   it('starts a new step after the next request of the reader', () => {
-    const items = groupToolSteps([
+    const items = groupBySteps([
       userMessage('u1'),
       toolMessage('t1'),
       userMessage('u2'),
@@ -57,7 +57,7 @@ describe('the grouping of the actions by step', () => {
   });
 
   it('keeps the text of the model outside of the step', () => {
-    const items = groupToolSteps([
+    const items = groupBySteps([
       userMessage('u1'),
       toolMessage('t1'),
       assistantMessage('a1')
@@ -70,7 +70,7 @@ describe('the grouping of the actions by step', () => {
   // The group of the actions must not swallow the whole turn: the actions
   // that follow a thought or an answer are the next step of the work.
   it('closes the group of the actions at the thought of the model', () => {
-    const items = groupToolSteps([
+    const items = groupBySteps([
       userMessage('u1'),
       toolMessage('t1'),
       toolMessage('t2'),
@@ -84,7 +84,7 @@ describe('the grouping of the actions by step', () => {
   });
 
   it('closes the group of the actions at the answer of the model', () => {
-    const items = groupToolSteps([
+    const items = groupBySteps([
       userMessage('u1'),
       toolMessage('t1'),
       assistantMessage('a1'),
@@ -97,7 +97,7 @@ describe('the grouping of the actions by step', () => {
   });
 
   it('keeps the actions of one turn together when the model says nothing', () => {
-    const items = groupToolSteps([
+    const items = groupBySteps([
       userMessage('u1'),
       toolMessage('t1'),
       emptyAssistantMessage('a1'),
@@ -121,7 +121,7 @@ describe('the card of a sub-agent in the feed', () => {
   // The work of a sub-agent is a block of its own: its actions stand in its
   // card, the card does not hide in the group of the actions of the parent.
   it('stands outside of the group and splits it in two', () => {
-    const items = groupToolSteps([
+    const items = groupBySteps([
       userMessage('u1'),
       toolMessage('t1'),
       taskMessage('k1'),
@@ -135,7 +135,19 @@ describe('the card of a sub-agent in the feed', () => {
   });
 
   it('stands alone when two sub-agents follow each other', () => {
-    const items = groupToolSteps([taskMessage('k1'), taskMessage('k2')]);
+    const items = groupBySteps([taskMessage('k1'), taskMessage('k2')]);
     expect(items.map((item) => item.kind)).toEqual(['message', 'message']);
+  });
+});
+
+// A head over one or two cards only repeated them: up to three actions stand
+// in the feed as plain cards, a group starts at four.
+describe('the threshold of a group', () => {
+  it('leaves three actions as cards and groups four', () => {
+    const three = [userMessage('u'), toolMessage('a'), toolMessage('b'), toolMessage('c')];
+    expect(groupToolSteps(three).map((item) => item.kind)).toEqual(['message', 'message', 'message', 'message']);
+    const four = [...three, toolMessage('d')];
+    expect(GROUP_FROM).toBe(4);
+    expect(groupToolSteps(four).map((item) => item.kind)).toEqual(['message', 'steps']);
   });
 });
