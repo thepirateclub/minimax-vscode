@@ -4,6 +4,8 @@
 
 A VS Code extension with a full coding agent powered by MiniMax models. The agent lives in the side panel, keeps its own conversation history, and calls tools against your project. Every write to disk and every command run asks for explicit confirmation.
 
+![The MiniMax agent panel in VS Code](docs/work_chat.png)
+
 ## Features
 
 - Chat with MiniMax M3.1 Flash and MiniMax M3 in the right-hand VS Code panel (Secondary Side Bar)
@@ -102,6 +104,8 @@ The reference to a file lives in the input field itself, so you can refer to it 
 - `MiniMax: Add File to Chat` in the context menu of a file inserts the same reference.
 - `Ctrl+Alt+M` (`MiniMax: Add Selection to Chat`) turns the selected code into a chip above the input field. The chip is visible, it can be removed, and the code itself goes to the model as a separate block.
 
+![File and tab suggestions in the input field](docs/action_attach.png)
+
 ## Commit text
 
 The Source Control panel has a button with a sparkle. It looks at the changes of the repository and writes the commit text into the message field.
@@ -138,6 +142,10 @@ The agent searches the project through an index that the extension builds itself
 
 The model keeps the task list through the `todo_write` tool. It is visible in the widget above the feed and survives a window reload, a click on a task changes nothing: the list is changed by the model. The whole list can be cleared with a button in the header of the widget, next to the fold button.
 
+The Settings tab gathers everything in one place: the key, the API address, the model, the reasoning depth, the mode, the list of tools that run without a confirmation.
+
+![The settings tab of the panel](docs/settings.png)
+
 ## Goal with limits
 
 The goal is set by the user, the model only reads it and changes its status.
@@ -151,6 +159,8 @@ The goal is set by the user, the model only reads it and changes its status.
 - Only you raise the limits. The model can mark the goal as done or blocked, but it cannot raise the limit and it cannot switch the auto-stop off with the status.
 - A raised limit keeps the money already spent: the work continues from the same place, the counter of the spend is not reset.
 - The goal lives with the session and survives a window reload.
+
+![The input field in the goal mode](docs/goal_prompt.png)
 
 ## Voice input
 
@@ -211,6 +221,10 @@ In the header of the panel lives the graph of the spend: one bar per agent actio
 
 The tooltip of a bar shows the details, for example `Action 1: in 389814 (353044 cached), out 11922`. The history of the spend is stored with the session, so the graph survives a window reload.
 
+A click on the badge in the status bar opens the same numbers: the spend of the day, the remainder of the week, the remainder of the 5-hour window and the cache hit.
+
+![Token spend across the limit windows](docs/stats_panel.png)
+
 ## The reasoning of the model
 
 MiniMax M3.1 Flash has the levels of the reasoning depth (`output_config.effort`). MiniMax M3 does not have them: the server ignores `effort` and `reasoning_effort`, the model picks the depth itself. Therefore the bottom row of the input field holds one reasoning switch, but its content depends on the chosen model.
@@ -256,6 +270,22 @@ The model can hand part of the work to a sub-agent through the `task` tool. The 
 - The write of a file by the child asks for the confirmation, as the parent does.
 - The spend of the child goes into the account of the session and of the budget of the goal once, in the graph of the spend it is added to the action of the parent.
 - The child does not start a child: the depth of the nesting is one.
+
+## Skills and MCP
+
+The panel works with skills in the `SKILL.md` format and with MCP servers.
+
+- The skills come from the disk: `.minimax/skills` and `.claude/skills` of the project, `~/.minimax/skills`, `~/.claude/skills`, `~/.agents/skills` of the user and the packages of the plugins. A skill of the project wins over a skill of the user with the same name.
+- The `Skills` section of the turn holds the names and the descriptions, the body of the skill is read by the `read_skill` tool.
+- A `/` in the input field after a space or at the start shows the skill suggestions, Tab or Enter picks one, the full name becomes a chip.
+- The MCP servers come only from the places of the user: the setting `minimax.mcpServers` and `*.mcp.json` of the plugins in `~/.minimax/plugins`. A file of the workspace never starts a server.
+- The tool of a server is named `mcp__server__tool`, every call asks for the confirmation.
+
+![The Skills tab](docs/skills.png)
+
+![The MCP tab](docs/mcp.png)
+
+![Skill suggestions in the input field](docs/action_skills.png)
 
 ## Development
 
