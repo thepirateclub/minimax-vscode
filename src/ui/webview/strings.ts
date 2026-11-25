@@ -186,7 +186,7 @@ export const STRINGS = {
   rules: 'Use project rules',
   rulesHint: 'Reads AGENTS.md, CLAUDE.md and other rule files into the system prompt.',
   webSearch: 'Web search',
-  webSearchHint: 'Reserved for the search tool, it is not implemented yet.',
+  webSearchHint: 'The agent searches the web with your M Plan key (web_search). The queries go to MiniMax.',
   loading: 'Loading the settings...',
   settingsSaved: 'The settings are saved.',
   openFiles: 'Open tabs',
