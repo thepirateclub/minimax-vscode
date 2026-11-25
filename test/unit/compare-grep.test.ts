@@ -6,6 +6,7 @@ import { createCompareTools, formatUnified } from '../../src/tools/compare';
 import { diffLines } from '../../src/tools/diff';
 import { createGrepTools, globToRegExp, grepText } from '../../src/tools/grep';
 import { createExistsTools, nearNames } from '../../src/tools/exists';
+import { isScratchPath, writesScratch } from '../../src/tools/scratch';
 import { missingFileHint } from '../../src/tools/repl/hints';
 import type { ToolContext } from '../../src/tools/types';
 
@@ -98,5 +99,60 @@ describe('path_exists', () => {
   it('finds the names that look like the missing one', () => {
     expect(nearNames('Readme.md', ['README.md', 'src'])).toEqual(['README.md']);
     expect(nearNames('parser.ts', ['parser.test.ts', 'lexer.ts'])).toEqual(['parser.test.ts']);
+  });
+});
+
+// The script of the model: cut a method out of a web and a native file,
+// count random() in it, compare the bodies. Tools do it now.
+describe('the functions of two languages', () => {
+  async function versions(): Promise<string> {
+    const root = await workspace();
+    await writeFile(
+      join(root, 'src', 'Game.ts'),
+      'class Game {\n  private dropLoot(): void {\n    const a = random()\n    const b = random()\n  }\n\n  equip(id: string): void {\n    this.save()\n  }\n}\n',
+      'utf8'
+    );
+    await writeFile(
+      join(root, 'src', 'Game.kt'),
+      'class Game {\n    private fun dropLoot() {\n        val a = random()\n    }\n\n    fun equip(id: String) {\n        save()\n    }\n}\n',
+      'utf8'
+    );
+    return root;
+  }
+
+  it('counts the matches inside one function of a file', async () => {
+    const root = await versions();
+    const [grep] = createGrepTools();
+    const web = await grep!.execute({ pattern: 'random\\(\\)', path: 'src/Game.ts', symbol: 'dropLoot', count_only: true }, ctx(root));
+    expect(web.content).toContain('src/Game.ts: 2');
+    const native = await grep!.execute({ pattern: 'random\\(\\)', path: 'src/Game.kt', symbol: 'dropLoot', context: 0 }, ctx(root));
+    expect(native.content).toContain('3:        val a = random()');
+    const none = await grep!.execute({ pattern: 'x', path: 'src/Game.kt', symbol: 'nothing' }, ctx(root));
+    expect(none.isError).toBe(true);
+  });
+
+  it('compares the same method of a web and of a native file', async () => {
+    const root = await versions();
+    const [, compare] = createCompareTools();
+    const result = await compare!.execute(
+      { path_a: 'src/Game.ts', symbol_a: 'equip', path_b: 'src/Game.kt', symbol_b: 'equip' },
+      ctx(root)
+    );
+    expect(result.content).toContain('--- src/Game.ts#equip');
+    expect(result.content).toContain('+        save()');
+  });
+});
+
+describe('the scratch folders of the project', () => {
+  it('knows a scratch path and a write into it', () => {
+    expect(isScratchPath('temp/final.txt')).toBe(true);
+    expect(isScratchPath('./tmp/a')).toBe(true);
+    expect(isScratchPath('src/temp/a.ts')).toBe(false);
+    expect(writesScratch("fs.writeFileSync('temp/ach.txt', x)")).toBe(true);
+    expect(writesScratch('node a.js > temp/out.txt')).toBe(true);
+    expect(writesScratch("open('tmp/x.txt', 'w')")).toBe(true);
+    expect(writesScratch('Get-Content a | Out-File temp\\b.txt')).toBe(true);
+    expect(writesScratch("fs.readFileSync('temp/a.txt')")).toBe(false);
+    expect(writesScratch('npm test')).toBe(false);
   });
 });

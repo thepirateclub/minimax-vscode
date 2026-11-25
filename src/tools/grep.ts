@@ -2,6 +2,7 @@ import { readFile, readdir, stat } from 'node:fs/promises';
 import { join, relative, sep } from 'node:path';
 import { resolveWorkspacePath } from '../paths';
 import { IGNORED_DIRS, TEXT_EXTENSIONS } from '../search/files';
+import { extractSymbol } from './symbols';
 import type { ToolEntry } from './types';
 
 // The search of grep: a regular expression, the lines around a match and
@@ -37,7 +38,13 @@ export function globToRegExp(glob: string): RegExp {
 }
 
 // The matches of one text with the lines around them, merged when they touch.
-export function grepText(content: string, pattern: RegExp, context: number, limit: number): { lines: string[]; count: number } {
+export function grepText(
+  content: string,
+  pattern: RegExp,
+  context: number,
+  limit: number,
+  offset = 0
+): { lines: string[]; count: number } {
   const lines = content.split(/\r?\n/);
   const hits: number[] = [];
   for (let i = 0; i < lines.length && hits.length < limit; i++) {
@@ -55,7 +62,7 @@ export function grepText(content: string, pattern: RegExp, context: number, limi
     }
     for (let i = from; i <= Math.min(lines.length - 1, hit + context); i++) {
       const mark = hits.includes(i) ? ':' : '-';
-      out.push(i + 1 + mark + (lines[i] ?? '').slice(0, LINE_LIMIT));
+      out.push(i + 1 + offset + mark + (lines[i] ?? '').slice(0, LINE_LIMIT));
       shownTo = i;
     }
   }
@@ -89,7 +96,7 @@ export function createGrepTools(): ToolEntry[] {
   const grep: ToolEntry = {
     name: 'grep',
     description:
-      'Search the files of the workspace with a regular expression, like grep -n -C. The answer groups the matches by file: `12:` marks a matching line, `11-` a line of the context, `--` a gap. Use it to find a shape of code and see it with its neighbours in one call; use search_code to find code by words.',
+      'Search the files of the workspace with a regular expression, like grep -n -C. The answer groups the matches by file: `12:` marks a matching line, `11-` a line of the context, `--` a gap. Use it to find a shape of code and see it with its neighbours in one call; use search_code to find code by words. With symbol it searches only the body of that function in the file of path, with count_only it returns the number of matches per file: use them instead of a script that cuts a function out and counts lines.',
     approval: 'never',
     sideEffect: false,
     inputSchema: {
@@ -100,7 +107,9 @@ export function createGrepTools(): ToolEntry[] {
         glob: { type: 'string', description: 'Only the files that match, for example "*.ts" or "src/**/*.test.ts".' },
         ignore_case: { type: 'boolean', description: 'Ignore the case of the letters.' },
         context: { type: 'number', description: 'Lines before and after every match, 0-10, default 2.' },
-        max_results: { type: 'number', description: 'The most matches to return, default 100.' }
+        max_results: { type: 'number', description: 'The most matches to return, default 100.' },
+        symbol: { type: 'string', description: 'Search only the body of this function, method or class; path must name the file.' },
+        count_only: { type: 'boolean', description: 'Return the number of matches per file, not the lines.' }
       },
       required: ['pattern']
     },
@@ -125,6 +134,11 @@ export function createGrepTools(): ToolEntry[] {
       if (!info) {
         return { content: 'grep failed: ' + sub + ' does not exist.', isError: true };
       }
+      const symbol = typeof input['symbol'] === 'string' ? input['symbol'].trim() : '';
+      if (symbol && !info.isFile()) {
+        return { content: 'grep failed: symbol needs path to name a file.', isError: true };
+      }
+      const countOnly = input['count_only'] === true;
       const files = info.isFile() ? [start] : walk(start, ctx.workspaceRoot, sub.length > 0);
       const parts: string[] = [];
       let total = 0;
@@ -140,15 +154,24 @@ export function createGrepTools(): ToolEntry[] {
         if (size > MAX_FILE_BYTES) {
           continue;
         }
-        const text = await readFile(file, 'utf8').catch(() => '');
-        const found = grepText(text, pattern, context, limit - total);
+        let text = await readFile(file, 'utf8').catch(() => '');
+        let offset = 0;
+        if (symbol) {
+          const body = extractSymbol(text, symbol, name);
+          if (!body) {
+            return { content: 'grep failed: no symbol ' + symbol + ' in ' + name + '.', isError: true };
+          }
+          text = body.text;
+          offset = body.start - 1;
+        }
+        const found = grepText(text, pattern, context, limit - total, offset);
         if (found.count > 0) {
           total += found.count;
-          parts.push(name, ...found.lines, '');
+          parts.push(...(countOnly ? [name + ': ' + found.count] : [name, ...found.lines, '']));
         }
       }
       if (total === 0) {
-        return { content: 'No matches for /' + pattern.source + '/.' };
+        return { content: 'No matches for /' + pattern.source + '/' + (symbol ? ' in ' + symbol : '') + '.' };
       }
       return {
         content: parts.join('\n') + (total >= limit ? '\nThe search stopped at ' + limit + ' matches, narrow it with path or glob.' : '') +

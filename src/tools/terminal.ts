@@ -1,3 +1,4 @@
+import { SCRATCH_REFUSAL, writesScratch } from './scratch';
 import { exec, execFile, type ExecFileException } from 'node:child_process';
 import { isAbsolute, relative, resolve } from 'node:path';
 import type { ToolEntry } from './types';
@@ -139,6 +140,9 @@ export function createTerminalTools(): ToolEntry[] {
       const command = String(input['command'] ?? '');
       if (command.trim().length === 0) {
         return { content: 'run_terminal failed: command must not be empty', isError: true };
+      }
+      if (writesScratch(command)) {
+        return { content: '[stderr] ' + SCRATCH_REFUSAL, isError: true };
       }
       const gitTool = gitToolFor(command);
       if (gitTool) {

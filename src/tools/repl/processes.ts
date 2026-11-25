@@ -1,3 +1,4 @@
+import { SCRATCH_REFUSAL, writesScratch } from '../scratch';
 import { missingFileHint } from './hints';
 import { execFile, spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { mkdtempSync, writeFileSync } from 'node:fs';
@@ -259,6 +260,9 @@ export async function executeRepl(
       content: 'repl_' + language + ' failed: the code is empty',
       isError: true
     };
+  }
+  if (writesScratch(code)) {
+    return { content: '[error] ' + SCRATCH_REFUSAL, isError: true };
   }
   const timeout = resolveReplTimeout(input['timeout_ms']);
 
