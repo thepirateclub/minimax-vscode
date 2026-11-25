@@ -4,6 +4,8 @@
 
 A VS Code extension with a full coding agent powered by MiniMax models. The agent lives in the side panel, keeps its own conversation history, and calls tools against your project. Every write to disk and every command run asks for explicit confirmation.
 
+![The MiniMax agent panel in VS Code](docs/panel.png)
+
 ## Features
 
 - Chat with MiniMax M3.1 Flash and MiniMax M3 in the right-hand VS Code panel (Secondary Side Bar)
