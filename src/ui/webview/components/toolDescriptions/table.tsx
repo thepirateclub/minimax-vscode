@@ -102,7 +102,9 @@ export const DESCRIBERS: Record<string, Describer> = {
     };
   },
   list_files: ({ input, content }) => {
-    const folder = text(input['path']) || '.';
+    const folder =
+      (Array.isArray(input['paths']) ? input['paths'].map(String).join(', ') : text(input['path']) || '.') +
+      (typeof input['glob'] === 'string' && input['glob'] ? ' ' + input['glob'] : '');
     return {
       icon: <IconList />,
       title: STRINGS.toolList + ' ' + folder,

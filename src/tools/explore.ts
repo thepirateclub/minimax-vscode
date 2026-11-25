@@ -4,6 +4,8 @@ import { resolveWorkspacePath } from '../paths';
 import { IGNORED_DIRS, isIgnoredName, isTextFile, TEXT_EXTENSIONS } from '../search/files';
 import { findInTree } from '../search/find';
 import type { ProjectSearch, SearchMode } from '../search/project';
+import { globToRegExp } from './grep';
+import { formatEntries, sortEntries, type ListedEntry, type ListSort } from './listing';
 import type { ToolEntry } from './types';
 
 export { IGNORED_DIRS, isTextFile };
@@ -67,62 +69,99 @@ export function createExploreTools(options: ExploreOptions = {}): ToolEntry[] {
   const listFiles: ToolEntry = {
     name: 'list_files',
     description:
-      'List files and folders of the workspace. Use it to understand the project layout before reading files.',
+      'List files and folders of the workspace. Use it to understand the project layout before reading files. Several folders go in one call with paths, details adds the size and the time of the last change, glob keeps the files that match (for example "*.png"), sort orders them by size or time. Use it instead of Get-ChildItem, dir, ls or find in the terminal: it works the same on every system.',
     approval: 'never',
     sideEffect: false,
     inputSchema: {
       type: 'object',
       properties: {
         path: { type: 'string', description: 'Directory relative to the workspace root.' },
-        depth: { type: 'integer', minimum: 1, maximum: 5, description: 'How deep to descend, default 2.' }
+        paths: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Several directories in one call, a missing one is named and skipped.'
+        },
+        depth: { type: 'integer', minimum: 1, maximum: 5, description: 'How deep to descend, default 2.' },
+        details: { type: 'boolean', description: 'Add the size and the time of the last change of every entry.' },
+        glob: { type: 'string', description: 'Keep only the files that match, for example "*.png" or "src/**/*.test.ts"; the folders are left out.' },
+        sort: { type: 'string', enum: ['name', 'size', 'time'], description: 'The order: name (default), size (largest first) or time (newest first).' }
       }
     },
     async execute(input, ctx) {
       // The path of the model must stay inside the workspace, the join of the
       // paths normalizes the .. and the listing would walk out of it.
-      let start: string;
-      try {
-        start = resolveWorkspacePath(ctx.workspaceRoot, String(input['path'] ?? '.'));
-      } catch (error) {
-        return {
-          content:
-            'list_files failed: ' +
-            (error instanceof Error ? error.message : String(error)),
-          isError: true
-        };
-      }
-      const depth = Math.min(5, Math.max(1, Number(input['depth'] ?? 2)));
+      const raw = Array.isArray(input['paths']) ? input['paths'].map(String) : [String(input['path'] ?? '.')];
+      const details = input['details'] === true;
+      const glob = typeof input['glob'] === 'string' && input['glob'].trim() ? globToRegExp(input['glob'].trim()) : undefined;
+      const sort = ['name', 'size', 'time'].includes(String(input['sort'])) ? (String(input['sort']) as ListSort) : undefined;
+      // A glob looks for files deep in the tree, not two levels down.
+      const depth = Math.min(glob ? 10 : 5, Math.max(1, Number(input['depth'] ?? (glob ? 10 : 2))));
+      const entries: ListedEntry[] = [];
       const lines: string[] = [];
+      const notes: string[] = [];
       const walk = async (dir: string, level: number): Promise<void> => {
-        if (level > depth || lines.length >= MAX_LIST_ENTRIES) {
+        if (level > depth || entries.length >= MAX_LIST_ENTRIES) {
           return;
         }
-        let entries;
+        let items;
         try {
-          entries = await readdir(dir, { withFileTypes: true });
+          items = await readdir(dir, { withFileTypes: true });
         } catch {
           return;
         }
-        for (const entry of entries) {
-          if (lines.length >= MAX_LIST_ENTRIES) {
+        for (const item of items) {
+          if (entries.length >= MAX_LIST_ENTRIES) {
             return;
           }
-          if (isIgnoredName(entry.name)) {
+          if (isIgnoredName(item.name)) {
             continue;
           }
-          const full = join(dir, entry.name);
+          const full = join(dir, item.name);
           const rel = relative(ctx.workspaceRoot, full).split(sep).join('/');
-          lines.push(entry.isDirectory() ? rel + '/' : rel);
-          if (entry.isDirectory()) {
+          const folder = item.isDirectory();
+          if (!glob || (!folder && glob.test(rel))) {
+            const info = details || sort ? await stat(full).catch(() => undefined) : undefined;
+            entries.push({ path: folder ? rel + '/' : rel, folder, size: info?.size ?? 0, modified: info?.mtime ?? new Date(0) });
+          }
+          if (folder) {
             await walk(full, level + 1);
           }
         }
       };
-      await walk(start, 1);
-      if (lines.length === 0) {
-        return { content: 'No files found', isError: false };
+      for (const path of raw) {
+        let start: string;
+        try {
+          start = resolveWorkspacePath(ctx.workspaceRoot, path);
+        } catch (error) {
+          notes.push(path + ': refused, ' + (error instanceof Error ? error.message : String(error)));
+          continue;
+        }
+        const info = await stat(start).catch(() => undefined);
+        if (!info) {
+          notes.push(path + ': missing');
+          continue;
+        }
+        const before = entries.length;
+        if (info.isFile()) {
+          const rel = relative(ctx.workspaceRoot, start).split(sep).join('/');
+          entries.push({ path: rel, folder: false, size: info.size, modified: info.mtime });
+        } else {
+          await walk(start, 1);
+        }
+        if (raw.length > 1 && entries.length === before) {
+          notes.push(path + ': empty');
+        }
       }
-      return { content: lines.join('\n'), isError: false };
+      lines.push(...formatEntries(sortEntries(entries, sort), details));
+      if (entries.length >= MAX_LIST_ENTRIES) {
+        lines.push('[the list stops at ' + MAX_LIST_ENTRIES + ' entries, narrow it with path or glob]');
+      }
+      if (lines.length === 0) {
+        // Every path left the workspace: that is a refusal, not an empty folder.
+        const refused = notes.length === raw.length && notes.every((note) => note.includes(': refused, '));
+        return { content: notes.length > 0 ? 'list_files failed: ' + notes.join('\n') : 'No files found', isError: refused };
+      }
+      return { content: [...lines, ...notes].join('\n'), isError: false };
     }
   };
 
