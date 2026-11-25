@@ -2,7 +2,7 @@
   "name": "minimax-agent",
   "displayName": "MiniMax Agent",
   "description": "Coding agent for VS Code powered by MiniMax models",
-  "version": "0.23.0",
+  "version": "0.24.0",
   "publisher": "local",
   "license": "MIT",
   "engines": {
@@ -322,6 +322,12 @@
           "default": [],
           "scope": "application",
           "description": "Rules approved without confirmation. A tool name approves the whole tool; a scoped rule approves part of it: run_terminal(npm test) for commands starting with that prefix (chained or redirected commands never match), write_file(src/ui/) for writes inside that folder."
+        },
+        "minimax.mcpServers": {
+          "type": "object",
+          "default": {},
+          "scope": "application",
+          "markdownDescription": "MCP servers of the agent, the form of `mcpServers` of Claude and Cursor: `{ \"name\": { \"command\": \"npx\", \"args\": [\"-y\", \"package\"] } }` or `{ \"name\": { \"url\": \"https://...\" } }`. The servers of the plugins in `~/.minimax/plugins` start too. Every call of an MCP tool asks for approval."
         },
         "minimax.enableWebSearch": {
           "type": "boolean",

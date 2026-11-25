@@ -29,6 +29,8 @@ export interface MiniMaxSettings {
   // The steps of the tools are shown in the feed.
   showToolSteps: boolean;
   autoApprove: string[];
+  // The MCP servers of the user, the form of `mcpServers` of Claude and Cursor.
+  mcpServers: Record<string, unknown>;
   enableWebSearch: boolean;
   rulesEnabled: boolean;
   // The language of the voice input, empty lets the model pick it.
@@ -83,6 +85,7 @@ export function getSettings(): MiniMaxSettings {
     collapseCode: cfg.get<boolean>('collapseCode', false),
     showToolSteps: cfg.get<boolean>('showToolSteps', true),
     autoApprove: userValue<string[]>(cfg, 'autoApprove', []),
+    mcpServers: userValue<Record<string, unknown>>(cfg, 'mcpServers', {}),
     enableWebSearch: cfg.get<boolean>('enableWebSearch', false),
     rulesEnabled: cfg.get<boolean>('rulesEnabled', true),
     speechLanguage: cfg.get<string>('speechLanguage', ''),

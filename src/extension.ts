@@ -1,3 +1,4 @@
+import { createMcpState, startMcp, stopMcp } from './host/mcp';
 import { discoverSkills } from './skills/skills';
 import { toUiQuota } from './ui/quotaMeter';
 import { isAbsolute } from 'node:path';
@@ -68,6 +69,8 @@ export class MiniMaxController {
   private counter = 0;
   fileCache: { files: string[]; at: number } | undefined;
   quota: QuotaSnapshot | undefined;
+  // The running MCP servers and their tools.
+  readonly mcp = createMcpState();
   // When every action started, the duration goes to the panel.
   readonly toolStarted = new Map<string, number>();
   // The voice input: ffmpeg records, MiniMax asr-1.0 transcribes.
@@ -205,6 +208,7 @@ export class MiniMaxController {
         settingsTimer = setTimeout(() => {
           settingsTimer = undefined;
           applySettings(this, );
+          void startMcp(this);
           warnAboutTheBaseUrl(this, );
           void this.sendInit();
         }, 100);
@@ -241,6 +245,9 @@ export class MiniMaxController {
       vscode.commands.registerCommand('minimax.reindex', () => void reindex(this, ))
     );
     context.subscriptions.push(this.statusBar);
+    // The MCP servers start with the extension and stop with it.
+    void startMcp(this);
+    context.subscriptions.push({ dispose: () => stopMcp(this) });
 
     const quotaTimer = setInterval(() => {
       void refreshQuota(this, );

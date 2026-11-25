@@ -1,6 +1,6 @@
 import type { UiToolCall } from '../../protocol';
 import { filePaths, firstLine } from './toolCardHelpers';
-import { IconRead } from '../icons';
+import { IconList, IconRead } from '../icons';
 import { DESCRIBERS, type ToolView } from './toolDescriptions/table';
 
 export type { ToolView } from './toolDescriptions/table';
@@ -33,6 +33,16 @@ function describeTool(tool: UiToolCall, folded: boolean): ToolView {
   const describer = DESCRIBERS[tool.name];
   if (describer) {
     return describer({ tool, input, paths, content, folded });
+  }
+  // A tool of an MCP server: mcp__server__tool reads as the server and the
+  // tool, not as the raw name of the registry.
+  const mcp = /^mcp__(.+?)__(.+)$/.exec(tool.name);
+  if (mcp) {
+    return {
+      icon: <IconList />,
+      title: mcp[1] + ': ' + mcp[2]!.replace(/_/g, ' '),
+      summary: firstLine(content)
+    };
   }
   return {
     icon: <IconRead />,

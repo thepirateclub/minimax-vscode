@@ -9,6 +9,11 @@ export class ToolRegistry {
     this.entries.set(entry.name, entry);
   }
 
+  // The tools of an MCP server leave with the server.
+  unregister(name: string): void {
+    this.entries.delete(name);
+  }
+
   list(): ToolEntry[] {
     return [...this.entries.values()];
   }
