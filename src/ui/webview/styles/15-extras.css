@@ -82,6 +82,16 @@
 .extras-head .settings-hint {
   flex: 1;
   margin: 0;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+
+.extras-head > button {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
 }
 
 .extras-group {
@@ -115,7 +125,15 @@
   border-radius: var(--radius-sm);
 }
 
+/* A skill is a quiet row, not a button of the theme: the general rule of
+   button would fill it with the main color and center its text. */
 .extras-item {
+  width: 100%;
+  align-items: stretch;
+  text-align: left;
+  background: transparent;
+  color: var(--fg);
+  border: none;
   cursor: pointer;
 }
 
