@@ -9,7 +9,7 @@ import { getSettings, onSettingsChanged } from './config/settings';
 import { watchDenyPaths } from './host/denyPaths';
 import { createLogger } from './logger';
 import { ProjectSearch } from './search/project';
-import { InMemoryBackupStore } from './storage/backups';
+import { createBackupStore } from './storage/fileBackups';
 import { projectLabel, SessionStore } from './storage/sessions';
 import { UsageLedger } from './storage/usage';
 import { editorDiagnostics } from './host/diagnostics';
@@ -34,7 +34,6 @@ import { showLogs, showUsage, generateCommitMessage, refreshQuota, undoLastChang
 import { searchFor, addFileToChat } from './host/workspace';
 import { registerEditorActions } from './host/editorActions';
 import type { AgentState } from './ui/protocol';
-
 import { getApiKey } from './config/secrets';
 import { resolveBaseUrl, MODELS } from './config/models';
 import * as vscode from 'vscode';
@@ -43,7 +42,7 @@ export class MiniMaxController {
   readonly context: vscode.ExtensionContext;
   readonly channel: vscode.OutputChannel;
   readonly logger: Logger;
-  readonly backups = new InMemoryBackupStore();
+  readonly backups: ReturnType<typeof createBackupStore>;
   readonly registry = new ToolRegistry();
   readonly store: SessionStore;
   readonly ledger: UsageLedger;
@@ -89,6 +88,7 @@ export class MiniMaxController {
     this.logger = createLogger(channel);
     this.store = new SessionStore(context.globalState);
     this.ledger = new UsageLedger(context.globalState);
+    this.backups = createBackupStore(context.globalStorageUri?.fsPath);
     this.panel = new AgentPanelProvider({
       extensionUri: context.extensionUri,
       onMessage: (message) => {
