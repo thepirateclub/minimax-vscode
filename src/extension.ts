@@ -6,7 +6,7 @@ import { toUiQuota } from './ui/quotaMeter';
 import { isAbsolute } from 'node:path';
 import { HttpSpeechClient } from './api/speech';
 import { getSettings, onSettingsChanged } from './config/settings';
-import { watchDenyPaths } from './host/denyPaths';
+import { registerHostServices } from './host/services';
 import { createLogger } from './logger';
 import { ProjectSearch } from './search/project';
 import { createBackupStore } from './storage/fileBackups';
@@ -205,7 +205,7 @@ export class MiniMaxController {
     // One save of the settings writes many keys and every write fires the
     // event. The agents and the panel are rebuilt once, after the last write.
     let settingsTimer: ReturnType<typeof setTimeout> | undefined;
-    watchDenyPaths(context);
+    registerHostServices(context);
     context.subscriptions.push(
       onSettingsChanged(() => {
         if (settingsTimer !== undefined) {

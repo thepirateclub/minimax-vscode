@@ -87,6 +87,15 @@ export class FileBackupStore implements BackupStore {
     return taken.map((stored) => stored.entry);
   }
 
+  async takeFile(sessionId: string, path: string): Promise<BackupEntry[]> {
+    const taken = this.entries.filter(
+      (stored) => stored.entry.sessionId === sessionId && stored.entry.path === path
+    );
+    this.entries = this.entries.filter((stored) => !taken.includes(stored));
+    await this.run(() => this.remove(taken));
+    return taken.map((stored) => stored.entry);
+  }
+
   // The backups that wait for the disk are written before the caller goes on.
   flush(): Promise<unknown> {
     return this.queue;

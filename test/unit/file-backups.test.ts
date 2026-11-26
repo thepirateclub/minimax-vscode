@@ -47,3 +47,18 @@ describe('the backups on the disk', () => {
     expect(readdirSync(folder)).toHaveLength(0);
   });
 });
+
+describe('the backups of one file', () => {
+  it('are taken alone, the rest of the turn stays', async () => {
+    const folder = dir();
+    const store = new FileBackupStore(folder);
+    await store.save('a.ts', 'a0', { sessionId: 's', next: 'a1' });
+    await store.save('b.ts', 'b0', { sessionId: 's', next: 'b1' });
+    await store.save('a.ts', 'a1', { sessionId: 's', next: 'a2' });
+    await store.save('a.ts', 'x', { sessionId: 'other', next: 'y' });
+    expect(planRestore(await store.takeFile('s', 'a.ts'))).toEqual([{ path: 'a.ts', restore: 'a0', expected: 'a2' }]);
+    await store.flush();
+    const reopened = new FileBackupStore(folder);
+    expect((await reopened.list()).map((entry) => entry.path + ':' + entry.sessionId)).toEqual(['b.ts:s', 'a.ts:other']);
+  });
+});

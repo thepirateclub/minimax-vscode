@@ -34,6 +34,9 @@ export interface UiToolCall {
 export interface UiChangedFile {
   path: string;
   status: 'added' | 'modified' | 'deleted' | 'renamed';
+  // The agent of the chat changed the file and its backup is kept: the
+  // reader can see the change and take the file back alone.
+  revertible?: boolean;
 }
 
 // A file of a deletion: the reader sees the list of the files before he
@@ -295,6 +298,8 @@ export type WebToExt =
   // A message leaves the queue.
   | { type: 'remove_queued'; id: string }
   | { type: 'clear_summary' }
+  | { type: 'revert_file'; path: string }
+  | { type: 'diff_file'; path: string }
   // The panel asks for the older messages of the chat.
   | { type: 'load_older' }
   | { type: 'stop' }

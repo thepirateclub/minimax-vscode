@@ -142,6 +142,7 @@ export function vscodeMock(): Record<string, unknown> {
     workspace: {
       getConfiguration: () => configuration,
       onDidChangeConfiguration: () => ({ dispose: () => undefined }),
+      registerTextDocumentContentProvider: () => ({ dispose: () => undefined }),
       get workspaceFolders() {
         const root = state.config.get('root');
         return typeof root === 'string' && root.length > 0

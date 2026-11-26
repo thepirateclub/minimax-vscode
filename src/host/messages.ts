@@ -1,3 +1,4 @@
+import { diffFile, revertFile } from './fileRevert';
 import { searchSessions } from '../storage/sessionSearch';
 import * as vscode from 'vscode';
 import { goalMachine, resumeGoal } from '../agent/stateMachines';
@@ -45,6 +46,14 @@ export async function handleWebviewMessage(host: MiniMaxController, message: Web
   }
   if (message.type === 'send_all_queued') {
     sendAllQueued(host);
+    return;
+  }
+  if (message.type === 'revert_file') {
+    await revertFile(host, message.path);
+    return;
+  }
+  if (message.type === 'diff_file') {
+    await diffFile(host, message.path);
     return;
   }
   if (message.type === 'clear_summary') {

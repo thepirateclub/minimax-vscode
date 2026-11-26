@@ -269,6 +269,8 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
         <SummaryBar
           files={summary}
           onOpenFile={(path) => vscode.postMessage({ type: 'open_file', path })}
+          onDiff={(path) => vscode.postMessage({ type: 'diff_file', path })}
+          onRevert={(path) => vscode.postMessage({ type: 'revert_file', path })}
           onClear={() => {
             setSummary([]);
             vscode.postMessage({ type: 'clear_summary' });

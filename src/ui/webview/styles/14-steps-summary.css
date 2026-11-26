@@ -225,3 +225,36 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* A row of a changed file: the name takes the room, the actions of the
+   agent's file stand at the right edge. */
+.summary-row {
+  display: flex;
+  align-items: center;
+}
+
+.summary-row .summary-file {
+  flex: 1;
+  min-width: 0;
+}
+
+.summary-action {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-h);
+  height: var(--control-h);
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+/* A quiet button keeps its own hover, the theme button fill stays away. */
+.summary-action:hover {
+  background: var(--row-hover);
+  color: var(--vscode-foreground);
+}

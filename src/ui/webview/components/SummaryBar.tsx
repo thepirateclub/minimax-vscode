@@ -1,5 +1,5 @@
 import type { UiChangedFile } from '../../protocol';
-import { IconClose, IconList } from '../icons';
+import { IconClose, IconEdit, IconList, IconRewind } from '../icons';
 import { STRINGS } from '../strings';
 
 // The mark of the status of a file, the reader sees it at a glance.
@@ -34,10 +34,14 @@ function label(status: UiChangedFile['status']): string {
 export function SummaryBar({
   files,
   onOpenFile,
+  onDiff,
+  onRevert,
   onClear
 }: {
   files: UiChangedFile[];
   onOpenFile: (path: string) => void;
+  onDiff?: (path: string) => void;
+  onRevert?: (path: string) => void;
   onClear?: () => void;
 }) {
   if (files.length === 0) {
@@ -64,7 +68,7 @@ export function SummaryBar({
       </div>
       <ul className="summary-files">
         {files.map((file) => (
-          <li key={file.path}>
+          <li key={file.path} className="summary-row">
             <button
               className="summary-file"
               onClick={() => onOpenFile(file.path)}
@@ -78,6 +82,18 @@ export function SummaryBar({
               </span>
               <span className="summary-name">{file.path}</span>
             </button>
+            {/* The work of the agent on one file: its change and the way
+                back, the rest of the turn stays. */}
+            {file.revertible && onDiff ? (
+              <button className="summary-action" title={STRINGS.summaryDiff} aria-label={STRINGS.summaryDiff} onClick={() => onDiff(file.path)}>
+                <IconEdit />
+              </button>
+            ) : null}
+            {file.revertible && onRevert ? (
+              <button className="summary-action" title={STRINGS.summaryRevert} aria-label={STRINGS.summaryRevert} onClick={() => onRevert(file.path)}>
+                <IconRewind />
+              </button>
+            ) : null}
           </li>
         ))}
       </ul>
