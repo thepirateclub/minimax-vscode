@@ -10,6 +10,12 @@ import { GROUP_FROM, speaks, type FeedItem, type ToolStep } from './toolCard';
 // every message and resumes the fold at the first message that changed, so a
 // flush costs the changed tail. The results keep their identity while their
 // content stays: the rows of the chat are memoized on them.
+//
+// The cache sees a change only as a new object: a message of the panel is
+// never changed in place. `item.text += delta` would keep the object, the
+// fold would not see the change and the feed would show the old text. Every
+// update of the messages copies the message it changes (appendToAssistant,
+// appendProgress, resetAssistant), test/unit/feed-cache.test.ts guards it.
 
 // The index of the first message that is not the same object.
 export function firstChange(prev: readonly UiMessage[], next: readonly UiMessage[]): number {
