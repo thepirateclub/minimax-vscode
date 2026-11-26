@@ -218,6 +218,7 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
         workspaceLabel={state.workspaceLabel}
         onSelectSession={(id) => vscode.postMessage({ type: 'select_session', id })}
         onDeleteSession={(id) => vscode.postMessage({ type: 'delete_session', id })}
+        onExportSession={(id) => vscode.postMessage({ type: 'export_session', id })}
         onSearchSessions={(query) => vscode.postMessage({ type: 'search_sessions', query })}
         onNewChat={() => vscode.postMessage({ type: 'new_session' })}
         version={state.version}

@@ -236,6 +236,7 @@ export const STRINGS = {
   allChats: 'All chats',
   thisProject: 'This project',
   deleteChat: 'Delete chat',
+  exportChat: 'Export to Markdown',
   showEarlier: 'Show earlier messages',
   jumpToLatest: 'Jump to the latest',
   copy: 'Copy',
