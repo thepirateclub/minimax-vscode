@@ -37,6 +37,8 @@ export const MAX_PARALLEL_TASKS = 3;
 
 export class Agent {
   private readonly options: AgentOptions;
+  // The turn that moved to the fallback model stays on it.
+  private readonly route = { onFallback: false };
   private readonly controller = new AbortController();
   // The state of the machine of the message of the assistant: the process
   // changes it by the result of the step.
@@ -88,7 +90,7 @@ export class Agent {
       // The request carries the old long results of the tools as stubs, the
       // history of the run keeps them whole (src/api/clearResults.ts).
       const request = clearOldToolResults(messages);
-      const streamed = await streamWithRetry(this.options, this.controller, request, (event) => this.applyAssistant(event));
+      const streamed = await streamWithRetry(this.options, this.controller, request, (event) => this.applyAssistant(event), this.route);
       const blocks = streamed.blocks;
       usage = addUsage(usage, streamed.usage);
       // The spend of every request goes to the host, the limits of the goal

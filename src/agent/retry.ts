@@ -7,6 +7,13 @@ import type {
   Usage
 } from '../api/types';
 import type { AgentOptions } from './types';
+import { isAvailabilityError } from './fallback';
+
+// Where the requests of a turn go. The turn that moved to the fallback model
+// stays there: the chat model would fail every next request the same way.
+export interface ModelRoute {
+  onFallback: boolean;
+}
 
 // How many times a request is repeated when the connection is lost.
 export const DEFAULT_MAX_RETRIES = 5;
@@ -44,7 +51,8 @@ export async function streamWithRetry(
   options: AgentOptions,
   controller: AbortController,
   messages: AnthropicMessage[],
-  handleEvent: (event: StreamEvent) => void
+  handleEvent: (event: StreamEvent) => void,
+  route: ModelRoute = { onFallback: false }
 ): Promise<{
   blocks: AnthropicContentBlock[];
   stopReason: StopReason;
@@ -60,16 +68,17 @@ export async function streamWithRetry(
     let usage: Usage = { inputTokens: 0, outputTokens: 0 };
     // The budget of the goal ran out in the middle of the answer.
     let budgetStopped = false;
+    const fallback = route.onFallback ? options.fallback : undefined;
     try {
       const stream = options.client.stream(
         {
-          model: options.model,
-          maxTokens: options.maxTokens,
+          model: fallback?.model ?? options.model,
+          maxTokens: fallback?.maxTokens ?? options.maxTokens,
           system: options.systemPrompt,
           messages: [...messages],
           tools: options.registry.toAnthropicTools(options.mode),
-          effort: options.effort,
-          thinking: options.thinking,
+          effort: fallback ? fallback.effort : options.effort,
+          thinking: fallback ? fallback.thinking : options.thinking,
           signal: controller.signal
         },
         { signal: controller.signal }
@@ -105,7 +114,20 @@ export async function streamWithRetry(
       const retryable = error instanceof MiniMaxApiError && error.retryable;
       // A request that the user stopped is not a failure of the server,
       // a retry would wait and fail again.
-      if (controller.signal.aborted || !retryable || attempt >= maxRetries) {
+      const spent = !retryable || attempt >= maxRetries;
+      if (!controller.signal.aborted && spent && !route.onFallback && options.fallback && isAvailabilityError(error)) {
+        // The chat model is not available: the request runs again on the
+        // fallback model with a fresh count of the retries.
+        route.onFallback = true;
+        attempt = 0;
+        if (emitted) {
+          options.onEvent({ type: 'assistant_reset' });
+        }
+        options.onEvent({ type: 'model_fallback', from: options.model, to: options.fallback.model });
+        options.logger.info('MiniMax model ' + options.model + ' failed, falling back to ' + options.fallback.model);
+        continue;
+      }
+      if (controller.signal.aborted || spent) {
         const message = error instanceof Error ? error.message : String(error);
         options.onEvent({ type: 'error', message });
         throw error;
