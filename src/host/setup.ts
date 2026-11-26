@@ -1,3 +1,4 @@
+import { fallbackFor } from '../agent/fallback';
 import { warmUp } from './warmup';
 import { notesFor } from './notes';
 import { renderNotes } from '../notes/store';
@@ -149,6 +150,7 @@ export async function ensureAgent(host: MiniMaxController, runtime: RuntimeSessi
     effort: effortFor(host, settings),
     mode: settings.mode,
     thinking: thinkingMode(host, settings),
+    fallback: fallbackFor(settings.fallbackModel, settings.model, settings),
     contextWindow: model?.contextWindow,
     historyLimit: settings.historyMaxMessages,
     contextThreshold: settings.contextThreshold,

@@ -1,3 +1,4 @@
+import { fallbackNotice } from '../agent/fallback';
 import { keepRecent } from '../ui/progressLog';
 import { closeGoal } from '../agent/stateMachines';
 import { addRequestUsage } from '../ui/usageTurns';
@@ -46,6 +47,11 @@ export function handleAgentEvent(host: MiniMaxController, runtime: RuntimeSessio
       }
     }
     postFor(host, runtime, { type: 'assistant_reset' });
+    return;
+  }
+  if (event.type === 'model_fallback') {
+    // The reader sees which model answers now and why.
+    postFor(host, runtime, { type: 'notice', message: fallbackNotice(event.from, event.to), kind: 'warn' });
     return;
   }
   if (event.type === 'retrying') {

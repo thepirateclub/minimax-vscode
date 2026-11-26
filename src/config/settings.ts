@@ -9,6 +9,9 @@ export interface MiniMaxSettings {
   // The model that plans the turn before the model of the chat works, empty
   // turns the pair off.
   plannerModel: string;
+  // The model of the turn when the chat model is not available, empty turns
+  // the fallback off.
+  fallbackModel: string;
   effort: EffortLevel;
   mode: AgentMode;
   thinking: boolean;
@@ -77,6 +80,8 @@ export function getSettings(): MiniMaxSettings {
     customBaseUrl: userValue<string>(cfg, 'customBaseUrl', ''),
     model: cfg.get<string>('model', 'MiniMax-M3.1-Flash'),
     plannerModel: cfg.get<string>('plannerModel', ''),
+    // User scope: the repository does not pick where the turns go.
+    fallbackModel: userValue<string>(cfg, 'fallbackModel', ''),
     effort: cfg.get<EffortLevel>('effort', 'max'),
     mode: cfg.get<AgentMode>('mode', 'code'),
     thinking: cfg.get<boolean>('thinking', false),

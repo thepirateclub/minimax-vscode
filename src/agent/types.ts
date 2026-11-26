@@ -11,6 +11,7 @@ import type { ChangedFile } from '../tools/types';
 import type { ApprovalGate, DiffPreview } from '../ui/approvals';
 import type { SessionState, ToolStateUpdate } from './state';
 import type { Logger } from '../logger';
+import type { FallbackModel } from './fallback';
 
 export type AgentEvent =
   | { type: 'assistant_start' }
@@ -21,6 +22,8 @@ export type AgentEvent =
   | { type: 'assistant_reset' }
   // The connection to MiniMax is lost, the request is repeated.
   | { type: 'retrying'; attempt: number; total: number; delayMs: number }
+  // The chat model is not available, the turn goes on the fallback model.
+  | { type: 'model_fallback'; from: string; to: string }
   | { type: 'tool_start'; id: string; name: string; input: Record<string, unknown> }
   | {
       type: 'tool_end';
@@ -66,6 +69,8 @@ export interface AgentRunOptions {
   retryBaseDelayMs?: number;
   effort?: EffortLevel;
   thinking?: 'adaptive';
+  // The model of the turn when the chat model is not available.
+  fallback?: FallbackModel;
   mode: AgentMode;
   systemPrompt: string;
   workspaceRoot: string;

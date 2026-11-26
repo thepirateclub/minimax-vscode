@@ -189,6 +189,22 @@
           "type": "string",
           "default": "MiniMax-M3.1-Flash"
         },
+        "minimax.fallbackModel": {
+          "type": "string",
+          "default": "",
+          "scope": "application",
+          "enum": [
+            "",
+            "MiniMax-M3",
+            "MiniMax-M3.1-Flash"
+          ],
+          "enumDescriptions": [
+            "Off: a turn fails when the chat model is not available.",
+            "The turn goes on MiniMax-M3 when the chat model is not available.",
+            "The turn goes on MiniMax-M3.1-Flash when the chat model is not available."
+          ],
+          "description": "The model a turn moves to when the chat model is not available: not in the plan, overloaded or failing after the retries. Key errors and the plan limit never fall back."
+        },
         "minimax.plannerModel": {
           "type": "string",
           "default": "",
