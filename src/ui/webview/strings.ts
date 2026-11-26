@@ -43,7 +43,7 @@ export const STRINGS = {
   toolDelete: 'Delete',
   toolFile: 'file',
   approvalDeleteWarning:
-    'The deletion is permanent: the files do not go to the trash.',
+    'The files go to the trash of the project (.minimax/agent/trash), kept 14 days.',
   toolSearch: 'Find',
   toolList: 'List',
   toolTerminal: 'Run',

@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, stat, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -100,12 +100,21 @@ describe('delete_files', () => {
     expect(result.content).toContain('2 files');
   });
 
-  it('says that the deletion is permanent', async () => {
+  it('moves the file to the trash of the project and names the way back', async () => {
     const root = await makeRoot();
-    await writeFile(join(root, 'a.txt'), 'one\n', 'utf8');
-    const result = await deleteTool().execute({ path: 'a.txt' }, makeContext(root));
-    // The files do not go to the trash, the reader has to know it.
-    expect(result.content).toContain('permanent');
+    await mkdir(join(root, 'src'), { recursive: true });
+    await writeFile(join(root, 'src', 'a.txt'), 'one\n', 'utf8');
+    const result = await deleteTool().execute({ path: 'src/a.txt' }, makeContext(root));
+    expect(result.isError).toBeFalsy();
+    expect(await exists(join(root, 'src', 'a.txt'))).toBe(false);
+    expect(result.content).toContain('.minimax/agent/trash/');
+    // The file keeps its path inside the folder of the deletion.
+    const trash = join(root, '.minimax', 'agent', 'trash');
+    const [chat] = await readdir(trash);
+    const [moment] = await readdir(join(trash, chat!));
+    expect(await readFile(join(trash, chat!, moment!, 'src', 'a.txt'), 'utf8')).toBe('one\n');
+    // Git does not see the trash.
+    expect(await readFile(join(root, '.minimax', 'agent', '.gitignore'), 'utf8')).toContain('*');
   });
 
   it('refuses a path outside the workspace and keeps the file', async () => {

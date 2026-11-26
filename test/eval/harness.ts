@@ -2,6 +2,8 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { Agent, type AgentEvent, type AgentRunResult } from '../../src/agent/agent';
+import type { AgentOptions } from '../../src/agent/types';
+import type { ToolEntry } from '../../src/tools/types';
 import type { MiniMaxClient } from '../../src/api/client';
 import type { AnthropicMessage, ChatRequest, StreamEvent } from '../../src/api/types';
 import type { AgentMode } from '../../src/config/models';
@@ -73,6 +75,11 @@ export interface Scenario {
   // Approvals answered no, by default every approval is yes.
   deny?: boolean;
   maxIterations?: number;
+  // The options of the agent beyond the defaults: the fallback model, the
+  // retries.
+  options?: Partial<AgentOptions>;
+  // The tools of the scenario next to the file tools, a sub-agent stub.
+  tools?: ToolEntry[];
 }
 
 export interface ToolRecord {
@@ -101,7 +108,7 @@ export async function runScenario(scenario: Scenario): Promise<Trace> {
       writeFileSync(join(root, path), content);
     }
     const registry = new ToolRegistry();
-    for (const entry of [...createFileTools({ backups: new InMemoryBackupStore() }), ...createGrepTools()]) {
+    for (const entry of [...createFileTools({ backups: new InMemoryBackupStore() }), ...createGrepTools(), ...(scenario.tools ?? [])]) {
       registry.register(entry);
     }
     const events: AgentEvent[] = [];
@@ -125,7 +132,8 @@ export async function runScenario(scenario: Scenario): Promise<Trace> {
       systemPrompt: 'system',
       workspaceRoot: root,
       logger: { info: () => undefined, error: () => undefined },
-      onEvent: (event) => events.push(event)
+      onEvent: (event) => events.push(event),
+      ...scenario.options
     });
     const result = await agent.run(scenario.prompt, []);
     const files: Record<string, string | undefined> = {};

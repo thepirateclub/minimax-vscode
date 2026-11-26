@@ -337,6 +337,7 @@ The key is taken from `MINIMAX_API_KEY` in the environment or from `.env.local` 
 - The paths of the tools are resolved only inside the root of the workspace, leaving it is forbidden. This concerns the search too: a file outside the workspace is not read and does not get into the answer of the model.
 - A ref that the model gives is not read as a git option: a separator of the options stands before the ref, so the model cannot point git to a file for writing.
 - The settings of the API address (`minimax.customBaseUrl`, `minimax.baseUrl`), of the list of the confirmations (`minimax.autoApprove`) and of the path to ffmpeg (`minimax.ffmpegPath`) have the scope application: a repository that the user opens cannot override them. The API address is accepted only over https, a foreign host asks for the confirmation.
+- The files the agent deletes stay 14 days in the trash of the project, `.minimax/agent/trash`.
 - The original of the file is saved before the write, it can be rolled back.
 - The API key lives only in the secret storage of VS Code, it gets neither into the webview nor into the logs.
 

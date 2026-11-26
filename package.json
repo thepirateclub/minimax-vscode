@@ -2,7 +2,7 @@
   "name": "minimax-agent",
   "displayName": "MiniMax Agent",
   "description": "Coding agent for VS Code powered by MiniMax models",
-  "version": "0.45.0",
+  "version": "0.46.0",
   "publisher": "katagarov",
   "license": "MIT",
   "repository": {
@@ -96,6 +96,11 @@
       {
         "command": "minimax.refreshContext",
         "title": "Refresh Workspace Context",
+        "category": "MiniMax"
+      },
+      {
+        "command": "minimax.clearTrash",
+        "title": "Empty the Trash of the Project",
         "category": "MiniMax"
       },
       {
