@@ -1,3 +1,4 @@
+import { keepRecent } from '../progressLog';
 import { isLatestSuggestion } from './suggestRequest';
 import { useEffect } from 'react';
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
@@ -349,7 +350,7 @@ export function appendProgress(
         ...item,
         tool: {
           ...item.tool,
-          progress: [...(item.tool.progress ?? []), line]
+          progress: keepRecent([...(item.tool.progress ?? []), line])
         }
       };
       return next;

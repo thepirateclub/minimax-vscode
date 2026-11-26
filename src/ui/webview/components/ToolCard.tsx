@@ -112,7 +112,7 @@ export function ToolCard({
           ) : tool.name === 'run_terminal' || tool.name === 'run_cmd' ? (
             <TerminalView
               command={String(tool.input['command'] ?? '')}
-              content={tool.content ?? ''}
+              content={tool.content ?? (tool.running ? (tool.progress ?? []).join('\n') : '')}
               running={tool.running === true}
             />
           ) : tool.name === 'repl_node' || tool.name === 'repl_python' ? (

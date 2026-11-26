@@ -1,3 +1,4 @@
+import { keepRecent } from '../ui/progressLog';
 import { closeGoal } from '../agent/stateMachines';
 import { addRequestUsage } from '../ui/usageTurns';
 import type { MiniMaxController } from '../extension';
@@ -65,10 +66,7 @@ export function handleAgentEvent(host: MiniMaxController, runtime: RuntimeSessio
     for (let index = runtime.uiMessages.length - 1; index >= 0; index--) {
       const message = runtime.uiMessages[index]!;
       if (message.tool && message.tool.id === event.id) {
-        message.tool.progress = [
-          ...(message.tool.progress ?? []),
-          event.line
-        ];
+        message.tool.progress = keepRecent([...(message.tool.progress ?? []), event.line]);
         break;
       }
     }
@@ -107,6 +105,11 @@ export function handleAgentEvent(host: MiniMaxController, runtime: RuntimeSessio
         message.tool.content = event.content;
         message.tool.isError = event.isError;
         message.tool.running = false;
+        // The live output of a command is replaced by its result: the
+        // chat does not keep the output twice.
+        if (message.tool.name === 'run_terminal' || message.tool.name === 'run_cmd') {
+          delete message.tool.progress;
+        }
         if (event.diff) {
           message.tool.diff = event.diff;
         }

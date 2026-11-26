@@ -4,6 +4,7 @@ import { SCRATCH_REFUSAL, writesScratch } from './scratch';
 import { exec, execFile, type ExecFileException } from 'node:child_process';
 import { resolveWorkspacePath } from '../paths';
 import { guardTree, TREE_OPTIONS, type TreeGuard } from './processTree';
+import { watchOutput, type LiveOutput } from './liveOutput';
 import type { ToolEntry } from './types';
 
 const DEFAULT_TIMEOUT_MS = 60_000;
@@ -197,12 +198,14 @@ export function createTerminalTools(): ToolEntry[] {
       }
       return await new Promise((resolvePromise) => {
         let guard: TreeGuard | undefined;
+        let live: LiveOutput | undefined;
         const done = (
           error: ExecFileException | null,
           stdout: string,
           stderr: string
         ): void => {
           guard?.dispose();
+          live?.close();
           const parts: string[] = [];
           if (guard?.timedOut()) {
             stderr += '\nthe command timed out after ' + Math.round(timeout / 1000) + 's, its processes are stopped';
@@ -236,6 +239,7 @@ export function createTerminalTools(): ToolEntry[] {
               done
             );
             guard = guardTree(child, timeout, ctx.signal);
+            live = watchOutput(child, ctx.progress);
           });
           return;
         }
@@ -245,6 +249,7 @@ export function createTerminalTools(): ToolEntry[] {
           done
         );
         guard = guardTree(child, timeout, ctx.signal);
+        live = watchOutput(child, ctx.progress);
       });
     }
   };
