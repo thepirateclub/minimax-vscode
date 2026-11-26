@@ -1,3 +1,4 @@
+import { forgetStamps } from '../tools/fileStamps';
 import { getSettings } from '../config/settings';
 import { stopReplSession } from '../tools/repl';
 import { historyPage, historyTail } from '../ui/historyPage';
@@ -239,6 +240,7 @@ export function deleteSession(host: MiniMaxController, id: string): void {
   }
   // The processes of the REPL of the chat go with it.
   stopReplSession(id);
+  forgetStamps(id);
   host.store.remove(id);
   // The removed chat is not the open one of any project.
   host.store.clearActiveId(id);
