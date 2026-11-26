@@ -1,10 +1,11 @@
+import * as vscode from 'vscode';
 import { goalMachine, resumeGoal } from '../agent/stateMachines';
 import { handleExtrasMessage } from './extras';
 import type { MiniMaxController } from '../extension';
 import type { WebToExt } from '../ui/protocol';
 import { sendQueued, sendAllQueued, removeQueued } from './queue';
 import { dropApprovalCard, dropApprovalCards, agentsByPriority } from './approvals';
-import { alwaysConfirms } from '../ui/approvalScope';
+import { alwaysConfirms, ruleFor } from '../ui/approvalScope';
 import { persist, loadOlder, selectSession, deleteSession, startNewSession } from './sessions';
 import { handleSend, retryTurn, rewindTo } from './turn';
 import { dismissSummary, postSummary, openFile, sendSuggestions } from './workspace';
@@ -53,6 +54,14 @@ export async function handleWebviewMessage(host: MiniMaxController, message: Web
     removeQueued(host, message.id);
     return;
   }
+  if (message.type === 'open_link') {
+    // Only a web address leaves the panel, the editor asks the reader about
+    // a domain it does not trust.
+    if (/^https?:\/\//i.test(message.url)) {
+      void vscode.env.openExternal(vscode.Uri.parse(message.url, true));
+    }
+    return;
+  }
   if (message.type === 'open_file') {
     await openFile(host, message.path, message.line);
     return;
@@ -83,13 +92,13 @@ export async function handleWebviewMessage(host: MiniMaxController, message: Web
       const pending = host.childApprovals.get(message.id);
       if (pending) {
         host.childApprovals.delete(message.id);
-        if (message.allowForSession && !alwaysConfirms(pending.toolName)) {
+        if (message.allowForSession && !alwaysConfirms(pending.toolName, pending.input)) {
           // The permission belongs to the chat of the child. The chat that
           // is active now has nothing to do with it, the reader answered
           // from another chat. A tool that always asks keeps no grant.
           host.sessions
             .get(pending.sessionId)
-            ?.approvedTools.add(pending.toolName);
+            ?.approvedTools.add(ruleFor(pending.toolName, pending.input));
         }
         pending.resolve({ approved: true, allowForSession: message.allowForSession });
       }

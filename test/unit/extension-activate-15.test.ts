@@ -98,4 +98,33 @@ describe('extension activation', () => {
       expect(cards[1]?.tool?.content).toBe('Wrote two.txt');
     });
   });
+
+  it('a deleted busy chat does not send the messages of its queue', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mm-ext-'));
+    state.config.set('root', root);
+    state.secrets.set('minimax.apiKey', 'test-key');
+    // The last answer must stay unused: the queue of the deleted chat would
+    // take it with a new turn.
+    state.responses.push(writeSse('toolu_1', 'note.txt', 'x'), TEXT_SSE, TEXT_SSE);
+    await boot();
+    const first = ofType('init')[0]!.state.activeSessionId;
+    state.receive?.({ type: 'send', text: 'write a note', mentions: [], selections: [] });
+    await waitForState(() => {
+      expect(ofType('approval_request').length).toBe(1);
+    });
+    state.receive?.({ type: 'send', text: 'queued request', mentions: [], selections: [] });
+    state.receive?.({ type: 'new_session' });
+    await waitForState(() => {
+      expect(ofType('init').length).toBeGreaterThan(1);
+    });
+    state.posted.length = 0;
+    state.receive?.({ type: 'delete_session', id: first! });
+    await waitForState(() => {
+      expect(state.responses.length).toBe(1);
+    });
+    await new Promise((done) => setTimeout(done, 100));
+    expect(state.responses.length).toBe(1);
+    // The open chat shows no bubble of the deleted one.
+    expect(ofType('user_message')).toHaveLength(0);
+  });
 });

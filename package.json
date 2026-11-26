@@ -2,7 +2,7 @@
   "name": "minimax-agent",
   "displayName": "MiniMax Agent",
   "description": "Coding agent for VS Code powered by MiniMax models",
-  "version": "0.43.3",
+  "version": "0.43.4",
   "publisher": "katagarov",
   "license": "MIT",
   "repository": {
@@ -30,7 +30,7 @@
     "Programming Languages",
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": ["onStartupFinished"],
   "contributes": {
     "viewsContainers": {
       "secondarySidebar": [
@@ -447,7 +447,7 @@
     "preview": "node test/visual/serve.mjs",
     "test:live": "vitest run --config vitest.live.config.ts",
     "build:production": "node esbuild.mjs --production",
-    "package": "node esbuild.mjs --production && vsce package",
+    "package": "vsce package",
     "vscode:prepublish": "node esbuild.mjs --production"
   },
   "devDependencies": {
@@ -455,7 +455,7 @@
     "@types/node": "^20.14.0",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
-    "@types/vscode": "^1.90.0",
+    "@types/vscode": "~1.106.0",
     "@vitejs/plugin-react": "^4.3.0",
     "@vscode/vsce": "^4.1.1",
     "esbuild": "^0.23.0",

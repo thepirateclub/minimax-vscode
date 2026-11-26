@@ -63,7 +63,7 @@ export function ApprovalCard({
         {/* One primary button in a group, the wider grant is secondary. The
             button names its scope: the prefix of the command or the folder.
             A tool that always asks has no grant, the card shows none. */}
-        {!alwaysConfirms(approval.name) ? (
+        {!alwaysConfirms(approval.name, approval.input) ? (
           <button className="secondary" onClick={() => onApprove(true)}>
             {scopeLabel(approval.name, approval.input)}
           </button>

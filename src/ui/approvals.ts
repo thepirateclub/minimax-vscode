@@ -50,7 +50,7 @@ export class ApprovalGate {
     }
     // A tool that always asks is never covered by a rule of the reader:
     // the deletion of a file is never silent.
-    const rules = alwaysConfirms(entry.name)
+    const rules = alwaysConfirms(entry.name, input)
       ? []
       : [...this.autoApprove, ...this.sessionApproved];
     if (rules.some((rule) => ruleAllows(rule, entry.name, input))) {
@@ -64,7 +64,7 @@ export class ApprovalGate {
       toolName: entry.name,
       input
     });
-    if (decision.approved && decision.allowForSession && !alwaysConfirms(entry.name)) {
+    if (decision.approved && decision.allowForSession && !alwaysConfirms(entry.name, input)) {
       // The grant has the scope of this call: the prefix of the command,
       // the folder of the write, the tool for the rest. A tool that always
       // asks keeps no grant, the next call asks again.

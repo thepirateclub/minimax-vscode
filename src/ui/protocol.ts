@@ -322,6 +322,7 @@ export type WebToExt =
   | { type: 'paste_image'; name: string; dataUrl: string }
   | { type: 'files_picked'; requestId: string; files: string[] }
   | { type: 'open_file'; path: string; line?: number }
+  | { type: 'open_link'; url: string }
   | { type: 'undo_last_change' }
   | { type: 'request_suggestions'; requestId: string; prefix: string }
   | { type: 'request_settings' }

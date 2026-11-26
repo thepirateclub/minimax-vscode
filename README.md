@@ -82,7 +82,7 @@
 
 Голосовой ввод настраивается там же: **Language** (пустое значение включает автоопределение) и **Microphone**. Словарь иностранных слов (`minimax.speechVocabulary`) и путь к ffmpeg (`minimax.ffmpegPath`) задаются в настройках VS Code.
 
-Ключ можно положить и в файл `.env.local` в корне проекта, переменная `MINIMAX_API_KEY`. Файл уже в `.gitignore` и в репозиторий не попадает. Приоритет у secret storage, `.env.local` используется как запасной источник.
+Запасной источник ключа это переменная окружения `MINIMAX_API_KEY` процесса редактора. Приоритет у secret storage. Файл `.env.local` расширение не читает: его читает только live-тест (`npm run test:live`).
 
 ## Команды
 
@@ -319,7 +319,7 @@ npm run package
 Открыть расширение в VS Code по F5 или поставить собранный файл:
 
 ```bash
-code --install-extension minimax-agent-0.42.3.vsix --force
+code --install-extension minimax-agent-0.43.4.vsix --force
 ```
 
 Имя файла повторяет версию из `package.json`.

@@ -1,3 +1,5 @@
+import { useLinkClicks } from './components/linkClicks';
+import { dropSuggestions, nextSuggestionId } from './suggestRequest';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePanelMessages } from './usePanelMessages';
 import type { GoalState, TodoItem } from '../../agent/state';
@@ -139,6 +141,9 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
     body.classList.add('mm-theme-' + state.theme);
   }, [state.theme]);
 
+  // A link of an answer goes to the host: the webview cannot navigate.
+  useLinkClicks(vscode);
+
   // The size of the font of the panel comes from the settings of the host.
   useEffect(() => {
     document.body.style.setProperty('--mm-font-base', state.fontSize + 'px');
@@ -178,10 +183,11 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
 
   const suggest = (prefix: string | undefined): void => {
     if (prefix === undefined) {
+      dropSuggestions();
       setSuggestions([]);
       return;
     }
-    vscode.postMessage({ type: 'request_suggestions', requestId: 'suggestions', prefix });
+    vscode.postMessage({ type: 'request_suggestions', requestId: nextSuggestionId(), prefix });
   };
 
   // A file reference lives in the input field as "@path", so the user can

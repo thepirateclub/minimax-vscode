@@ -34,6 +34,17 @@ describe('applyEdit, the lenient match', () => {
     });
   });
 
+  it('moves only the first line when only the first line lost its indentation', () => {
+    // The space at the end of the first line makes the exact match miss.
+    const file = 'function f() {\n    if (a) { \n        run();\n    }\n}\n';
+    const result = applyEdit(file, 'if (a) {\n        run();\n    }', 'if (b) {\n        run();\n    }', false);
+    expect(result).toEqual({
+      ok: true,
+      text: 'function f() {\n    if (b) {\n        run();\n    }\n}\n',
+      lenient: true
+    });
+  });
+
   it('ignores the spaces at the end of the lines', () => {
     const result = applyEdit('a  \nb\t\nc\n', 'a\nb', 'A\nB', false);
     expect(result).toEqual({ ok: true, text: 'A\nB\nc\n', lenient: true });

@@ -27,11 +27,28 @@ export function commandHints(messages: UiMessage[]): Array<CommandHint | undefin
   return hints;
 }
 
+// The hint of a card keeps its object while the card does not change: the
+// row of a message is memoized, a fresh object on every flush of the stream
+// drew every row again.
+const hintCache = new WeakMap<object, CommandHint>();
+
 function hintOf(message: UiMessage): CommandHint | undefined {
   const tool = message.tool;
   if (message.role !== 'tool' || !tool || tool.name !== TERMINAL_TOOL) {
     return undefined;
   }
+  const cached = hintCache.get(tool);
+  if (cached) {
+    return cached;
+  }
+  const made = makeHint(tool);
+  if (made) {
+    hintCache.set(tool, made);
+  }
+  return made;
+}
+
+function makeHint(tool: NonNullable<UiMessage['tool']>): CommandHint | undefined {
   const command = tool.input['command'];
   if (typeof command !== 'string' || command.trim().length === 0) {
     return undefined;

@@ -67,6 +67,21 @@ describe('ProjectSearch', () => {
     expect(outcome.hits[0]?.snippet).not.toBe('');
   });
 
+  it('keeps the semantic hits inside the folder of the call', async () => {
+    const root = await makeProject();
+    await mkdir(join(root, 'docs'), { recursive: true });
+    await writeFile(join(root, 'docs', 'invoice.md'), 'invoice notes\n', 'utf8');
+    const search = new ProjectSearch(root);
+    search.setSemanticProvider({
+      embed: async (texts) =>
+        texts.map((text) => (text.toLowerCase().includes('invoice') ? [1, 0] : [0, 1]))
+    });
+    for (const mode of ['semantic', 'hybrid', 'auto'] as const) {
+      const outcome = await search.search('invoice', { mode, path: 'src' });
+      expect(outcome.hits.every((hit) => hit.path.startsWith('src/')), mode).toBe(true);
+    }
+  });
+
   it('takes the new content of a file after the change', async () => {
     const root = await makeProject();
     const search = new ProjectSearch(root);

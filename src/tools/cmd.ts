@@ -1,3 +1,4 @@
+import { guardTree } from './processTree';
 import { SCRATCH_REFUSAL, writesScratch } from './scratch';
 import { exec, type ExecException } from 'node:child_process';
 import { resolveWorkspacePath } from '../paths';
@@ -116,16 +117,19 @@ export function createCmdTools(): ToolEntry[] {
         // one argument and Node escapes the quotes for CreateProcess: the
         // shell receives backslashes and prints them, a command with quotes
         // came back corrupted (echo "a b" gave \"a b\").
-        exec(
+        // The timeout and the stop kill the whole tree of the command.
+        const child = exec(
           command,
           {
             cwd,
-            timeout,
             maxBuffer: 10 * 1024 * 1024,
-            signal: ctx.signal,
             windowsHide: true
           },
           (error: ExecException | null, stdout: string, stderr: string) => {
+            guard.dispose();
+            if (guard.timedOut()) {
+              stderr += '\nthe command timed out after ' + Math.round(timeout / 1000) + 's, its processes are stopped';
+            }
             const parts: string[] = [];
             if (stdout.trim().length > 0) {
               parts.push(stdout.trim());
@@ -152,6 +156,7 @@ export function createCmdTools(): ToolEntry[] {
             });
           }
         );
+        const guard = guardTree(child, timeout, ctx.signal);
       });
     }
   };

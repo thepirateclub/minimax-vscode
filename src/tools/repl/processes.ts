@@ -1,3 +1,4 @@
+import { killTree, TREE_OPTIONS } from '../processTree';
 import { SCRATCH_REFUSAL, writesScratch } from '../scratch';
 import { missingFileHint } from './hints';
 import { execFile, spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
@@ -129,6 +130,8 @@ function stopProcess(proc: ReplProcess): void {
     waiter.resolve({ output: '', error: 'the process of the REPL is stopped' });
   }
   try {
+    // The tree goes: a server started from the REPL must not outlive it.
+    killTree(proc.child.pid);
     proc.child.kill();
   } catch {
     // Процесс уже мёртв, закрывать его не нужно.
@@ -179,6 +182,7 @@ function startProcess(
   const child = spawn(command, args, {
     cwd,
     windowsHide: true,
+    ...TREE_OPTIONS,
     env: {
       ...process.env,
       MINIMAX_REPL_BLOCK_END: REPL_BLOCK_END,

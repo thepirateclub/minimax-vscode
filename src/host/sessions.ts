@@ -224,6 +224,8 @@ export function deleteSession(host: MiniMaxController, id: string): void {
     // must not burn any further, and the finished turn must not write
     // the chat back into the store.
     runtime.deleted = true;
+    // The queue goes with the chat, it must not start a turn after the stop.
+    runtime.queue.length = 0;
     if (runtime.busy) {
       runtime.agent?.stop();
     }

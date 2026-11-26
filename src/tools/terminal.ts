@@ -2,7 +2,8 @@ import { cutMiddle, dropExitEcho, posixScript, powershellScript, splitLeadingCd,
 import { deleteToolFor } from './deleteCommand';
 import { SCRATCH_REFUSAL, writesScratch } from './scratch';
 import { exec, execFile, type ExecFileException } from 'node:child_process';
-import { isAbsolute, relative, resolve } from 'node:path';
+import { resolveWorkspacePath } from '../paths';
+import { guardTree, TREE_OPTIONS, type TreeGuard } from './processTree';
 import type { ToolEntry } from './types';
 
 const DEFAULT_TIMEOUT_MS = 60_000;
@@ -35,12 +36,12 @@ function resolveCwd(root: string, candidate: string | undefined): string {
   if (!candidate) {
     return root;
   }
-  const target = isAbsolute(candidate) ? candidate : resolve(root, candidate);
-  const rel = relative(resolve(root), target);
-  if (rel.startsWith('..') || isAbsolute(rel)) {
+  // The same check as every path of the model, links included.
+  try {
+    return resolveWorkspacePath(root, candidate);
+  } catch {
     throw new Error('cwd escapes the workspace root: ' + candidate);
   }
-  return target;
 }
 
 // The git commands have tools of their own: the tools read the output of git
@@ -195,12 +196,17 @@ export function createTerminalTools(): ToolEntry[] {
         };
       }
       return await new Promise((resolvePromise) => {
+        let guard: TreeGuard | undefined;
         const done = (
           error: ExecFileException | null,
           stdout: string,
           stderr: string
         ): void => {
+          guard?.dispose();
           const parts: string[] = [];
+          if (guard?.timedOut()) {
+            stderr += '\nthe command timed out after ' + Math.round(timeout / 1000) + 's, its processes are stopped';
+          }
           if (stdout.trim().length > 0) {
             parts.push(stdout.trim());
           }
@@ -223,20 +229,22 @@ export function createTerminalTools(): ToolEntry[] {
           // The command runs as one PowerShell script: the exit code of the
           // last native command becomes the exit code of the run.
           void windowsShell().then((shell) => {
-            execFile(
+            const child = execFile(
               shell,
               ['-NoProfile', '-NonInteractive', '-Command', powershellScript(command)],
-              { cwd, timeout, maxBuffer: 10 * 1024 * 1024, signal: ctx.signal, windowsHide: true },
+              { cwd, maxBuffer: 10 * 1024 * 1024, windowsHide: true },
               done
             );
+            guard = guardTree(child, timeout, ctx.signal);
           });
           return;
         }
-        exec(
+        const child = exec(
           posixScript(command),
-          { cwd, timeout, maxBuffer: 10 * 1024 * 1024, signal: ctx.signal, windowsHide: true },
+          { cwd, maxBuffer: 10 * 1024 * 1024, windowsHide: true, ...TREE_OPTIONS },
           done
         );
+        guard = guardTree(child, timeout, ctx.signal);
       });
     }
   };

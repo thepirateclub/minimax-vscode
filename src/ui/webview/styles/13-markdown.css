@@ -43,6 +43,13 @@
   color: var(--accent);
   text-decoration: underline;
   text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+/* A picture of an answer must not push the panel wider than its width. */
+.markdown img {
+  max-width: 100%;
+  height: auto;
 }
 
 /* The headings take the weight, not the accent: the accent means a click. */
@@ -349,4 +356,4 @@
 .thinking-icon .icon {
   transform: translateY(-1.5px);
 }
-
+

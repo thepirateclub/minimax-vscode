@@ -1,6 +1,7 @@
 // A stand of the panel for the eye: the real webview with a fake host. It
 // posts one chat that holds every kind of message, so a change of the styles
 // is checked on the whole panel at once. Build and serve: npm run preview.
+import { nextSuggestionId } from '../../src/ui/webview/suggestRequest';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from '../../src/ui/webview/App';
@@ -148,7 +149,9 @@ const vscode = {
         post({ type: 'mention', path: 'src/ui/webview/components/Header.tsx' });
         post({
           type: 'suggestions',
-          requestId: 'suggestions',
+          // The stand answers without a request: it takes the id the panel
+          // waits for.
+          requestId: nextSuggestionId(),
           items: [
             { id: 'a', path: 'src/ui/format.ts', label: 'format.ts', source: 'open' },
             { id: 'b', path: 'src/ui/statusBar.ts', label: 'statusBar.ts', source: 'workspace' },

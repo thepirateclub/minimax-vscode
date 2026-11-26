@@ -80,7 +80,9 @@ export function createFileTools(deps: {
         try {
           const target = resolveWorkspacePath(ctx.workspaceRoot, path);
           const raw = await readFileAsync(target, 'utf8');
-          const lines = raw.split('\n');
+          // An empty file has no lines: split gives one empty line and the
+          // answer read `1: ` instead of an empty file.
+          const lines = raw.length === 0 ? [] : raw.split('\n');
           const slice = lines.slice(Math.max(0, start - 1), Math.max(0, end));
           body = slice.map((line, offset) => (start + offset) + ': ' + line).join('\n');
           beyondRange = slice.length === 0 && raw.length > 0;
@@ -188,6 +190,12 @@ export function createFileTools(deps: {
           return { content: edit.error, isError: true };
         }
         const updated = edit.text;
+        if (updated.length > MAX_WRITE_CHARS) {
+          return {
+            content: 'edit_file refused: the file after the edit exceeds ' + MAX_WRITE_CHARS + ' characters',
+            isError: true
+          };
+        }
         await deps.backups.save(target, raw, { sessionId: ctx.sessionId, next: updated });
         await writeFileAsync(target, updated, 'utf8');
         // A lenient match is named: the model learns its old_string was off.

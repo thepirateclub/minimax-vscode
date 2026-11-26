@@ -91,6 +91,9 @@ export function createExploreTools(options: ExploreOptions = {}): ToolEntry[] {
       // The path of the model must stay inside the workspace, the join of the
       // paths normalizes the .. and the listing would walk out of it.
       const raw = Array.isArray(input['paths']) ? input['paths'].map(String) : [String(input['path'] ?? '.')];
+      if (raw.length === 0) {
+        return { content: 'list_files failed: paths is empty, name at least one folder or leave it out', isError: true };
+      }
       const details = input['details'] === true;
       const glob = typeof input['glob'] === 'string' && input['glob'].trim() ? globToRegExp(input['glob'].trim()) : undefined;
       const sort = ['name', 'size', 'time'].includes(String(input['sort'])) ? (String(input['sort']) as ListSort) : undefined;

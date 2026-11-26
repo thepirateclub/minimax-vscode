@@ -82,7 +82,7 @@ Every setting is available right in the panel: the **Settings** tab next to the 
 
 Voice input is configured there as well: **Language** (an empty value turns auto-detection on) and **Microphone**. The dictionary of foreign words (`minimax.speechVocabulary`) and the path to ffmpeg (`minimax.ffmpegPath`) are set in the VS Code settings.
 
-The key can also be put into a `.env.local` file in the root of the project, the variable `MINIMAX_API_KEY`. The file is in `.gitignore` and never reaches the repository. The secret storage has the priority, `.env.local` is the fallback source.
+The fallback source of the key is the environment variable `MINIMAX_API_KEY` of the editor process. The secret storage has the priority. The extension does not read `.env.local`: only the live test (`npm run test:live`) reads it.
 
 ## Commands
 
@@ -312,7 +312,7 @@ npm run package
 Open the extension in VS Code with F5 or install the built file:
 
 ```bash
-code --install-extension minimax-agent-0.42.3.vsix --force
+code --install-extension minimax-agent-0.43.4.vsix --force
 ```
 
 The name of the file repeats the version from `package.json`.
