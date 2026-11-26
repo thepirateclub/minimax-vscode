@@ -32,7 +32,7 @@ export function commandHints(messages: UiMessage[]): Array<CommandHint | undefin
 // drew every row again.
 const hintCache = new WeakMap<object, CommandHint>();
 
-function hintOf(message: UiMessage): CommandHint | undefined {
+export function hintOf(message: UiMessage): CommandHint | undefined {
   const tool = message.tool;
   if (message.role !== 'tool' || !tool || tool.name !== TERMINAL_TOOL) {
     return undefined;

@@ -179,20 +179,23 @@ const EMPTY_SOURCES: CodeSource[] = [];
 // keeps its identity while the reads do not change, the rows of the chat are
 // not redrawn for nothing.
 export function collectFileSources(messages: UiMessage[]): CodeSource[] {
-  const reads: UiMessage[] = [];
-  for (const message of messages) {
-    const tool = message.tool;
-    if (
-      message.role !== 'tool' ||
-      !tool ||
-      tool.name !== 'read_file' ||
-      tool.isError === true ||
-      (tool.content ?? '').length === 0
-    ) {
-      continue;
-    }
-    reads.push(message);
-  }
+  return sourcesOfReads(messages.filter(isSourceRead));
+}
+
+// The card of a read that names a source: a read of a file that worked.
+export function isSourceRead(message: UiMessage): boolean {
+  const tool = message.tool;
+  return (
+    message.role === 'tool' &&
+    tool !== undefined &&
+    tool.name === 'read_file' &&
+    tool.isError !== true &&
+    (tool.content ?? '').length > 0
+  );
+}
+
+// The sources of the given reads, the cards of read_file that worked.
+export function sourcesOfReads(reads: readonly UiMessage[]): CodeSource[] {
   if (reads.length === 0) {
     return EMPTY_SOURCES;
   }

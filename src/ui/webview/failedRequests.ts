@@ -24,7 +24,7 @@ export function failedRequests(messages: UiMessage[]): Set<string> {
 
 // A failure of the panel is a notice of the kind error, a failed action is a
 // card with the red mark. A note or a warning is not a failure.
-function isFailure(message: UiMessage): boolean {
+export function isFailure(message: UiMessage): boolean {
   if (message.role === 'notice') {
     return message.kind === 'error';
   }
