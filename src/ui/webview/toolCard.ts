@@ -112,7 +112,7 @@ export function groupBySteps(messages: UiMessage[]): FeedItem[] {
 }
 
 // The message of the model says something: it has a thought or an answer.
-function speaks(message: UiMessage): boolean {
+export function speaks(message: UiMessage): boolean {
   return (message.text?.length ?? 0) > 0 || (message.thinking?.length ?? 0) > 0;
 }
 

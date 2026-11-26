@@ -1,13 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { UiMessage } from '../../protocol';
-import { collectFileSources } from '../codeBlock';
-import { commandHints, type CommandHint } from '../commandHistory';
-import { failedRequests } from '../failedRequests';
 import { feedAction, isAtBottom, measure } from '../listScroll';
 import { STRINGS } from '../strings';
 import { MessageRow } from './MessageRow';
 import { ToolSteps } from './ToolSteps';
-import { groupToolSteps, type FeedItem } from '../toolCard';
+import { createChatLists, createFeed } from '../feedCache';
+import type { FeedItem } from '../toolCard';
 
 // The panel keeps the dom small, the older messages are loaded on demand.
 const PAGE = 120;
@@ -168,21 +166,14 @@ export function MessageList({
 
   // The files the agent has read, a snippet of one of them gets the name
   // of the file in its header.
-  // The lists walk the whole chat: they are counted once per change of the
-  // messages, not on every render of the feed (scroll, the visible window).
-  const sources = useMemo(() => collectFileSources(messages), [messages]);
-  // The request can be repeated only when the turn of it failed.
-  const failed = useMemo(() => failedRequests(messages), [messages]);
-  // The command of a message by its id: the steps of the tools break the
-  // order of the feed, the index of the message is not its place anymore.
-  const commandsById = useMemo(() => {
-    const commands = commandHints(messages);
-    const byId = new Map<string, CommandHint | undefined>();
-    messages.forEach((message, index) => {
-      byId.set(message.id, commands[index]);
-    });
-    return byId;
-  }, [messages]);
+  // The lists walk the whole chat. The caches resume at the first message
+  // that changed: a flush of the stream costs its tail, not the chat.
+  const chatLists = useRef(createChatLists()).current;
+  const feedOf = useRef(createFeed()).current;
+  // The files the agent has read name the snippets, the request can be
+  // repeated only when its turn failed, the command that ran before every
+  // message names the output it quotes.
+  const { sources, failed, commandsById } = useMemo(() => chatLists(messages), [chatLists, messages]);
 
   const shown = useMemo(
     () => (messages.length > visible ? messages.slice(-visible) : messages),
@@ -194,7 +185,7 @@ export function MessageList({
   const pendingCount = hidden + olderMessages;
   // The feed of the chat, the steps of the actions and the messages of the
   // model in the order they came.
-  const feed = useMemo(() => groupToolSteps(shown), [shown]);
+  const feed = useMemo(() => feedOf(shown), [feedOf, shown]);
 
   return (
     <div className="messages-wrap">
