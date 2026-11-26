@@ -368,6 +368,15 @@
           "scope": "application",
           "description": "Rules approved without confirmation. A tool name approves the whole tool; a scoped rule approves part of it: run_terminal(npm test) for commands starting with that prefix (chained or redirected commands never match), write_file(src/ui/) for writes inside that folder."
         },
+        "minimax.denyPaths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": ["**/.env", "**/.env.*", "!**/.env.example", "!**/.env.sample", "!**/.env.template", "**/*.pem", "**/*.key", "**/*.p12", "**/*.pfx", "**/id_rsa*", "**/id_ed25519*", "**/.ssh/**", "**/secrets/**", "**/.aws/credentials", "**/.npmrc", "**/.netrc"],
+          "scope": "application",
+          "description": "Files the agent never reads, writes or searches, even with approval. Glob patterns relative to the workspace, as in .gitignore: ** crosses folders, a pattern without a slash matches a name in any folder, ! lets a file through."
+        },
         "minimax.mcpServers": {
           "type": "object",
           "default": {},

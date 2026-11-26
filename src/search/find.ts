@@ -1,3 +1,4 @@
+import { isDeniedPath } from '../denyPaths';
 import { readFile, readdir, stat } from 'node:fs/promises';
 import { join, relative, sep } from 'node:path';
 import { resolveWorkspacePath } from '../paths';
@@ -136,7 +137,7 @@ export async function findInTree(
       }
       const dot = entry.name.lastIndexOf('.');
       const extension = dot === -1 ? '' : entry.name.slice(dot).toLowerCase();
-      if (!TEXT_EXTENSIONS.has(extension)) {
+      if (!TEXT_EXTENSIONS.has(extension) || isDeniedPath(root, full)) {
         continue;
       }
       await scanFile(full);

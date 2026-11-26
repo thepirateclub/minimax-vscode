@@ -5,6 +5,7 @@ import { resolveWorkspacePath } from '../paths';
 import type { BackupStore } from '../storage/backups';
 import { withProblems, type DiagnosticsProvider } from './diagnostics';
 import { applyEdit } from './editMatch';
+import { maskSecrets } from './secrets';
 import type { ToolEntry } from './types';
 
 export { resolveWorkspacePath };
@@ -84,7 +85,8 @@ export function createFileTools(deps: {
           // answer read `1: ` instead of an empty file.
           const lines = raw.length === 0 ? [] : raw.split('\n');
           const slice = lines.slice(Math.max(0, start - 1), Math.max(0, end));
-          body = slice.map((line, offset) => (start + offset) + ': ' + line).join('\n');
+          // A key in a config reaches the server of the model otherwise.
+          body = maskSecrets(slice.map((line, offset) => (start + offset) + ': ' + line).join('\n')).text;
           beyondRange = slice.length === 0 && raw.length > 0;
         } catch (error) {
           failed += 1;

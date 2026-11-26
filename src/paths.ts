@@ -1,5 +1,6 @@
 import { realpathSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { isDeniedPath } from './denyPaths';
 
 // The path of the model must stay inside the workspace root. Every tool that
 // takes a path goes through this check: the join of the paths normalizes the
@@ -17,6 +18,11 @@ export function resolveWorkspacePath(root: string, candidate: string): string {
   const realBase = realOrSelf(base);
   if (escapes(realBase, realExisting(target))) {
     throw new Error('path escapes the workspace root through a link: ' + candidate);
+  }
+  // A secret of the project stays closed even inside the root, the reader
+  // names these files in minimax.denyPaths.
+  if (isDeniedPath(base, target) || isDeniedPath(realBase, realExisting(target))) {
+    throw new Error('path is closed by minimax.denyPaths: ' + candidate);
   }
   return target;
 }

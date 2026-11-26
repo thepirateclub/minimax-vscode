@@ -1,3 +1,5 @@
+import { maskSecrets } from './secrets';
+import { isDeniedPath } from '../denyPaths';
 import { readFile, readdir, stat } from 'node:fs/promises';
 import { join, relative, sep } from 'node:path';
 import { resolveWorkspacePath } from '../paths';
@@ -62,7 +64,7 @@ export function grepText(
     }
     for (let i = from; i <= Math.min(lines.length - 1, hit + context); i++) {
       const mark = hits.includes(i) ? ':' : '-';
-      out.push(i + 1 + offset + mark + (lines[i] ?? '').slice(0, LINE_LIMIT));
+      out.push(i + 1 + offset + mark + maskSecrets((lines[i] ?? '').slice(0, LINE_LIMIT)).text);
       shownTo = i;
     }
   }
@@ -85,7 +87,7 @@ async function* walk(dir: string, root: string, hidden: boolean): AsyncGenerator
       yield* walk(full, root, hidden);
     } else if (entry.isFile()) {
       const dot = entry.name.lastIndexOf('.');
-      if (TEXT_EXTENSIONS.has(dot === -1 ? '' : entry.name.slice(dot).toLowerCase())) {
+      if (TEXT_EXTENSIONS.has(dot === -1 ? '' : entry.name.slice(dot).toLowerCase()) && !isDeniedPath(root, full)) {
         yield full;
       }
     }

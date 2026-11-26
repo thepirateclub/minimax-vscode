@@ -1,3 +1,4 @@
+import { DEFAULT_DENY_PATHS } from '../denyPaths';
 import * as vscode from 'vscode';
 import type { AgentMode, BaseUrlPreset, EffortLevel } from './models';
 
@@ -29,6 +30,7 @@ export interface MiniMaxSettings {
   // The steps of the tools are shown in the feed.
   showToolSteps: boolean;
   autoApprove: string[];
+  denyPaths: string[];
   // The MCP servers of the user, the form of `mcpServers` of Claude and Cursor.
   mcpServers: Record<string, unknown>;
   enableWebSearch: boolean;
@@ -87,6 +89,8 @@ export function getSettings(): MiniMaxSettings {
     collapseCode: cfg.get<boolean>('collapseCode', false),
     showToolSteps: cfg.get<boolean>('showToolSteps', true),
     autoApprove: userValue<string[]>(cfg, 'autoApprove', []),
+    // A repository must not open its own secrets to the agent.
+    denyPaths: userValue<string[]>(cfg, 'denyPaths', DEFAULT_DENY_PATHS),
     mcpServers: userValue<Record<string, unknown>>(cfg, 'mcpServers', {}),
     enableWebSearch: userValue<boolean>(cfg, 'enableWebSearch', false),
     rulesEnabled: cfg.get<boolean>('rulesEnabled', true),
