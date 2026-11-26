@@ -29,6 +29,7 @@ export function persist(host: MiniMaxController, runtime: RuntimeSession): void 
     updatedAt: runtime.updatedAt,
     workspaceRoot: runtime.workspaceRoot,
     messages: runtime.history,
+    ...(runtime.digest ? { digest: runtime.digest } : {}),
     uiMessages: runtime.uiMessages,
     usage: runtime.usage,
     turns: runtime.turns,
@@ -87,6 +88,7 @@ export function runtimeFrom(host: MiniMaxController, stored: StoredSession): Run
     // that opens it takes it.
     workspaceRoot: stored.workspaceRoot ?? host.workspaceRoot(),
     history: [...stored.messages],
+    digest: stored.digest,
     uiMessages: [...(stored.uiMessages ?? [])],
     panelOffset: undefined,
     agent: undefined,

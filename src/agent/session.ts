@@ -1,6 +1,7 @@
 import { balanceHistory, fitHistory } from '../api/history';
 import type { AnthropicMessage } from '../api/types';
 import { Agent } from './agent';
+import { summarizeHistory, withDigest } from './digest';
 import type { AgentRunOptions } from './types';
 import { buildPreview } from '../tools/preview';
 import { approvalFiles } from '../tools/delete';
@@ -22,6 +23,11 @@ export interface SessionOptions extends AgentRunOptions {
   contextProvider?: () => Promise<string>;
   autoApprove: string[];
   onApproval: (approval: UiApproval) => void;
+  // The old turns the cut throws away become a digest in the system prompt.
+  summarize?: boolean;
+  // The digest of the saved chat, and the place the new one goes to.
+  digest?: string;
+  onDigest?: (digest: string) => void;
 }
 
 // The counter of the approvals of the whole host. The reader can answer a
@@ -112,8 +118,10 @@ export class AgentSession {
     const context = this.options.contextProvider
       ? await this.options.contextProvider()
       : '';
-    const systemPrompt =
-      context.length > 0 ? this.systemPrompt + '\n\n' + context : this.systemPrompt;
+    const systemPrompt = withDigest(
+      context.length > 0 ? this.systemPrompt + '\n\n' + context : this.systemPrompt,
+      this.options.digest
+    );
     // The options of the session carry the options of the agent, a new
     // field of the agent reaches it without a list of names here.
     const run: AgentRunOptions = this.options;
@@ -139,10 +147,35 @@ export class AgentSession {
       this.options.contextThreshold
     );
     this.history = kept;
+    await this.digestDropped(balanced.slice(0, balanced.length - kept.length));
     // The request is found by itself, the same text can stand in the
     // history more than once.
     const request = result.messages[result.requestIndex];
     return request ? kept.indexOf(request) : -1;
+  }
+
+  // The cut threw the head of the history away: its digest keeps the
+  // thread. A failure of the digest leaves the old one, the turn is done.
+  private async digestDropped(dropped: AnthropicMessage[]): Promise<void> {
+    if (!this.options.summarize || dropped.length === 0 || this.turnAbort.signal.aborted) {
+      return;
+    }
+    try {
+      const { digest, usage } = await summarizeHistory({
+        client: this.options.client,
+        model: this.options.model,
+        previous: this.options.digest,
+        dropped,
+        signal: this.turnAbort.signal
+      });
+      if (digest.length > 0) {
+        this.options.digest = digest;
+        this.options.onDigest?.(digest);
+      }
+      this.options.onEvent({ type: 'usage', usage });
+    } catch (error) {
+      this.options.logger.error('the digest of the history failed', error);
+    }
   }
 
   private async requestApproval(

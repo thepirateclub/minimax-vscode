@@ -21,6 +21,8 @@ export interface RuntimeSession {
   panelOffset: number | undefined;
   agent: AgentSession | undefined;
   busy: boolean;
+  // The digest of the old turns, it stands in the system prompt.
+  digest?: string;
   // The automatic rounds of fixes after a failed check of the project.
   verifyRound?: number;
   // The next turn is a fix after a failed check, not a request of the reader.

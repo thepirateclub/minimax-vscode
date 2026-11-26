@@ -21,6 +21,7 @@ export interface MiniMaxSettings {
   historyMaxMessages: number;
   // The share of the context window the history may take, in percent.
   contextThreshold: number;
+  summarizeHistory: boolean;
   // The semantic layer of the search sends the code of the project to the server.
   semanticSearch: boolean;
   // The cards of the actions fold to their title.
@@ -84,6 +85,7 @@ export function getSettings(): MiniMaxSettings {
     fontSize: cfg.get<number>('fontSize', 13),
     historyMaxMessages: cfg.get<number>('historyMaxMessages', 120),
     contextThreshold: cfg.get<number>('contextThreshold', 50),
+    summarizeHistory: cfg.get<boolean>('summarizeHistory', true),
     // The semantic search sends the code of the project to the server, the
     // web search sends the queries: a repository must not turn them on.
     semanticSearch: userValue<boolean>(cfg, 'semanticSearch', false),

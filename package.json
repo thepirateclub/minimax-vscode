@@ -332,6 +332,11 @@
           "maximum": 1000,
           "description": "How many messages the chat keeps before the oldest turns are cut."
         },
+        "minimax.summarizeHistory": {
+          "type": "boolean",
+          "default": true,
+          "description": "When the history no longer fits the context, the old turns become a short digest the agent keeps reading, instead of being dropped. Costs one extra request when the cut happens."
+        },
         "minimax.contextThreshold": {
           "type": "number",
           "default": 50,

@@ -200,6 +200,7 @@ export function capSession(
     updatedAt: session.updatedAt,
     workspaceRoot: session.workspaceRoot,
     messages: trimHistory(session.messages, limit, MAX_STORED_HISTORY_CHARS),
+    ...(session.digest ? { digest: session.digest } : {}),
     uiMessages,
     usage: session.usage.slice(-MAX_STORED_USAGE_TURNS),
     turns: (session.turns ?? []).slice(-MAX_STORED_TURNS),
