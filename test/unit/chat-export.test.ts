@@ -68,3 +68,24 @@ describe('chat export', () => {
     expect(exportFileName('  ')).toBe('chat.md');
   });
 });
+
+describe('the edges of the export', () => {
+  it('gives Windows a name it can create', () => {
+    expect(exportFileName('CON')).toBe('CON chat.md');
+    expect(exportFileName('nul.txt')).toBe('nul.txt chat.md');
+    expect(exportFileName('Console work')).toBe('Console work.md');
+    expect(exportFileName('Done...')).toBe('Done.md');
+    expect(exportFileName('...')).toBe('chat.md');
+  });
+
+  it('keeps the thinking folded and the heading on one line', () => {
+    const text = chatToMarkdown({
+      title: 'Two\nlines',
+      updatedAt: 0,
+      uiMessages: [{ id: 'a', role: 'assistant', thinking: 'see </details> here', text: 'ok' }]
+    } as never);
+    expect(text.split('\n')[0]).toBe('# Two lines');
+    expect(text.match(/<\/details>/g)).toHaveLength(1);
+    expect(text).toContain('&lt;/details&gt;');
+  });
+});

@@ -44,7 +44,9 @@ function diffBlock(tool: UiToolCall): string | undefined {
 
 // The thinking is folded as in the panel: a details block hides it.
 function thinkingBlock(thinking: string): string {
-  return '<details>\n<summary>Thinking</summary>\n\n' + thinking.trim() + '\n\n</details>';
+  // A `</details>` inside the thought would close the block early.
+  const text = thinking.trim().replace(/<\/details>/gi, '&lt;/details&gt;');
+  return '<details>\n<summary>Thinking</summary>\n\n' + text + '\n\n</details>';
 }
 
 function messageBlocks(message: UiMessage): string[] {
@@ -72,7 +74,9 @@ function messageBlocks(message: UiMessage): string[] {
 }
 
 export function chatToMarkdown(chat: ChatExport): string {
-  const blocks = ['# ' + (chat.title.trim() || 'Chat'), '_Exported ' + new Date(chat.updatedAt).toISOString() + '_'];
+  // An old chat can carry a line break in its title, the heading is one line.
+  const title = chat.title.replace(/\s+/g, ' ').trim();
+  const blocks = ['# ' + (title || 'Chat'), '_Exported ' + new Date(chat.updatedAt).toISOString() + '_'];
   // The last block is a list of actions, the next action joins it.
   let openList = false;
   for (const message of chat.uiMessages) {
@@ -99,6 +103,14 @@ export function chatToMarkdown(chat: ChatExport): string {
 // The name of the file is the title of the chat without the signs a file
 // system refuses.
 export function exportFileName(title: string): string {
-  const base = title.replace(/[\\/:*?"<>|\u0000-\u001f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80);
-  return (base || 'chat') + '.md';
+  // Windows refuses a name that ends with a dot or a space, and the names of
+  // its devices (CON, NUL, COM1 and so on) with any extension.
+  const base = title
+    .replace(/[\\/:*?"<>|\u0000-\u001f]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 80)
+    .replace(/[. ]+$/, '');
+  const safe = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\..*)?$/i.test(base) ? base + ' chat' : base;
+  return (safe || 'chat') + '.md';
 }
