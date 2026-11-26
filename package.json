@@ -2,7 +2,7 @@
   "name": "minimax-agent",
   "displayName": "MiniMax Agent",
   "description": "Coding agent for VS Code powered by MiniMax models",
-  "version": "0.44.0",
+  "version": "0.44.1",
   "publisher": "katagarov",
   "license": "MIT",
   "repository": {
@@ -504,15 +504,15 @@
   },
   "devDependencies": {
     "@types/markdown-it": "^14.2.0",
-    "@types/node": "^20.14.0",
+    "@types/node": "^22.20.7",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
     "@types/vscode": "~1.106.0",
     "@vitejs/plugin-react": "^4.3.0",
     "@vscode/vsce": "^4.1.1",
-    "esbuild": "^0.23.0",
-    "typescript": "^5.5.0",
-    "vitest": "^2.1.0"
+    "esbuild": "^0.28.2",
+    "typescript": "~5.9",
+    "vitest": "^3.2.7"
   },
   "dependencies": {
     "markdown-it": "^14.1.0",
