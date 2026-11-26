@@ -312,8 +312,10 @@ npm run package
 Open the extension in VS Code with F5 or install the built file:
 
 ```bash
-code --install-extension minimax-agent-0.43.4.vsix --force
+code --install-extension minimax-agent-<version>.vsix --force
 ```
+
+`<version>` is the `version` field of `package.json`, the built file carries it in its name.
 
 The name of the file repeats the version from `package.json`.
 
