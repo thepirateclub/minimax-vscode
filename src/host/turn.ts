@@ -6,7 +6,7 @@ import type { RuntimeSession } from './runtime';
 import type { UiSelection, QueuedMessage } from '../ui/protocol';
 import type { TurnAnchor } from '../agent/turns';
 import { enqueue, moveQueued, postQueue, pumpQueue } from './queue';
-import { setState } from './channel';
+import { postFor, setState } from './channel';
 import { persist, startNewSession, postHistory } from './sessions';
 import { stopNotice } from '../agent/stopReason';
 import { getSettings } from '../config/settings';
@@ -51,6 +51,11 @@ export async function runTurn(host: MiniMaxController, runtime: RuntimeSession,
   mentions: string[],
   selections: UiSelection[],
   queued?: QueuedMessage): Promise<void> {
+  // A deleted chat sends nothing: the queue of a chat removed in the middle
+  // of a turn would start a new turn on a chat that is gone.
+  if (runtime.deleted) {
+    return;
+  }
   // The turn is taken at once: the building of the agent takes a moment
   // and a second send in that window would start two turns on one
   // history. The queue of the reader waits behind this flag.
@@ -66,14 +71,14 @@ export async function runTurn(host: MiniMaxController, runtime: RuntimeSession,
       getSettings().maxIterations,
       runtime.goal
     );
-    host.panel.post({
+    postFor(host, runtime, {
       type: 'notice',
       message: notice?.message ?? 'The budget of the goal is exhausted.',
       kind: notice?.kind ?? 'warn'
     });
     // The request does not go out, it comes back to the input field, the
     // user does not lose it.
-    host.panel.post({ type: 'restore_input', text, mentions, selections });
+    postFor(host, runtime, { type: 'restore_input', text, mentions, selections });
     if (queued) {
       moveQueued(queued, 'fail', 'The budget of the goal is exhausted.');
       postQueue(host, runtime);
@@ -90,6 +95,8 @@ export async function runTurn(host: MiniMaxController, runtime: RuntimeSession,
     return;
   }
 
+  // The stop of the panel reaches the plan and the build of the prompt too.
+  const turnSignal = agent.beginTurn();
   runtime.errorReported = false;
   runtime.turnStopped = false;
   runtime.lastError = undefined;
@@ -99,7 +106,7 @@ export async function runTurn(host: MiniMaxController, runtime: RuntimeSession,
   const userId = host.nextId('user');
   const sentAt = Date.now();
   runtime.uiMessages.push({ id: userId, role: 'user', text, at: sentAt });
-  host.panel.post({ type: 'user_message', id: userId, text, at: sentAt });
+  postFor(host, runtime, { type: 'user_message', id: userId, text, at: sentAt });
   if (runtime.title === 'New chat') {
     const firstLine = text.trim().split('\n')[0] ?? '';
     runtime.title = firstLine.slice(0, TITLE_LIMIT) || 'New chat';
@@ -115,20 +122,16 @@ export async function runTurn(host: MiniMaxController, runtime: RuntimeSession,
         cancellable: true
       },
       async (_progress, token) => {
-        const planning = new AbortController();
-        token.onCancellationRequested(() => {
-          planning.abort();
-          agent.stop();
-        });
+        token.onCancellationRequested(() => agent.stop());
         const prompt = await buildPromptText(host, text, mentions, selections);
-        requestPlace = await agent.send(await planRequest(host, runtime, prompt, planning.signal));
+        requestPlace = await agent.send(await planRequest(host, runtime, prompt, turnSignal));
       }
     );
   } catch (error) {
     host.logger.error('the agent run failed', error);
     if (!runtime.errorReported) {
       const message = error instanceof Error ? error.message : String(error);
-      host.panel.post({ type: 'error', message });
+      postFor(host, runtime, { type: 'error', message });
       setState(host, 'error', runtime);
     }
   } finally {

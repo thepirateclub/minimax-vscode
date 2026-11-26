@@ -126,7 +126,12 @@ export function createTodoTools(): ToolEntry[] {
           (changes ? ' ' + changes : '') +
           // The model left the list without a current task: the reader did
           // not see where the work stood.
-          (next && next.status === 'pending' ? ' No task is in_progress: set the task you work on in_progress.' : ''),
+          (next && next.status === 'pending' ? ' No task is in_progress: set the task you work on in_progress.' : '') +
+          // The prompt asks for one current task: two of them hide which
+          // one the work is on.
+          (todos.filter((item) => item.status === 'in_progress').length > 1
+            ? ' Several tasks are in_progress: keep exactly one in_progress.'
+            : ''),
         state
       };
     }

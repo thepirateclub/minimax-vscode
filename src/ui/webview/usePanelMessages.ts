@@ -1,3 +1,4 @@
+import { isLatestSuggestion } from './suggestRequest';
 import { useEffect } from 'react';
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import type { GoalState, TodoItem } from '../../agent/state';
@@ -237,7 +238,9 @@ export function usePanelMessages(
         return;
       }
       if (message.type === 'suggestions') {
-        setSuggestions(message.items);
+        if (isLatestSuggestion(message.requestId)) {
+          setSuggestions(message.items);
+        }
         return;
       }
       if (message.type === 'settings') {

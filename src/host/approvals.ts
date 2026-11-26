@@ -55,6 +55,7 @@ export async function requestChildApproval(host: MiniMaxController, runtime: Run
   return await new Promise<ApprovalDecision>((resolve) => {
     host.childApprovals.set(id, {
       toolName: request.toolName,
+      input: request.input,
       sessionId: runtime.id,
       resolve
     });

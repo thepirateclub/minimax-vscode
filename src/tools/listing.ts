@@ -41,6 +41,9 @@ export function sortEntries(entries: ListedEntry[], sort: ListSort | undefined):
   if (sort === 'time') {
     return [...entries].sort((a, b) => b.modified.getTime() - a.modified.getTime());
   }
+  if (sort === 'name') {
+    return [...entries].sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+  }
   return entries;
 }
 

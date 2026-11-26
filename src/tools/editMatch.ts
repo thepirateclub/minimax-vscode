@@ -34,9 +34,10 @@ export function applyEdit(
     };
   }
   if (matches > 0) {
-    // replace_all keeps the dollars literal, a single replace expands the
-    // dollar patterns of String.replace: the old rule of the tool.
-    const text = replaceAll ? raw.split(oldString).join(newString) : raw.replace(oldString, newString);
+    // The dollars of new_string stay literal in both cases: String.replace
+    // with a string turned `$1` and `$&` of the code of the model (a regex
+    // replacement, a template of a shell) into the text of the match.
+    const text = replaceAll ? raw.split(oldString).join(newString) : raw.replace(oldString, () => newString);
     return { ok: true, text, lenient: false };
   }
   return lenientEdit(raw, oldString, newString);
@@ -73,16 +74,32 @@ function lenientEdit(raw: string, oldString: string, newString: string): EditRes
   // same step that separates old_string from the matched lines.
   const fileIndent = indentOf(fileLines[start] ?? '');
   const oldIndent = indentOf(wanted[0] ?? '');
+  // A model that copies from the middle of a line drops the indentation of
+  // the first line only, the rest of old_string already has the indentation
+  // of the file: then only the first line of new_string moves, otherwise the
+  // lines after it got the indentation twice.
+  const firstOnly =
+    oldIndent !== fileIndent &&
+    wanted.length > 1 &&
+    wanted
+      .slice(1)
+      .every(
+        (line, index) =>
+          line.trim().length === 0 ||
+          (indentOf(line) === indentOf(fileLines[start + index + 1] ?? '') && indentOf(line).startsWith(fileIndent))
+      );
   const replacement = newString
     .replace(/\r/g, '')
     .split('\n')
-    .map((line) =>
-      line.trim().length === 0
-        ? line.trim()
-        : line.startsWith(oldIndent)
-          ? fileIndent + line.slice(oldIndent.length)
-          : line
-    );
+    .map((line, index) => {
+      if (line.trim().length === 0) {
+        return line.trim();
+      }
+      if (firstOnly && index > 0) {
+        return line;
+      }
+      return line.startsWith(oldIndent) ? fileIndent + line.slice(oldIndent.length) : line;
+    });
   const next = [
     ...fileLines.slice(0, start),
     ...replacement,

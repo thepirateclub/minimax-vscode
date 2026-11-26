@@ -17,6 +17,15 @@ describe('the guard of web_fetch', () => {
     }
   });
 
+  it('reads an IPv4 address carried in IPv6 in any form', async () => {
+    for (const ip of ['::ffff:7f00:1', '::ffff:a9fe:a9fe', '::ffff:0:0', '::7f00:1', '64:ff9b::a9fe:a9fe', '0:0:0:0:0:ffff:7f00:1']) {
+      expect(isPrivateAddress(ip), ip).toBe(true);
+    }
+    expect(isPrivateAddress('::ffff:808:808')).toBe(false);
+    expect(await refuseAddress('http://[::ffff:127.0.0.1]/')).toContain('local network');
+    expect(await refuseAddress('http://[::ffff:a9fe:a9fe]/latest/')).toContain('local network');
+  });
+
   it('refuses localhost, a local IP and a name that points to one', async () => {
     expect(await refuseAddress('http://localhost:3000/')).toContain('local network');
     expect(await refuseAddress('http://[::1]/')).toContain('local network');

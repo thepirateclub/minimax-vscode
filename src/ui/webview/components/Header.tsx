@@ -61,6 +61,8 @@ export function Header({
         <span
           className={'state-dot state-' + state}
           title={state}
+          // A span without a role keeps its label from the screen reader.
+          role="status"
           aria-label={state}
         />
         <SessionMenu

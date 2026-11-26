@@ -23,6 +23,9 @@ interface ManifestProperty {
 }
 
 interface Manifest {
+  activationEvents: string[];
+  engines: { vscode: string };
+  devDependencies: Record<string, string>;
   contributes: {
     commands: ManifestCommand[];
     menus: Record<string, ManifestMenuEntry[]>;
@@ -93,5 +96,16 @@ describe('the manifest of the extension', () => {
       type: 'boolean',
       default: false
     });
+  });
+
+  it('starts with the editor: the badge of the quota lives without the panel', () => {
+    expect(manifest.activationEvents).toContain('onStartupFinished');
+  });
+
+  it('types the API of the oldest supported editor', () => {
+    const engine = String(manifest.engines.vscode).replace(/^[\^~]/, '');
+    const types = String(manifest.devDependencies['@types/vscode']);
+    expect(types.startsWith('~')).toBe(true);
+    expect(types.slice(1).split('.').slice(0, 2)).toEqual(engine.split('.').slice(0, 2));
   });
 });

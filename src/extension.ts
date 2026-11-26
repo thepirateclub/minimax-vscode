@@ -57,6 +57,7 @@ export class MiniMaxController {
     string,
     {
       toolName: string;
+      input: Record<string, unknown>;
       sessionId: string;
       resolve: (decision: ApprovalDecision) => void;
     }

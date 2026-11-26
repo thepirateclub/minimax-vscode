@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { readFile, stat } from 'node:fs/promises';
 
 // The layer that turns the code of the project into numbers.
@@ -49,8 +50,11 @@ export async function readIfSmall(path: string): Promise<string | undefined> {
   }
 }
 
+// The signature tells that the vector of a file is stale. The length with
+// the head and the tail missed a change in the middle that kept the length
+// (a renamed word of the same size), the hash of the whole text does not.
 export function signatureOf(content: string): string {
-  return content.length + ':' + content.slice(0, 64) + ':' + content.slice(-64);
+  return content.length + ':' + createHash('sha1').update(content).digest('hex');
 }
 
 export interface VectorEntry {

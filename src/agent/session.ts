@@ -37,6 +37,10 @@ export class AgentSession {
   private agent: Agent | undefined;
   private systemPrompt: string;
   private approvalCounter = 0;
+  // The stop of the current turn. A stop can come while the prompt or the
+  // plan is built, before the agent of the turn exists: the old agent is
+  // already done and its abort went nowhere, the turn then ran anyway.
+  private turnAbort = new AbortController();
 
   constructor(options: SessionOptions) {
     this.options = options;
@@ -65,7 +69,14 @@ export class AgentSession {
     this.approval.setAutoApprove(names);
   }
 
+  // A new turn starts: the stop of the last turn does not reach it.
+  beginTurn(): AbortSignal {
+    this.turnAbort = new AbortController();
+    return this.turnAbort.signal;
+  }
+
   stop(): void {
+    this.turnAbort.abort();
     this.agent?.abort();
     // The turn waits for the answer of the reader, a stop must end it:
     // every approval that waits is rejected.
@@ -106,6 +117,12 @@ export class AgentSession {
     // The options of the session carry the options of the agent, a new
     // field of the agent reaches it without a list of names here.
     const run: AgentRunOptions = this.options;
+    if (this.turnAbort.signal.aborted) {
+      // The reader stopped the turn before the agent began: the same event
+      // as a stopped run, nothing goes to the server.
+      this.options.onEvent({ type: 'error', message: 'The request was aborted.' });
+      return -1;
+    }
     this.agent = new Agent({
       ...run,
       approval: this.approval,

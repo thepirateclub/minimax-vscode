@@ -7,7 +7,7 @@
 
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 
 export interface Skill {
   name: string;
@@ -83,7 +83,7 @@ async function isDir(path: string): Promise<boolean> {
 async function readSkill(dir: string): Promise<Skill | undefined> {
   try {
     const parsed = parseSkillFile(await readFile(join(dir, 'SKILL.md'), 'utf8'));
-    const name = parsed.name ?? dir.split(/[\/]/).pop() ?? '';
+    const name = parsed.name ?? basename(dir) ?? '';
     if (!name || !parsed.description) {
       return undefined;
     }

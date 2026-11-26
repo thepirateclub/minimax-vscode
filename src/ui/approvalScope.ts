@@ -22,8 +22,52 @@ const SHELL_OPERATORS = /[;&|`<>\r\n]|\$\(/;
 // because the panel and the host read it without the tools of the extension.
 export const ALWAYS_CONFIRM_TOOLS = ['delete_files'];
 
-export function alwaysConfirms(toolName: string): boolean {
-  return ALWAYS_CONFIRM_TOOLS.includes(toolName);
+export function alwaysConfirms(toolName: string, input?: Record<string, unknown>): boolean {
+  if (ALWAYS_CONFIRM_TOOLS.includes(toolName)) {
+    return true;
+  }
+  // A git command that throws work away has no tool of its own and runs in
+  // the shell. A rule of the reader (even a bare run_terminal) must not let
+  // it pass silently: the loss cannot be undone.
+  return COMMAND_TOOLS.includes(toolName) && input !== undefined && destroysGitWork(String(input['command'] ?? ''));
+}
+
+// The global flags of git that take a value.
+const GIT_VALUE_FLAGS = new Set(['-C', '-c', '--git-dir', '--work-tree', '--namespace', '--exec-path']);
+
+// True for git clean -f, reset --hard, push --force, stash drop or clear,
+// branch -D, checkout or restore of paths, reflog expire, filter-branch.
+export function destroysGitWork(command: string): boolean {
+  for (const segment of command.split(/&&|\|\||;|\||\r?\n/)) {
+    const words = tokens(segment);
+    let index = words.findIndex((word) => /(^|[\\/])git(\.exe)?$/i.test(word));
+    if (index === -1) {
+      continue;
+    }
+    index += 1;
+    while ((words[index] ?? '').startsWith('-')) {
+      index += GIT_VALUE_FLAGS.has(words[index]!) ? 2 : 1;
+    }
+    const sub = words[index];
+    const rest = words.slice(index + 1);
+    const has = (...flags: string[]): boolean => rest.some((word) => flags.includes(word));
+    const short = (letter: string): boolean => rest.some((word) => /^-[a-zA-Z]+$/.test(word) && word.includes(letter));
+    if (
+      (sub === 'clean' && (has('--force') || short('f'))) ||
+      (sub === 'reset' && has('--hard', '--merge', '--keep')) ||
+      (sub === 'push' && (has('--force', '--force-with-lease', '--mirror', '--delete') || short('f') || short('d') || rest.some((word) => word.startsWith('+') || word.startsWith('--force')))) ||
+      (sub === 'stash' && has('drop', 'clear')) ||
+      (sub === 'branch' && (short('D') || (has('--delete', '-d') && has('--force', '-f')))) ||
+      (sub === 'checkout' && (has('--', '.', '-f', '--force'))) ||
+      sub === 'restore' ||
+      sub === 'filter-branch' ||
+      (sub === 'reflog' && has('expire', 'delete')) ||
+      (sub === 'update-ref' && has('-d'))
+    ) {
+      return true;
+    }
+  }
+  return false;
 }
 
 export function ruleFor(toolName: string, input: Record<string, unknown>): string {

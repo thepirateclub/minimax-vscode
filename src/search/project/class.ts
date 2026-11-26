@@ -128,7 +128,11 @@ export class ProjectSearch {
     if (wantsSemantic || (requested === 'auto' && semanticAllowed)) {
       if (semanticAllowed) {
         try {
-          semantic = await this.semanticHits(query, MAX_CANDIDATE_FILES);
+          // The semantic layer ranks the whole project: the folder of the
+          // call keeps only its own files, as the lexical layer does.
+          semantic = (await this.semanticHits(query, MAX_CANDIDATE_FILES)).filter(
+            (hit) => prefix.length === 0 || hit.path.startsWith(prefix)
+          );
         } catch (error) {
           note =
             'the semantic layer failed: ' +

@@ -116,7 +116,7 @@ export function postQueue(host: MiniMaxController, runtime: RuntimeSession): voi
 
 
 export async function pumpQueue(host: MiniMaxController, runtime: RuntimeSession): Promise<void> {
-  if (runtime.busy || runtime.queuePaused) {
+  if (runtime.busy || runtime.queuePaused || runtime.deleted) {
     return;
   }
   const next = runtime.queue.find((item) => item.state === 'waiting');
