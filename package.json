@@ -2,7 +2,7 @@
   "name": "minimax-agent",
   "displayName": "MiniMax Agent",
   "description": "Coding agent for VS Code powered by MiniMax models",
-  "version": "0.43.6",
+  "version": "0.44.0",
   "publisher": "katagarov",
   "license": "MIT",
   "repository": {
@@ -96,6 +96,11 @@
       {
         "command": "minimax.refreshContext",
         "title": "Refresh Workspace Context",
+        "category": "MiniMax"
+      },
+      {
+        "command": "minimax.selectFolder",
+        "title": "Select Project Folder",
         "category": "MiniMax"
       },
       {
@@ -332,6 +337,11 @@
           "maximum": 1000,
           "description": "How many messages the chat keeps before the oldest turns are cut."
         },
+        "minimax.summarizeHistory": {
+          "type": "boolean",
+          "default": true,
+          "description": "When the history no longer fits the context, the old turns become a short digest the agent keeps reading, instead of being dropped. Costs one extra request when the cut happens."
+        },
         "minimax.contextThreshold": {
           "type": "number",
           "default": 50,
@@ -368,6 +378,32 @@
           "scope": "application",
           "description": "Rules approved without confirmation. A tool name approves the whole tool; a scoped rule approves part of it: run_terminal(npm test) for commands starting with that prefix (chained or redirected commands never match), write_file(src/ui/) for writes inside that folder."
         },
+        "minimax.denyPaths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "**/.env",
+            "**/.env.*",
+            "!**/.env.example",
+            "!**/.env.sample",
+            "!**/.env.template",
+            "**/*.pem",
+            "**/*.key",
+            "**/*.p12",
+            "**/*.pfx",
+            "**/id_rsa*",
+            "**/id_ed25519*",
+            "**/.ssh/**",
+            "**/secrets/**",
+            "**/.aws/credentials",
+            "**/.npmrc",
+            "**/.netrc"
+          ],
+          "scope": "application",
+          "description": "Files the agent never reads, writes or searches, even with approval. Glob patterns relative to the workspace, as in .gitignore: ** crosses folders, a pattern without a slash matches a name in any folder, ! lets a file through."
+        },
         "minimax.mcpServers": {
           "type": "object",
           "default": {},
@@ -379,6 +415,20 @@
           "type": "boolean",
           "default": false,
           "description": "The agent searches the web with the M Plan key (the web_search tool). The queries go to MiniMax."
+        },
+        "minimax.verifyCommand": {
+          "type": "string",
+          "default": "",
+          "scope": "application",
+          "description": "A command that checks the project after a turn of the agent that changed files, for example npm run typecheck && npm test. It runs without a confirmation, a failure goes back to the agent to fix. Empty turns the check off."
+        },
+        "minimax.verifyRounds": {
+          "type": "number",
+          "default": 2,
+          "minimum": 0,
+          "maximum": 10,
+          "scope": "application",
+          "description": "How many times in a row the agent gets a failed check to fix before it stops and waits for you."
         },
         "minimax.rulesEnabled": {
           "type": "boolean",

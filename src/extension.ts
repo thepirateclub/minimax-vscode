@@ -6,9 +6,11 @@ import { toUiQuota } from './ui/quotaMeter';
 import { isAbsolute } from 'node:path';
 import { HttpSpeechClient } from './api/speech';
 import { getSettings, onSettingsChanged } from './config/settings';
+import { registerHostServices } from './host/services';
+import { currentRoot } from './host/folders';
 import { createLogger } from './logger';
 import { ProjectSearch } from './search/project';
-import { InMemoryBackupStore } from './storage/backups';
+import { createBackupStore } from './storage/fileBackups';
 import { projectLabel, SessionStore } from './storage/sessions';
 import { UsageLedger } from './storage/usage';
 import { editorDiagnostics } from './host/diagnostics';
@@ -33,7 +35,6 @@ import { showLogs, showUsage, generateCommitMessage, refreshQuota, undoLastChang
 import { searchFor, addFileToChat } from './host/workspace';
 import { registerEditorActions } from './host/editorActions';
 import type { AgentState } from './ui/protocol';
-
 import { getApiKey } from './config/secrets';
 import { resolveBaseUrl, MODELS } from './config/models';
 import * as vscode from 'vscode';
@@ -42,7 +43,7 @@ export class MiniMaxController {
   readonly context: vscode.ExtensionContext;
   readonly channel: vscode.OutputChannel;
   readonly logger: Logger;
-  readonly backups = new InMemoryBackupStore();
+  readonly backups: ReturnType<typeof createBackupStore>;
   readonly registry = new ToolRegistry();
   readonly store: SessionStore;
   readonly ledger: UsageLedger;
@@ -88,6 +89,7 @@ export class MiniMaxController {
     this.logger = createLogger(channel);
     this.store = new SessionStore(context.globalState);
     this.ledger = new UsageLedger(context.globalState);
+    this.backups = createBackupStore(context.globalStorageUri?.fsPath);
     this.panel = new AgentPanelProvider({
       extensionUri: context.extensionUri,
       onMessage: (message) => {
@@ -202,9 +204,9 @@ export class MiniMaxController {
     );
 
     // One save of the settings writes many keys and every write fires the
-    // event. The agents and the panel are rebuilt once, after the last
-    // write, not a dozen times in a row.
+    // event. The agents and the panel are rebuilt once, after the last write.
     let settingsTimer: ReturnType<typeof setTimeout> | undefined;
+    registerHostServices(this, context);
     context.subscriptions.push(
       onSettingsChanged(() => {
         if (settingsTimer !== undefined) {
@@ -272,9 +274,7 @@ export class MiniMaxController {
   // The panel of the source control asks the model for a commit message.
   // A click on the badge opens the numbers of the plan.
   workspaceRoot(): string {
-    const folders = vscode.workspace.workspaceFolders;
-    const first = folders && folders.length > 0 ? folders[0] : undefined;
-    return first ? first.uri.fsPath : process.cwd();
+    return currentRoot(this.context);
   }
 
   nextId(prefix: string): string {

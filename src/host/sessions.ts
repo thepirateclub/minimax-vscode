@@ -1,3 +1,4 @@
+import { forgetStamps } from '../tools/fileStamps';
 import { getSettings } from '../config/settings';
 import { stopReplSession } from '../tools/repl';
 import { historyPage, historyTail } from '../ui/historyPage';
@@ -28,6 +29,7 @@ export function persist(host: MiniMaxController, runtime: RuntimeSession): void 
     updatedAt: runtime.updatedAt,
     workspaceRoot: runtime.workspaceRoot,
     messages: runtime.history,
+    ...(runtime.digest ? { digest: runtime.digest } : {}),
     uiMessages: runtime.uiMessages,
     usage: runtime.usage,
     turns: runtime.turns,
@@ -86,6 +88,7 @@ export function runtimeFrom(host: MiniMaxController, stored: StoredSession): Run
     // that opens it takes it.
     workspaceRoot: stored.workspaceRoot ?? host.workspaceRoot(),
     history: [...stored.messages],
+    digest: stored.digest,
     uiMessages: [...(stored.uiMessages ?? [])],
     panelOffset: undefined,
     agent: undefined,
@@ -181,11 +184,13 @@ export function restoreSession(host: MiniMaxController): void {
     startNewSession(host);
     return;
   }
-  const runtime = runtimeFrom(host, stored);
+  // A chat that still lives in the host (it may run in the background) is
+  // taken as it is, a second copy would lose its turn.
+  const runtime = host.sessions.get(stored.id) ?? runtimeFrom(host, stored);
   host.sessions.set(runtime.id, runtime);
   host.activeSessionId = runtime.id;
   host.store.setActiveIdFor(root, runtime.id);
-  setState(host, 'idle');
+  setState(host, runtime.state, runtime);
   void host.sendInit();
 }
 
@@ -239,6 +244,7 @@ export function deleteSession(host: MiniMaxController, id: string): void {
   }
   // The processes of the REPL of the chat go with it.
   stopReplSession(id);
+  forgetStamps(id);
   host.store.remove(id);
   // The removed chat is not the open one of any project.
   host.store.clearActiveId(id);

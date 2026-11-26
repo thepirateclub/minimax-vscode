@@ -8,12 +8,16 @@
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { basename, join } from 'node:path';
+import { discoverCommands } from './commands';
 
 export interface Skill {
   name: string;
   description: string;
   // The folder of the skill, its SKILL.md and the files it names.
   dir: string;
+  // A command of the reader: the markdown file of the template. A command
+  // is not a skill of the model, it is only called from the request.
+  command?: string;
 }
 
 const MAX_DESCRIPTION = 300;
@@ -164,13 +168,17 @@ export async function discoverSkills(workspaceRoot: string, home: string = homed
       }
     }
   }
+  // The commands of the reader share the `/name` of the field: a skill with
+  // the same name wins, it is the older way of the same call.
+  add(await discoverCommands(workspaceRoot, home));
   return [...byName.values()];
 }
 
 // The section of the prompt: the names and the descriptions only. The model
 // reads the body of a skill with read_skill when the task needs it, the
 // prompt stays short with many skills.
-export function renderSkills(skills: readonly Skill[]): string {
+export function renderSkills(all: readonly Skill[]): string {
+  const skills = all.filter((skill) => skill.command === undefined);
   if (skills.length === 0) {
     return '';
   }
@@ -183,6 +191,9 @@ export function renderSkills(skills: readonly Skill[]): string {
 // The body of a skill and the files of its folder, the model reads them
 // with read_file when the skill names them.
 export async function readSkillText(skill: Skill): Promise<string> {
+  if (skill.command !== undefined) {
+    return 'Command ' + skill.name + ' (file ' + skill.command + ')\n\n' + parseSkillFile(await readFile(skill.command, 'utf8')).body.trim();
+  }
   const parsed = parseSkillFile(await readFile(join(skill.dir, 'SKILL.md'), 'utf8'));
   let files: string[] = [];
   try {

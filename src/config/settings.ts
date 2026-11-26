@@ -1,3 +1,4 @@
+import { DEFAULT_DENY_PATHS } from '../denyPaths';
 import * as vscode from 'vscode';
 import type { AgentMode, BaseUrlPreset, EffortLevel } from './models';
 
@@ -20,6 +21,7 @@ export interface MiniMaxSettings {
   historyMaxMessages: number;
   // The share of the context window the history may take, in percent.
   contextThreshold: number;
+  summarizeHistory: boolean;
   // The semantic layer of the search sends the code of the project to the server.
   semanticSearch: boolean;
   // The cards of the actions fold to their title.
@@ -29,10 +31,13 @@ export interface MiniMaxSettings {
   // The steps of the tools are shown in the feed.
   showToolSteps: boolean;
   autoApprove: string[];
+  denyPaths: string[];
   // The MCP servers of the user, the form of `mcpServers` of Claude and Cursor.
   mcpServers: Record<string, unknown>;
   enableWebSearch: boolean;
   rulesEnabled: boolean;
+  verifyCommand: string;
+  verifyRounds: number;
   // The language of the voice input, empty lets the model pick it.
   speechLanguage: string;
   // The device of the voice input, empty picks a microphone by its name.
@@ -80,6 +85,7 @@ export function getSettings(): MiniMaxSettings {
     fontSize: cfg.get<number>('fontSize', 13),
     historyMaxMessages: cfg.get<number>('historyMaxMessages', 120),
     contextThreshold: cfg.get<number>('contextThreshold', 50),
+    summarizeHistory: cfg.get<boolean>('summarizeHistory', true),
     // The semantic search sends the code of the project to the server, the
     // web search sends the queries: a repository must not turn them on.
     semanticSearch: userValue<boolean>(cfg, 'semanticSearch', false),
@@ -87,9 +93,14 @@ export function getSettings(): MiniMaxSettings {
     collapseCode: cfg.get<boolean>('collapseCode', false),
     showToolSteps: cfg.get<boolean>('showToolSteps', true),
     autoApprove: userValue<string[]>(cfg, 'autoApprove', []),
+    // A repository must not open its own secrets to the agent.
+    denyPaths: userValue<string[]>(cfg, 'denyPaths', DEFAULT_DENY_PATHS),
     mcpServers: userValue<Record<string, unknown>>(cfg, 'mcpServers', {}),
     enableWebSearch: userValue<boolean>(cfg, 'enableWebSearch', false),
     rulesEnabled: cfg.get<boolean>('rulesEnabled', true),
+    // The command runs without a question: a repository must not name it.
+    verifyCommand: userValue<string>(cfg, 'verifyCommand', ''),
+    verifyRounds: userValue<number>(cfg, 'verifyRounds', 2),
     speechLanguage: cfg.get<string>('speechLanguage', ''),
     microphone: cfg.get<string>('microphone', ''),
     speechVocabulary: cfg.get<string[]>('speechVocabulary', []),

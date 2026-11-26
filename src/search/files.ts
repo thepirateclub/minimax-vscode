@@ -1,3 +1,4 @@
+import { isDeniedPath } from '../denyPaths';
 import { readdir } from 'node:fs/promises';
 import { join, relative, sep } from 'node:path';
 
@@ -53,7 +54,7 @@ export async function collectTextFiles(
         await walk(full);
         continue;
       }
-      if (!isTextFile(entry.name)) {
+      if (!isTextFile(entry.name) || isDeniedPath(root, full)) {
         continue;
       }
       found.push(full);

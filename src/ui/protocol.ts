@@ -34,6 +34,9 @@ export interface UiToolCall {
 export interface UiChangedFile {
   path: string;
   status: 'added' | 'modified' | 'deleted' | 'renamed';
+  // The agent of the chat changed the file and its backup is kept: the
+  // reader can see the change and take the file back alone.
+  revertible?: boolean;
 }
 
 // A file of a deletion: the reader sees the list of the files before he
@@ -270,6 +273,8 @@ export type ExtToWeb =
   // message is slow to transfer and to draw.
   | { type: 'history_older'; messages: UiMessage[]; olderMessages: number }
   | { type: 'sessions'; sessions: UiSessionSummary[] }
+  // The chats found by the text, an answer to search_sessions.
+  | { type: 'session_search'; query: string; hits: Array<{ id: string; snippet?: string }> }
   | { type: 'models'; models: ModelInfo[]; selected: string }
   | { type: 'files'; requestId: string; files: UiFile[] }
   | { type: 'selection'; selection: UiSelection }
@@ -293,6 +298,8 @@ export type WebToExt =
   // A message leaves the queue.
   | { type: 'remove_queued'; id: string }
   | { type: 'clear_summary' }
+  | { type: 'revert_file'; path: string }
+  | { type: 'diff_file'; path: string }
   // The panel asks for the older messages of the chat.
   | { type: 'load_older' }
   | { type: 'stop' }
@@ -303,6 +310,7 @@ export type WebToExt =
   | { type: 'new_session' }
   | { type: 'select_session'; id: string }
   | { type: 'delete_session'; id: string }
+  | { type: 'search_sessions'; query: string }
   | {
       type: 'set_goal';
       objective: string;

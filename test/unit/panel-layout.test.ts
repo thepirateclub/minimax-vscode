@@ -81,6 +81,7 @@ function renderHeader(version: string, quota?: UiQuota): string {
       workspaceLabel: 'minimax-vscode',
       onSelectSession: noop,
       onDeleteSession: noop,
+      onSearchSessions: noop,
       onNewChat: noop,
       version
     }) as ReactElement

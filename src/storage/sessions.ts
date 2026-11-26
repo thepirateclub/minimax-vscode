@@ -20,6 +20,8 @@ export interface StoredSession {
   // project that opens it.
   workspaceRoot?: string;
   messages: AnthropicMessage[];
+  // The digest of the old turns the cut of the history threw away.
+  digest?: string;
   uiMessages: UiMessage[];
   usage: UiUsageTurn[];
   // The anchors of the requests, the chat rolls back to one of them.

@@ -1,6 +1,5 @@
-import { discoverSkills, readSkillText } from '../skills/skills';
+import { calledSkillBlocks } from './skillBlocks';
 import { selectionBlock } from '../agent/editorPrompts';
-import { mentionedSkills } from '../ui/skillMentions';
 import type { MiniMaxController } from '../extension';
 import type { RuntimeSession } from './runtime';
 import type { UiSelection, QueuedMessage } from '../ui/protocol';
@@ -16,12 +15,30 @@ import { formatWorkspaceProblems, mentionsProblems } from '../agent/problems';
 import { goalBudgetOk, ensureAgent, planRequest } from './setup';
 import { refreshQuota } from './commands';
 import * as vscode from 'vscode';
+import { verifyTurn } from './verify';
 import { isAbsolute, relative } from 'node:path';
 import { planRestore, restoreFiles } from '../storage/backups';
 import { forgetChangedFiles } from './changedFiles';
 
 // The limit of the title of a chat.
 const TITLE_LIMIT = 60;
+
+// After the turn: the check of the project, then the queue. The chat stays
+// busy while the check runs, a request of the reader waits in the queue.
+async function afterTurn(host: MiniMaxController, runtime: RuntimeSession, startedAt: number): Promise<void> {
+  runtime.busy = true;
+  const fix = await verifyTurn(host, runtime, startedAt).catch((error: unknown) => {
+    host.logger.error('the project check failed to run', error);
+    return undefined;
+  });
+  runtime.busy = false;
+  if (fix !== undefined && !runtime.deleted) {
+    runtime.fixing = true;
+    await runTurn(host, runtime, fix, [], []);
+    return;
+  }
+  void pumpQueue(host, runtime);
+}
 
 export async function handleSend(host: MiniMaxController, text: string,
   mentions: string[],
@@ -60,6 +77,11 @@ export async function runTurn(host: MiniMaxController, runtime: RuntimeSession,
   // and a second send in that window would start two turns on one
   // history. The queue of the reader waits behind this flag.
   runtime.busy = true;
+  // A request of the reader starts the count of the automatic fixes anew.
+  if (!runtime.fixing) {
+    runtime.verifyRound = 0;
+  }
+  runtime.fixing = false;
   // The moment of the turn: the rewind takes back the files changed since.
   const startedAt = Date.now();
   // The budget of the goal is over, the request does not go out. The user
@@ -161,9 +183,10 @@ export async function runTurn(host: MiniMaxController, runtime: RuntimeSession,
     }
     persist(host, runtime);
     void refreshQuota(host);
-    // The next message of the queue goes out.
     runtime.sendNow = false;
-    void pumpQueue(host, runtime);
+    // The check of the project goes before the queue: a failure is the
+    // next request of the chat, the turn of the fix pumps the queue itself.
+    void afterTurn(host, runtime, startedAt);
   }
 }
 
@@ -337,15 +360,8 @@ export async function buildPromptText(host: MiniMaxController, text: string,
   if (mentionsProblems(text)) {
     blocks.push(formatWorkspaceProblems(workspaceDiagnostics(host.workspaceRoot())));
   }
-  // A skill called with `/name` comes with the request: its instructions
-  // and the list of its files.
-  const skills = await discoverSkills(host.workspaceRoot()).catch(() => []);
-  for (const name of mentionedSkills(text, skills.map((skill) => skill.name))) {
-    const skill = skills.find((item) => item.name === name);
-    if (skill) {
-      blocks.push('Use the skill ' + name + ' for this request:\n' + (await readSkillText(skill)));
-    }
-  }
+  // A skill or a command called with `/name` comes with the request.
+  blocks.push(...(await calledSkillBlocks(host.workspaceRoot(), text)));
   for (const selection of selections) {
     blocks.push(selectionBlock(selection));
   }

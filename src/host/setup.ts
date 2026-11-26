@@ -149,6 +149,11 @@ export async function ensureAgent(host: MiniMaxController, runtime: RuntimeSessi
     contextWindow: model?.contextWindow,
     historyLimit: settings.historyMaxMessages,
     contextThreshold: settings.contextThreshold,
+    summarize: settings.summarizeHistory,
+    digest: runtime.digest,
+    onDigest: (digest) => {
+      runtime.digest = digest;
+    },
     systemPrompt: await buildPrompt(host),
     contextProvider: async () => await sessionContext(host, runtime),
     sessionId: runtime.id,
@@ -163,7 +168,8 @@ export async function ensureAgent(host: MiniMaxController, runtime: RuntimeSessi
       }
     },
     budget: () => goalBudgetOk(host, runtime),
-    workspaceRoot: host.workspaceRoot(),
+    // The tools of the chat work in its own project.
+    workspaceRoot: runtime.workspaceRoot,
     logger: host.logger,
     autoApprove: settings.autoApprove,
     onEvent: (event) => handleAgentEvent(host, runtime, event),

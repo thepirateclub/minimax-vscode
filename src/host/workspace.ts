@@ -13,6 +13,7 @@ import type { RuntimeSession } from './runtime';
 import { readChangedFiles } from '../git/changes';
 import { dismissKeys, mergeChangedFiles, withoutDismissed } from './changedFiles';
 import { isAbsolute } from 'node:path';
+import { markRevertible } from './fileRevert';
 import * as vscode from 'vscode';
 
 export function searchFor(host: MiniMaxController, root: string): ProjectSearch {
@@ -200,7 +201,7 @@ export async function postSummary(host: MiniMaxController, runtime: RuntimeSessi
   if (files.length === 0) {
     return;
   }
-  postFor(host, runtime, { type: 'summary', files });
+  postFor(host, runtime, { type: 'summary', files: await markRevertible(host, runtime, files) });
 }
 
 

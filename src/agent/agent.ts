@@ -27,6 +27,8 @@ import type { ChangedFile } from '../tools/types';
 
 // The answers in a row with a call of a tool in the text, then the turn ends.
 const MAX_LEAKS = 2;
+// The sub-agents of one answer that run at the same time.
+export const MAX_PARALLEL_TASKS = 3;
 
 
 
@@ -123,189 +125,23 @@ export class Agent {
       }
 
       const results: AnthropicContentBlock[] = [];
-      for (const toolUse of toolUses) {
-        const signature = signatureOf(toolUse.name, toolUse.input);
-        const seen = (identicalCalls.get(signature) ?? 0) + 1;
-        identicalCalls.set(signature, seen);
-
-        if (seen > MAX_IDENTICAL_CALLS) {
-          const message =
-            'The same tool call was repeated ' +
-            MAX_IDENTICAL_CALLS +
-            ' times with identical arguments. Change the approach instead of repeating it.';
-          // The refusal is a card of its own. The model sees the reason, the
-          // reader has to see it too, a silent refusal is a defect.
-          this.options.onEvent({
-            type: 'tool_start',
-            id: toolUse.id,
-            name: toolUse.name,
-            input: toolUse.input
-          });
-          this.options.onEvent({
-            type: 'tool_end',
-            id: toolUse.id,
-            name: toolUse.name,
-            content: message,
-            isError: true
-          });
-          results.push({
-            type: 'tool_result',
-            tool_use_id: toolUse.id,
-            content: message,
-            is_error: true
-          });
-          continue;
-        }
-
-        const entry = this.options.registry.get(toolUse.name);
-        if (!entry) {
-          const message = 'Unknown tool: ' + toolUse.name;
-          // The refusal is a card of its own, the reader sees the reason.
-          this.options.onEvent({
-            type: 'tool_start',
-            id: toolUse.id,
-            name: toolUse.name,
-            input: toolUse.input
-          });
-          this.options.onEvent({
-            type: 'tool_end',
-            id: toolUse.id,
-            name: toolUse.name,
-            content: message,
-            isError: true
-          });
-          results.push({
-            type: 'tool_result',
-            tool_use_id: toolUse.id,
-            content: message,
-            is_error: true
-          });
-          continue;
-        }
-
-        // The model should not even see this tool in plan mode, but a tool
-        // call that slipped through is refused instead of executed.
-        if (!this.options.registry.isAllowed(entry, this.options.mode)) {
-          const message =
-            'This tool is disabled in plan mode. The user has to switch the agent to code mode first.';
-          this.options.onEvent({
-            type: 'tool_start',
-            id: toolUse.id,
-            name: toolUse.name,
-            input: toolUse.input
-          });
-          this.options.onEvent({
-            type: 'tool_end',
-            id: toolUse.id,
-            name: toolUse.name,
-            content: message,
-            isError: true
-          });
-          results.push({
-            type: 'tool_result',
-            tool_use_id: toolUse.id,
-            content: message,
-            is_error: true
-          });
-          continue;
-        }
-
-        const decision = await this.options.approval.approve(entry, toolUse.input);
-        this.options.onEvent({
-          type: 'approval_resolved',
-          id: toolUse.id,
-          approved: decision.approved
-        });
-
-        if (!decision.approved) {
-          this.options.onEvent({
-            type: 'tool_start',
-            id: toolUse.id,
-            name: toolUse.name,
-            input: toolUse.input
-          });
-          this.options.onEvent({
-            type: 'tool_end',
-            id: toolUse.id,
-            name: toolUse.name,
-            content: 'Rejected by the user.',
-            isError: true
-          });
-          results.push({
-            type: 'tool_result',
-            tool_use_id: toolUse.id,
-            content: 'Rejected by the user.',
-            is_error: true
-          });
-          continue;
-        }
-
-        this.options.onEvent({
-          type: 'tool_start',
-          id: toolUse.id,
-          name: toolUse.name,
-          input: toolUse.input
-        });
-
-        // The change of a file is taken before the write. After the write the
-        // file on disk is already the new one and the change is gone.
-        const diff = await previewOf(this.options.workspaceRoot, toolUse.name, toolUse.input);
-
-        let content: string;
-        let isError = false;
-        let state: ToolStateUpdate | undefined;
-        // The files the tool changed, the panel shows them with their
-        // status.
-        let changed: ChangedFile[] | undefined;
-        try {
-          const result = await entry.execute(toolUse.input, {
-            workspaceRoot: this.options.workspaceRoot,
-            signal: this.controller.signal,
-            logger: this.options.logger,
-            depth: this.options.depth,
-            sessionId: this.options.sessionId,
-            sessionState: this.options.sessionState,
-            progress: (line) =>
-              this.options.onEvent({ type: 'tool_progress', id: toolUse.id, line })
-          });
-          // The spend of the child belongs to the action of the parent, the
-          // column of the graph of the spend holds the sum. It is not added to
-          // the `usage` event of the parent: the host counts the budget of the
-          // goal from the `usage` events only, and the child sends its own
-          // `usage` events to the host, so the child would be counted twice
-          // against the budget of the goal.
-          if (result.usage) {
-            usage = addUsage(usage, result.usage);
+      for (let index = 0; index < toolUses.length; ) {
+        // The sub-agents of one answer work at the same time: each has its
+        // own history, waiting for one before the next only cost time.
+        let end = index + 1;
+        if (toolUses[index]!.name === 'task') {
+          while (end < toolUses.length && end - index < MAX_PARALLEL_TASKS && toolUses[end]!.name === 'task') {
+            end += 1;
           }
-          content = result.content;
-          isError = result.isError === true;
-          state = result.state;
-          changed = result.changed;
-        } catch (error) {
-          content = error instanceof Error ? error.message : String(error);
-          isError = true;
         }
-
-        this.options.onEvent({
-          type: 'tool_end',
-          id: toolUse.id,
-          name: toolUse.name,
-          content,
-          isError,
-          diff,
-          state,
-          changed
-        });
-        results.push({
-          type: 'tool_result',
-          tool_use_id: toolUse.id,
-          content,
-          is_error: isError
-        });
-        // The write worked, the world changed: the same read is a new read.
-        if (entry.sideEffect && !isError) {
-          forgetReadCalls(identicalCalls, this.options.registry);
+        const done = await Promise.all(toolUses.slice(index, end).map((use) => this.callTool(use, identicalCalls)));
+        for (const one of done) {
+          results.push(one.block);
+          if (one.usage) {
+            usage = addUsage(usage, one.usage);
+          }
         }
+        index = end;
       }
 
       // The note rides on the last result: a text block next to the results
@@ -337,6 +173,198 @@ export class Agent {
 
   // The process of the message of the assistant: the machine changes its
   // state by the result of the step, the events of the step go to the panel.
+  // One call of a tool: the checks, the approval, the run and its events.
+  private async callTool(
+    toolUse: Extract<AnthropicContentBlock, { type: 'tool_use' }>,
+    identicalCalls: Map<string, number>
+  ): Promise<{ block: AnthropicContentBlock; usage?: Usage }> {
+    const results: AnthropicContentBlock[] = [];
+    let extra: Usage | undefined;
+    const signature = signatureOf(toolUse.name, toolUse.input);
+    const seen = (identicalCalls.get(signature) ?? 0) + 1;
+    identicalCalls.set(signature, seen);
+
+    if (seen > MAX_IDENTICAL_CALLS) {
+      const message =
+        'The same tool call was repeated ' +
+        MAX_IDENTICAL_CALLS +
+        ' times with identical arguments. Change the approach instead of repeating it.';
+      // The refusal is a card of its own. The model sees the reason, the
+      // reader has to see it too, a silent refusal is a defect.
+      this.options.onEvent({
+        type: 'tool_start',
+        id: toolUse.id,
+        name: toolUse.name,
+        input: toolUse.input
+      });
+      this.options.onEvent({
+        type: 'tool_end',
+        id: toolUse.id,
+        name: toolUse.name,
+        content: message,
+        isError: true
+      });
+      results.push({
+        type: 'tool_result',
+        tool_use_id: toolUse.id,
+        content: message,
+        is_error: true
+      });
+      return { block: results[0]!, usage: extra };
+    }
+
+    const entry = this.options.registry.get(toolUse.name);
+    if (!entry) {
+      const message = 'Unknown tool: ' + toolUse.name;
+      // The refusal is a card of its own, the reader sees the reason.
+      this.options.onEvent({
+        type: 'tool_start',
+        id: toolUse.id,
+        name: toolUse.name,
+        input: toolUse.input
+      });
+      this.options.onEvent({
+        type: 'tool_end',
+        id: toolUse.id,
+        name: toolUse.name,
+        content: message,
+        isError: true
+      });
+      results.push({
+        type: 'tool_result',
+        tool_use_id: toolUse.id,
+        content: message,
+        is_error: true
+      });
+      return { block: results[0]!, usage: extra };
+    }
+
+    // The model should not even see this tool in plan mode, but a tool
+    // call that slipped through is refused instead of executed.
+    if (!this.options.registry.isAllowed(entry, this.options.mode)) {
+      const message =
+        'This tool is disabled in plan mode. The user has to switch the agent to code mode first.';
+      this.options.onEvent({
+        type: 'tool_start',
+        id: toolUse.id,
+        name: toolUse.name,
+        input: toolUse.input
+      });
+      this.options.onEvent({
+        type: 'tool_end',
+        id: toolUse.id,
+        name: toolUse.name,
+        content: message,
+        isError: true
+      });
+      results.push({
+        type: 'tool_result',
+        tool_use_id: toolUse.id,
+        content: message,
+        is_error: true
+      });
+      return { block: results[0]!, usage: extra };
+    }
+
+    const decision = await this.options.approval.approve(entry, toolUse.input);
+    this.options.onEvent({
+      type: 'approval_resolved',
+      id: toolUse.id,
+      approved: decision.approved
+    });
+
+    if (!decision.approved) {
+      this.options.onEvent({
+        type: 'tool_start',
+        id: toolUse.id,
+        name: toolUse.name,
+        input: toolUse.input
+      });
+      this.options.onEvent({
+        type: 'tool_end',
+        id: toolUse.id,
+        name: toolUse.name,
+        content: 'Rejected by the user.',
+        isError: true
+      });
+      results.push({
+        type: 'tool_result',
+        tool_use_id: toolUse.id,
+        content: 'Rejected by the user.',
+        is_error: true
+      });
+      return { block: results[0]!, usage: extra };
+    }
+
+    this.options.onEvent({
+      type: 'tool_start',
+      id: toolUse.id,
+      name: toolUse.name,
+      input: toolUse.input
+    });
+
+    // The change of a file is taken before the write. After the write the
+    // file on disk is already the new one and the change is gone.
+    const diff = await previewOf(this.options.workspaceRoot, toolUse.name, toolUse.input);
+
+    let content: string;
+    let isError = false;
+    let state: ToolStateUpdate | undefined;
+    // The files the tool changed, the panel shows them with their
+    // status.
+    let changed: ChangedFile[] | undefined;
+    try {
+      const result = await entry.execute(toolUse.input, {
+        workspaceRoot: this.options.workspaceRoot,
+        signal: this.controller.signal,
+        logger: this.options.logger,
+        depth: this.options.depth,
+        sessionId: this.options.sessionId,
+        sessionState: this.options.sessionState,
+        progress: (line) =>
+          this.options.onEvent({ type: 'tool_progress', id: toolUse.id, line })
+      });
+      // The spend of the child belongs to the action of the parent, the
+      // column of the graph of the spend holds the sum. It is not added to
+      // the `usage` event of the parent: the host counts the budget of the
+      // goal from the `usage` events only, and the child sends its own
+      // `usage` events to the host, so the child would be counted twice
+      // against the budget of the goal.
+      if (result.usage) {
+        extra = result.usage;
+      }
+      content = result.content;
+      isError = result.isError === true;
+      state = result.state;
+      changed = result.changed;
+    } catch (error) {
+      content = error instanceof Error ? error.message : String(error);
+      isError = true;
+    }
+
+    this.options.onEvent({
+      type: 'tool_end',
+      id: toolUse.id,
+      name: toolUse.name,
+      content,
+      isError,
+      diff,
+      state,
+      changed
+    });
+    results.push({
+      type: 'tool_result',
+      tool_use_id: toolUse.id,
+      content,
+      is_error: isError
+    });
+    // The write worked, the world changed: the same read is a new read.
+    if (entry.sideEffect && !isError) {
+      forgetReadCalls(identicalCalls, this.options.registry);
+    }
+    return { block: results[0]!, usage: extra };
+  }
+
   private applyAssistant(event: StreamEvent): void {
     for (const delta of deltasOf(event)) {
       const result = applyDelta(this.assistantState, delta);

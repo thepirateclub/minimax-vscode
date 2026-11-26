@@ -218,6 +218,7 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
         workspaceLabel={state.workspaceLabel}
         onSelectSession={(id) => vscode.postMessage({ type: 'select_session', id })}
         onDeleteSession={(id) => vscode.postMessage({ type: 'delete_session', id })}
+        onSearchSessions={(query) => vscode.postMessage({ type: 'search_sessions', query })}
         onNewChat={() => vscode.postMessage({ type: 'new_session' })}
         version={state.version}
       />
@@ -268,6 +269,8 @@ export function App({ vscode }: { vscode: VsCodeApi }) {
         <SummaryBar
           files={summary}
           onOpenFile={(path) => vscode.postMessage({ type: 'open_file', path })}
+          onDiff={(path) => vscode.postMessage({ type: 'diff_file', path })}
+          onRevert={(path) => vscode.postMessage({ type: 'revert_file', path })}
           onClear={() => {
             setSummary([]);
             vscode.postMessage({ type: 'clear_summary' });

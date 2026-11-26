@@ -5,9 +5,16 @@ import { resolveWorkspacePath } from '../paths';
 import type { BackupStore } from '../storage/backups';
 import { withProblems, type DiagnosticsProvider } from './diagnostics';
 import { applyEdit } from './editMatch';
+import { changedOutside, rememberText } from './fileStamps';
+import { maskSecrets } from './secrets';
 import type { ToolEntry } from './types';
 
 export { resolveWorkspacePath };
+
+export const EXTERNAL_WRITE_REFUSAL =
+  'write_file refused: the file changed outside the agent since you last read or wrote it, the write would throw that change away. Read the file again, then write it or use edit_file.';
+export const EXTERNAL_EDIT_NOTE =
+  'Note: the file changed outside the agent since you last read it. Read it again before the next edit.';
 
 const MAX_READ_LINES = 2000;
 const MAX_READ_CHARS = 200_000;
@@ -80,11 +87,13 @@ export function createFileTools(deps: {
         try {
           const target = resolveWorkspacePath(ctx.workspaceRoot, path);
           const raw = await readFileAsync(target, 'utf8');
+          rememberText(ctx.sessionId, target, raw);
           // An empty file has no lines: split gives one empty line and the
           // answer read `1: ` instead of an empty file.
           const lines = raw.length === 0 ? [] : raw.split('\n');
           const slice = lines.slice(Math.max(0, start - 1), Math.max(0, end));
-          body = slice.map((line, offset) => (start + offset) + ': ' + line).join('\n');
+          // A key in a config reaches the server of the model otherwise.
+          body = maskSecrets(slice.map((line, offset) => (start + offset) + ': ' + line).join('\n')).text;
           beyondRange = slice.length === 0 && raw.length > 0;
         } catch (error) {
           failed += 1;
@@ -138,9 +147,15 @@ export function createFileTools(deps: {
         if (previous === null && isScratchPath(String(input['path'] ?? ''))) {
           return { content: SCRATCH_REFUSAL, isError: true };
         }
+        // The reader changed the file after the agent saw it: the whole
+        // write would throw that change away.
+        if (previous !== null && changedOutside(ctx.sessionId, target, previous)) {
+          return { content: EXTERNAL_WRITE_REFUSAL, isError: true };
+        }
         await deps.backups.save(target, previous, { sessionId: ctx.sessionId, next: content });
         await mkdir(dirname(target), { recursive: true });
         await writeFileAsync(target, content, 'utf8');
+        rememberText(ctx.sessionId, target, content);
         const wrote = 'Wrote ' + String(input['path']);
         return {
           content: await withProblems(wrote, target, deps.diagnostics, ctx.signal),
@@ -185,6 +200,9 @@ export function createFileTools(deps: {
       try {
         const target = resolveWorkspacePath(ctx.workspaceRoot, String(input['path'] ?? ''));
         const raw = await readFileAsync(target, 'utf8');
+        // The exact old_string still guards the edit, the model only hears
+        // that its picture of the file is stale.
+        const stale = changedOutside(ctx.sessionId, target, raw);
         const edit = applyEdit(raw, oldString, newString, input['replace_all'] === true);
         if (!edit.ok) {
           return { content: edit.error, isError: true };
@@ -198,11 +216,13 @@ export function createFileTools(deps: {
         }
         await deps.backups.save(target, raw, { sessionId: ctx.sessionId, next: updated });
         await writeFileAsync(target, updated, 'utf8');
+        rememberText(ctx.sessionId, target, updated);
         // A lenient match is named: the model learns its old_string was off.
         const edited =
           'Edited ' +
           String(input['path']) +
-          (edit.lenient ? ' (old_string matched with the whitespace ignored)' : '');
+          (edit.lenient ? ' (old_string matched with the whitespace ignored)' : '') +
+          (stale ? '\n' + EXTERNAL_EDIT_NOTE : '');
         return {
           content: await withProblems(edited, target, deps.diagnostics, ctx.signal),
           isError: false,

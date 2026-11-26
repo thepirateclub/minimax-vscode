@@ -24,6 +24,9 @@ export interface BackupStore {
   list(): Promise<BackupEntry[]>;
   // The backups of one chat since a moment, the store forgets them.
   takeSince(sessionId: string, since: number): Promise<BackupEntry[]>;
+  // The backups of one file of one chat, the store forgets them: the
+  // reader takes back a single file of the work of the agent.
+  takeFile(sessionId: string, path: string): Promise<BackupEntry[]>;
 }
 
 export class InMemoryBackupStore implements BackupStore {
@@ -52,6 +55,12 @@ export class InMemoryBackupStore implements BackupStore {
     const taken = this.entries.filter(
       (entry) => entry.sessionId === sessionId && entry.createdAt >= since
     );
+    this.entries = this.entries.filter((entry) => !taken.includes(entry));
+    return taken;
+  }
+
+  async takeFile(sessionId: string, path: string): Promise<BackupEntry[]> {
+    const taken = this.entries.filter((entry) => entry.sessionId === sessionId && entry.path === path);
     this.entries = this.entries.filter((entry) => !taken.includes(entry));
     return taken;
   }

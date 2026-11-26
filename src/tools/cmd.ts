@@ -1,3 +1,4 @@
+import { watchOutput } from './liveOutput';
 import { guardTree } from './processTree';
 import { SCRATCH_REFUSAL, writesScratch } from './scratch';
 import { exec, type ExecException } from 'node:child_process';
@@ -120,6 +121,7 @@ export function createCmdTools(): ToolEntry[] {
         // The timeout and the stop kill the whole tree of the command.
         // The callback runs after the guard exists: exec never answers synchronously.
         let guard: ReturnType<typeof guardTree> | undefined;
+        let live: ReturnType<typeof watchOutput>;
         const child = exec(
           command,
           {
@@ -129,6 +131,7 @@ export function createCmdTools(): ToolEntry[] {
           },
           (error: ExecException | null, stdout: string, stderr: string) => {
             guard?.dispose();
+            live?.close();
             if (guard?.timedOut()) {
               stderr += '\nthe command timed out after ' + Math.round(timeout / 1000) + 's, its processes are stopped';
             }
@@ -159,6 +162,7 @@ export function createCmdTools(): ToolEntry[] {
           }
         );
         guard = guardTree(child, timeout, ctx.signal);
+        live = watchOutput(child, ctx.progress);
       });
     }
   };
