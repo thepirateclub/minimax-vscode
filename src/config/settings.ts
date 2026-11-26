@@ -35,6 +35,8 @@ export interface MiniMaxSettings {
   mcpServers: Record<string, unknown>;
   enableWebSearch: boolean;
   rulesEnabled: boolean;
+  verifyCommand: string;
+  verifyRounds: number;
   // The language of the voice input, empty lets the model pick it.
   speechLanguage: string;
   // The device of the voice input, empty picks a microphone by its name.
@@ -94,6 +96,9 @@ export function getSettings(): MiniMaxSettings {
     mcpServers: userValue<Record<string, unknown>>(cfg, 'mcpServers', {}),
     enableWebSearch: userValue<boolean>(cfg, 'enableWebSearch', false),
     rulesEnabled: cfg.get<boolean>('rulesEnabled', true),
+    // The command runs without a question: a repository must not name it.
+    verifyCommand: userValue<string>(cfg, 'verifyCommand', ''),
+    verifyRounds: userValue<number>(cfg, 'verifyRounds', 2),
     speechLanguage: cfg.get<string>('speechLanguage', ''),
     microphone: cfg.get<string>('microphone', ''),
     speechVocabulary: cfg.get<string[]>('speechVocabulary', []),

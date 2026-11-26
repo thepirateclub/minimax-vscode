@@ -389,6 +389,20 @@
           "default": false,
           "description": "The agent searches the web with the M Plan key (the web_search tool). The queries go to MiniMax."
         },
+        "minimax.verifyCommand": {
+          "type": "string",
+          "default": "",
+          "scope": "application",
+          "description": "A command that checks the project after a turn of the agent that changed files, for example npm run typecheck && npm test. It runs without a confirmation, a failure goes back to the agent to fix. Empty turns the check off."
+        },
+        "minimax.verifyRounds": {
+          "type": "number",
+          "default": 2,
+          "minimum": 0,
+          "maximum": 10,
+          "scope": "application",
+          "description": "How many times in a row the agent gets a failed check to fix before it stops and waits for you."
+        },
         "minimax.rulesEnabled": {
           "type": "boolean",
           "default": true
