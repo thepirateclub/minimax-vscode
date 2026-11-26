@@ -139,9 +139,9 @@ describe('the card of the confirmation of a deletion', () => {
     expect(markup).toContain('8 B');
   });
 
-  it('says that the deletion cannot be undone', () => {
+  it('says where the deleted files go', () => {
     const markup = card([{ path: 'a.txt', bytes: 4 }]);
-    expect(markup.toLowerCase()).toContain('permanent');
+    expect(markup).toContain('.minimax/agent/trash');
   });
 
   it('has no grant of the session, the deletion is never silent', () => {

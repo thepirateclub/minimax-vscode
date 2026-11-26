@@ -1,5 +1,6 @@
 import type { MiniMaxController } from '../extension';
 import { persist, restoreSession } from './sessions';
+import { clearTrash } from '../tools/trash';
 import * as vscode from 'vscode';
 
 // The project of the panel in a window with several folders. The first
@@ -44,5 +45,20 @@ export async function selectFolder(host: MiniMaxController): Promise<void> {
 }
 
 export function registerFolderCommand(host: MiniMaxController, context: vscode.ExtensionContext): void {
-  context.subscriptions.push(vscode.commands.registerCommand('minimax.selectFolder', () => void selectFolder(host)));
+  context.subscriptions.push(
+    vscode.commands.registerCommand('minimax.selectFolder', () => void selectFolder(host)),
+    vscode.commands.registerCommand('minimax.clearTrash', () => void emptyTrash(host))
+  );
+}
+
+// The trash of the project goes away for good, the reader confirms it.
+async function emptyTrash(host: MiniMaxController): Promise<void> {
+  const answer = await vscode.window.showWarningMessage(
+    'MiniMax: delete the files in the trash of the project for good?',
+    { modal: true },
+    'Delete'
+  );
+  if (answer === 'Delete') {
+    await clearTrash(host.workspaceRoot());
+  }
 }

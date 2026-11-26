@@ -1,4 +1,5 @@
-import { stat, unlink } from 'node:fs/promises';
+import { stat } from 'node:fs/promises';
+import { moveToTrash, trashFolder } from './trash';
 import { resolveWorkspacePath } from '../paths';
 import { formatBytes } from '../ui/format';
 import type { ToolEntry } from './types';
@@ -132,7 +133,7 @@ export function createDeleteTools(): ToolEntry[] {
   const deleteFiles: ToolEntry = {
     name: DELETE_TOOL_NAME,
     description:
-      'Delete one file or several files from the workspace. The user sees the list of the files with their size and confirms the deletion every time, no rule of the session covers it. The deletion is permanent, the files do not go to the trash. Directories are not deleted, delete the files inside them one by one. Never delete a file with a shell command, this tool is the only way.',
+      'Delete one file or several files from the workspace. The user sees the list of the files with their size and confirms the deletion every time, no rule of the session covers it. The files go to the trash of the project (.minimax/agent/trash) and are kept 14 days. Directories are not deleted, delete the files inside them one by one. Never delete a file with a shell command, this tool is the only way.',
     approval: 'always',
     sideEffect: true,
     inputSchema: {
@@ -177,9 +178,13 @@ export function createDeleteTools(): ToolEntry[] {
       }
       const deleted: string[] = [];
       const failed: string[] = [];
+      const bin = trashFolder(ctx.workspaceRoot, ctx.sessionId, Date.now());
+      let place = '';
       for (const file of plan.files) {
         try {
-          await unlink(String(file.target));
+          // The file goes to the trash of the project, the reader takes it
+          // back by moving it home.
+          place = await moveToTrash(ctx.workspaceRoot, String(file.target), bin);
           deleted.push(file.path);
         } catch (failure) {
           failed.push(
@@ -214,11 +219,19 @@ export function createDeleteTools(): ToolEntry[] {
           formatBytes(plan.totalBytes) +
           ' in total:\n' +
           lines.join('\n') +
-          '\nThe deletion is permanent: the files do not go to the trash.',
+          '\nThe files are in the trash of the project: ' +
+          trashRoot(place) +
+          ' (kept 14 days). Move a file back from there to restore it.',
         isError: false,
         changed: deleted.map((path) => ({ path, status: 'deleted' }))
       };
     }
   };
   return [deleteFiles];
+}
+
+// The folder of the deletion from the place of one of its files:
+// .minimax/agent/trash/<chat>/<moment>/...
+function trashRoot(place: string): string {
+  return place.split('/').slice(0, 5).join('/') + '/';
 }

@@ -1,6 +1,7 @@
 import type { MiniMaxController } from '../extension';
 import { prepareIndex } from './commands';
 import { startMcp } from './mcp';
+import { pruneTrash } from '../tools/trash';
 
 // Every window of the editor activates the extension on start for the badge
 // of the quota. The index of the project and the MCP servers wait for the
@@ -15,6 +16,8 @@ export function warmUp(host: MiniMaxController): void {
   warm.add(host);
   void startMcp(host);
   void prepareIndex(host);
+  // The old deletions leave the trash of the project.
+  void pruneTrash(host.workspaceRoot()).catch(() => undefined);
 }
 
 export function isWarm(host: MiniMaxController): boolean {

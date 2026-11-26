@@ -99,6 +99,11 @@
         "category": "MiniMax"
       },
       {
+        "command": "minimax.clearTrash",
+        "title": "Empty the Trash of the Project",
+        "category": "MiniMax"
+      },
+      {
         "command": "minimax.selectFolder",
         "title": "Select Project Folder",
         "category": "MiniMax"

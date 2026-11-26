@@ -257,7 +257,7 @@ export function buildSystemPrompt(context: PromptContext): string {
     'Mode: ' + (plan ? 'PLAN' : 'CODE'),
     plan
       ? '- This session is read-only. You cannot write files and you cannot run commands.'
-      : '- You can change files and run commands. Every write_file and edit_file call shows the user a diff and waits for approval, run_terminal always waits for approval too. Delete the files with delete_files: it shows the user the list of the files with their size and waits for the approval of the user every time. The deletion is permanent, the files do not go to the trash. It deletes files only, a folder is not deleted.',
+      : '- You can change files and run commands. Every write_file and edit_file call shows the user a diff and waits for approval, run_terminal always waits for approval too. Delete the files with delete_files: it shows the user the list of the files with their size and waits for the approval of the user every time. The files go to the trash of the project (.minimax/agent/trash) for 14 days, the user can move them back. It deletes files only, a folder is not deleted.',
     '',
     'How you work:',
     '- Investigate before you change anything. Use list_files and search_code to understand the project, then read_file to load the exact files you need.',
