@@ -117,7 +117,7 @@ export function createTaskTools(options: TaskOptions): ToolEntry[] {
   const task: ToolEntry = {
     name: 'task',
     description:
-      'Start a sub-agent that works on its own and answers with a report. Use it for a piece of work that needs its own context: exploring the project, making a change or checking the work of somebody. The answer of the sub-agent is the result of this call. The role "explore" only reads, "worker" changes files, "verifier" checks the work and runs the tests of the project.',
+      'Start a sub-agent that works on its own and answers with a report. Use it for a piece of work that needs its own context: exploring the project, making a change or checking the work of somebody. The answer of the sub-agent is the result of this call. The role "explore" only reads, "worker" changes files, "verifier" checks the work and runs the tests of the project. Several task calls in one answer run at the same time (up to 3): give independent pieces of work to separate sub-agents in one answer, never two workers on the same files.',
     approval: 'never',
     // The child can change files, the tool is not available in plan mode.
     sideEffect: true,
