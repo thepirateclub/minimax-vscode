@@ -168,7 +168,8 @@ export async function ensureAgent(host: MiniMaxController, runtime: RuntimeSessi
       }
     },
     budget: () => goalBudgetOk(host, runtime),
-    workspaceRoot: host.workspaceRoot(),
+    // The tools of the chat work in its own project.
+    workspaceRoot: runtime.workspaceRoot,
     logger: host.logger,
     autoApprove: settings.autoApprove,
     onEvent: (event) => handleAgentEvent(host, runtime, event),

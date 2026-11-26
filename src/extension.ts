@@ -7,6 +7,7 @@ import { isAbsolute } from 'node:path';
 import { HttpSpeechClient } from './api/speech';
 import { getSettings, onSettingsChanged } from './config/settings';
 import { registerHostServices } from './host/services';
+import { currentRoot } from './host/folders';
 import { createLogger } from './logger';
 import { ProjectSearch } from './search/project';
 import { createBackupStore } from './storage/fileBackups';
@@ -205,7 +206,7 @@ export class MiniMaxController {
     // One save of the settings writes many keys and every write fires the
     // event. The agents and the panel are rebuilt once, after the last write.
     let settingsTimer: ReturnType<typeof setTimeout> | undefined;
-    registerHostServices(context);
+    registerHostServices(this, context);
     context.subscriptions.push(
       onSettingsChanged(() => {
         if (settingsTimer !== undefined) {
@@ -273,9 +274,7 @@ export class MiniMaxController {
   // The panel of the source control asks the model for a commit message.
   // A click on the badge opens the numbers of the plan.
   workspaceRoot(): string {
-    const folders = vscode.workspace.workspaceFolders;
-    const first = folders && folders.length > 0 ? folders[0] : undefined;
-    return first ? first.uri.fsPath : process.cwd();
+    return currentRoot(this.context);
   }
 
   nextId(prefix: string): string {

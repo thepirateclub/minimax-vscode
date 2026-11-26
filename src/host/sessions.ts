@@ -184,11 +184,13 @@ export function restoreSession(host: MiniMaxController): void {
     startNewSession(host);
     return;
   }
-  const runtime = runtimeFrom(host, stored);
+  // A chat that still lives in the host (it may run in the background) is
+  // taken as it is, a second copy would lose its turn.
+  const runtime = host.sessions.get(stored.id) ?? runtimeFrom(host, stored);
   host.sessions.set(runtime.id, runtime);
   host.activeSessionId = runtime.id;
   host.store.setActiveIdFor(root, runtime.id);
-  setState(host, 'idle');
+  setState(host, runtime.state, runtime);
   void host.sendInit();
 }
 

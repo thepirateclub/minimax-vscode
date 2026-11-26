@@ -99,6 +99,11 @@
         "category": "MiniMax"
       },
       {
+        "command": "minimax.selectFolder",
+        "title": "Select Project Folder",
+        "category": "MiniMax"
+      },
+      {
         "command": "minimax.reindex",
         "title": "Rebuild Project Index",
         "category": "MiniMax"
