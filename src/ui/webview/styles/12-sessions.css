@@ -159,4 +159,21 @@ html {
   color: var(--muted);
   font-size: var(--fs-xs);
 }
-
+
+/* The search of the chats: a quiet field on top of the list. */
+.session-search {
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 4px;
+}
+
+/* The place of the query in the text of a found chat. */
+.session-snippet {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  font-style: italic;
+}

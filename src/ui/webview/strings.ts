@@ -16,6 +16,8 @@ export const STRINGS = {
   modeCodeHint: 'Code mode: the agent can change files and run commands, every write asks for approval.',
   approve: 'Allow',
   reject: 'Reject',
+  searchChats: 'Search chats',
+  noChatsFound: 'No chats match the search.',
   approveKey: 'Allow (Enter)',
   alwaysKey: 'Always allow (A)',
   rejectKey: 'Reject (Esc)',

@@ -23,6 +23,7 @@ export function Header({
   workspaceLabel,
   onSelectSession,
   onDeleteSession,
+  onSearchSessions,
   onNewChat,
   version
 }: {
@@ -40,6 +41,7 @@ export function Header({
   workspaceLabel: string;
   onSelectSession: (id: string) => void;
   onDeleteSession: (id: string) => void;
+  onSearchSessions: (query: string) => void;
   onNewChat: () => void;
   version: string;
 }) {
@@ -72,6 +74,7 @@ export function Header({
           workspaceLabel={workspaceLabel}
           onSelect={onSelectSession}
           onDelete={onDeleteSession}
+          onSearch={onSearchSessions}
           onNewChat={onNewChat}
         />
         <button

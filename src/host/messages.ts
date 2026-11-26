@@ -1,3 +1,4 @@
+import { searchSessions } from '../storage/sessionSearch';
 import * as vscode from 'vscode';
 import { goalMachine, resumeGoal } from '../agent/stateMachines';
 import { handleExtrasMessage } from './extras';
@@ -130,6 +131,11 @@ export async function handleWebviewMessage(host: MiniMaxController, message: Web
   }
   if (message.type === 'select_session') {
     selectSession(host, message.id);
+    return;
+  }
+  if (message.type === 'search_sessions') {
+    // The text of the chats lives in the host, the panel holds only titles.
+    host.panel.post({ type: 'session_search', query: message.query, hits: searchSessions(host.store.list(), message.query) });
     return;
   }
   if (message.type === 'delete_session') {
