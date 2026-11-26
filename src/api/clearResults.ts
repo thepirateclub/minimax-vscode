@@ -15,6 +15,10 @@ export const KEEP_RECENT_RESULTS = 8;
 // A short result costs less than the stub would save.
 const MIN_CLEARED_CHARS = 600;
 
+function clearable(block: { is_error?: boolean; content: string }): boolean {
+  return block.is_error !== true && block.content.length >= MIN_CLEARED_CHARS;
+}
+
 export function clearOldToolResults(messages: readonly AnthropicMessage[]): AnthropicMessage[] {
   const calls = new Map<string, AnthropicToolUseBlock>();
   let total = 0;
@@ -22,7 +26,7 @@ export function clearOldToolResults(messages: readonly AnthropicMessage[]): Anth
     for (const block of message.content) {
       if (block.type === 'tool_use') {
         calls.set(block.id, block);
-      } else if (block.type === 'tool_result') {
+      } else if (block.type === 'tool_result' && clearable(block)) {
         total++;
       }
     }
@@ -38,9 +42,10 @@ export function clearOldToolResults(messages: readonly AnthropicMessage[]): Anth
       if (block.type !== 'tool_result') {
         return block;
       }
-      const index = seen++;
       // An error stays: the model learns from the failure, and it is short.
-      if (index >= clearBefore || block.is_error === true || block.content.length < MIN_CLEARED_CHARS) {
+      // Only the results that can be cleared are counted: the last eight
+      // are eight long ones, the short ones never took their place.
+      if (!clearable(block) || seen++ >= clearBefore) {
         return block;
       }
       changed = true;

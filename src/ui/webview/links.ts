@@ -16,7 +16,14 @@ export function linkTarget(href: string): LinkTarget | undefined {
     return undefined;
   }
   const match = /^(.*?)(?:#L?(\d+)(?:-L?\d+)?|:(\d+))?$/.exec(value);
-  const path = decodeURIComponent((match?.[1] ?? value).replace(/^\.\//, ''));
+  const raw = (match?.[1] ?? value).replace(/^\.\//, '');
+  let path: string;
+  try {
+    path = decodeURIComponent(raw);
+  } catch {
+    // A broken escape (`%zz`) is a literal name, not a crash of the click.
+    path = raw;
+  }
   const line = Number(match?.[2] ?? match?.[3] ?? 0);
   return path.length > 0 ? { kind: 'file', path, ...(line > 0 ? { line } : {}) } : undefined;
 }

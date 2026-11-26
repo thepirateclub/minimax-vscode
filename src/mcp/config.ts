@@ -35,6 +35,11 @@ function asRecord(value: unknown): Record<string, string> | undefined {
   return Object.fromEntries(entries);
 }
 
+// Headers of a server carry its token: plain http only to this machine.
+function secureUrl(url: string): boolean {
+  return /^https:\/\//i.test(url) || /^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?(\/|$)/i.test(url);
+}
+
 // One server of the `mcpServers` object, the form of Claude, Cursor and the
 // plugins of MiniMax: a command with its arguments, or a url.
 export function parseServerConfig(value: unknown): McpServerConfig | undefined {
@@ -45,7 +50,7 @@ export function parseServerConfig(value: unknown): McpServerConfig | undefined {
   if (record['disabled'] === true) {
     return undefined;
   }
-  if (typeof record['url'] === 'string' && /^https?:\/\//i.test(record['url'])) {
+  if (typeof record['url'] === 'string' && secureUrl(record['url'])) {
     const headers = asRecord(record['headers']);
     return { url: record['url'], ...(headers ? { headers } : {}) };
   }

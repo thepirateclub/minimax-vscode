@@ -209,6 +209,7 @@ export function ComposerInput(props: {
           <button
             className="composer-attach"
             title={STRINGS.attach}
+            aria-label={STRINGS.attach}
             onMouseDown={(event) => event.preventDefault()}
             onClick={onPickFiles}
           >
@@ -238,7 +239,7 @@ export function ComposerInput(props: {
               <button
                 className={'composer-goal' + (goalMode ? ' active' : '')}
                 title={goalMode ? STRINGS.goalModeOff : STRINGS.goalModeOn}
-                aria-label={STRINGS.goalModeOn}
+                aria-label={goalMode ? STRINGS.goalModeOff : STRINGS.goalModeOn}
                 aria-pressed={goalMode}
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => {

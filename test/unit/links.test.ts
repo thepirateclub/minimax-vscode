@@ -12,3 +12,9 @@ describe('the links of an answer', () => {
     }
   });
 });
+
+describe('a broken escape in a link', () => {
+  it('stays a literal name instead of a crash of the click', () => {
+    expect(linkTarget('src/a%zz.ts')).toEqual({ kind: 'file', path: 'src/a%zz.ts' });
+  });
+});

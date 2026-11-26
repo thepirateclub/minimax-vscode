@@ -249,6 +249,8 @@ export function handleAgentEvent(host: MiniMaxController, runtime: RuntimeSessio
       return;
     }
     postFor(host, runtime, { type: 'error', message: event.message });
+    // A failed turn names its time too, as a stopped one does.
+    markStepTime(host, runtime);
     setState(host, 'error', runtime);
     // The turn is over, the time of the turn is not running anymore.
     runtime.turnStartedAt = 0;
