@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import type { QuotaSnapshot } from '../api/quota';
 import type { UsageSummary } from '../storage/usage';
-import { buildUsageRows, weeklyResetText } from './usageRows';
+import { buildUsageRows } from './usageRows';
 
 export type AgentState = 'idle' | 'thinking' | 'streaming' | 'tool' | 'error';
 
@@ -58,17 +58,12 @@ export class StatusBarController {
     this.item.show();
   }
 
+  // The rows name both resets already: a line of its own printed them twice.
   private tooltip(): string {
     const rows = buildUsageRows(this.usage, this.quota);
     const lines = ['MiniMax Agent'];
     for (const row of rows) {
       lines.push(row.label + ': ' + row.value);
-    }
-    if (this.quota?.resetsAt !== undefined && this.quota.resetsAt > Date.now()) {
-      lines.push('The 5-hour window resets ' + weeklyResetText(this.quota.resetsAt));
-    }
-    if (this.quota?.weeklyResetsAt !== undefined && this.quota.weeklyResetsAt > Date.now()) {
-      lines.push('The weekly limit resets ' + weeklyResetText(this.quota.weeklyResetsAt));
     }
     return lines.join('\n');
   }

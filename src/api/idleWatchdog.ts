@@ -23,6 +23,9 @@ export class IdleWatchdog {
     this.expiry = new Promise<never>((_resolve, reject) => {
       this.rejectExpiry = reject;
     });
+    // The quiet period can end while no read waits: the rejection must not
+    // surface as an unhandled one, the next race still gets it.
+    this.expiry.catch(() => undefined);
   }
 
   // The read waits for the data. The promise of the watchdog wins when the

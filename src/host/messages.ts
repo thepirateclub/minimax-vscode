@@ -1,3 +1,4 @@
+import { warmUp } from './warmup';
 import { diffFile, revertFile } from './fileRevert';
 import { searchSessions } from '../storage/sessionSearch';
 import * as vscode from 'vscode';
@@ -28,6 +29,8 @@ export async function handleWebviewMessage(host: MiniMaxController, message: Web
     return;
   }
   if (message.type === 'ready') {
+    // The reader looked at the panel: the index and the servers start.
+    warmUp(host);
     // The panel has just loaded, it holds nothing of the chat yet.
     await host.sendInit(true);
     return;

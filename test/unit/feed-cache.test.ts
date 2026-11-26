@@ -1,4 +1,6 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { appendProgress, appendToAssistant, resetAssistant } from '../../src/ui/webview/usePanelMessages';
 import type { UiMessage } from '../../src/ui/protocol';
 import { collectFileSources } from '../../src/ui/webview/codeBlock';
 import { commandHints } from '../../src/ui/webview/commandHistory';
@@ -84,5 +86,42 @@ describe('the feed cache', () => {
     expect(second.failed).toBe(first.failed);
     expect(secondFeed.slice(0, -1)).toEqual(firstFeed.slice(0, -1));
     secondFeed.slice(0, -1).forEach((item, index) => expect(item).toBe(firstFeed[index]));
+  });
+});
+
+// The cache sees a change only as a new object: the updates of the panel
+// copy the message they change. A frozen chat throws on a change in place.
+describe('the messages of the panel are never changed in place', () => {
+  function frozen(messages: UiMessage[]): UiMessage[] {
+    for (const message of messages) {
+      if (message.tool) {
+        Object.freeze(message.tool);
+      }
+      Object.freeze(message);
+    }
+    return Object.freeze(messages) as UiMessage[];
+  }
+
+  it('copies the message the stream, the journal and the reset change', () => {
+    const chat = frozen([
+      { id: 'u', role: 'user', text: 'go' },
+      { id: 't', role: 'tool', tool: { id: 't', name: 'run_terminal', input: {}, running: true } },
+      { id: 'a', role: 'assistant', text: 'part' }
+    ] as UiMessage[]);
+    const streamed = appendToAssistant(chat, 'text', ' more');
+    expect(streamed[2]).not.toBe(chat[2]);
+    expect(streamed[2]!.text).toBe('part more');
+    const logged = appendProgress(chat, 't', 'line');
+    expect(logged[1]).not.toBe(chat[1]);
+    expect(resetAssistant(chat)[2]).not.toBe(chat[2]);
+    // The cache sees each change.
+    const feed = createFeed();
+    feed(chat);
+    expect(feed(streamed).at(-1)).toEqual({ kind: 'message', message: streamed[2] });
+  });
+
+  it('keeps every update of the hook free of assignments to a message', () => {
+    const source = readFileSync('src/ui/webview/usePanelMessages.ts', 'utf8');
+    expect(source).not.toMatch(/\b(item|message|prev|last|next\[\w+\]!?)\.(text|thinking|tool|progress|content)\s*(\+=|=[^=>])/);
   });
 });

@@ -1,6 +1,7 @@
 import { notesFor } from './host/notes';
 import type { Notes } from './notes/sqlite';
-import { createMcpState, startMcp, stopMcp } from './host/mcp';
+import { createMcpState, stopMcp } from './host/mcp';
+import { restartMcpIfWarm } from './host/warmup';
 import { discoverSkills } from './skills/skills';
 import { toUiQuota } from './ui/quotaMeter';
 import { isAbsolute } from 'node:path';
@@ -31,7 +32,7 @@ import { handleWebviewMessage } from './host/messages';
 import type { Logger } from './logger';
 import type { QuotaSnapshot } from './api/quota';
 import { applySettings, addApiKey, clearApiKey, setEndpoint, warnAboutTheBaseUrl, selectModel, selectMode, selectEffort } from './host/settings';
-import { showLogs, showUsage, generateCommitMessage, refreshQuota, undoLastChange, refreshContext, prepareIndex, reindex } from './host/commands';
+import { showLogs, showUsage, generateCommitMessage, refreshQuota, undoLastChange, refreshContext, reindex } from './host/commands';
 import { searchFor, addFileToChat } from './host/workspace';
 import { registerEditorActions } from './host/editorActions';
 import type { AgentState } from './ui/protocol';
@@ -215,7 +216,7 @@ export class MiniMaxController {
         settingsTimer = setTimeout(() => {
           settingsTimer = undefined;
           applySettings(this, );
-          void startMcp(this);
+          restartMcpIfWarm(this);
           warnAboutTheBaseUrl(this, );
           void this.sendInit();
         }, 100);
@@ -252,8 +253,8 @@ export class MiniMaxController {
       vscode.commands.registerCommand('minimax.reindex', () => void reindex(this, ))
     );
     context.subscriptions.push(this.statusBar);
-    // The MCP servers start with the extension and stop with it.
-    void startMcp(this);
+    // The MCP servers start with the first look at the panel and stop with
+    // the extension (src/host/warmup.ts).
     context.subscriptions.push({ dispose: () => stopMcp(this) });
 
     const quotaTimer = setInterval(() => {
@@ -386,10 +387,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   controller = new MiniMaxController(context, channel);
   controller.register(context);
   restoreSession(controller);
+  // The badge of the quota needs the start; the index and the servers wait
+  // for the panel or the first turn (src/host/warmup.ts).
   void refreshQuota(controller);
-  // The index of the project is built in the background, the first search
-  // does not wait for the files of the disk.
-  void prepareIndex(controller);
 }
 
 export function deactivate(): void {

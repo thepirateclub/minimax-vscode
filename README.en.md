@@ -312,8 +312,10 @@ npm run package
 Open the extension in VS Code with F5 or install the built file:
 
 ```bash
-code --install-extension minimax-agent-0.43.4.vsix --force
+code --install-extension minimax-agent-<version>.vsix --force
 ```
+
+`<version>` is the `version` field of `package.json`, the built file carries it in its name.
 
 The name of the file repeats the version from `package.json`.
 
@@ -331,7 +333,7 @@ The key is taken from `MINIMAX_API_KEY` in the environment or from `.env.local` 
 
 ## Security
 
-- Any write to disk and any run of a command require the confirmation in the panel, there is a button "Always allow in this session".
+- Any write to disk and any run of a command require the confirmation in the panel, there is a button "Always allow in this session". Such a grant lives in memory until the window reloads and is deliberately not saved with the chat: a lasting rule goes into the setting `minimax.autoApprove`.
 - The paths of the tools are resolved only inside the root of the workspace, leaving it is forbidden. This concerns the search too: a file outside the workspace is not read and does not get into the answer of the model.
 - A ref that the model gives is not read as a git option: a separator of the options stands before the ref, so the model cannot point git to a file for writing.
 - The settings of the API address (`minimax.customBaseUrl`, `minimax.baseUrl`), of the list of the confirmations (`minimax.autoApprove`) and of the path to ffmpeg (`minimax.ffmpegPath`) have the scope application: a repository that the user opens cannot override them. The API address is accepted only over https, a foreign host asks for the confirmation.
