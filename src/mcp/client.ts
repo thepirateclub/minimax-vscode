@@ -193,6 +193,14 @@ function settle(pending: Map<number, Pending>, message: unknown): void {
 
 // The answer of the HTTP transport is json or a stream of events; the
 // message with the id of the request is the answer.
+function parseJson(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error('The MCP server sent a broken answer: ' + text.slice(0, 200));
+  }
+}
+
 export function readHttpAnswer(contentType: string, body: string, id: number): unknown {
   const messages: unknown[] = [];
   if (contentType.includes('text/event-stream')) {
@@ -203,11 +211,11 @@ export function readHttpAnswer(contentType: string, body: string, id: number): u
         .map((line) => line.slice(5).trimStart())
         .join('\n');
       if (data) {
-        messages.push(JSON.parse(data));
+        messages.push(parseJson(data));
       }
     }
   } else if (body.trim().length > 0) {
-    const parsed: unknown = JSON.parse(body);
+    const parsed: unknown = parseJson(body);
     messages.push(...(Array.isArray(parsed) ? parsed : [parsed]));
   }
   for (const message of messages) {

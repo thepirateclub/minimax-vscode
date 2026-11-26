@@ -48,3 +48,14 @@ describe('the git commands that throw work away', () => {
     expect(asked).toBe(1);
   });
 });
+
+describe('the rewrites of history and the removal of a worktree', () => {
+  it('asks every time', () => {
+    expect(destroysGitWork('git push origin :feature')).toBe(true);
+    expect(destroysGitWork('git rebase main')).toBe(true);
+    expect(destroysGitWork('git commit --amend --no-edit')).toBe(true);
+    expect(destroysGitWork('git commit -m fix')).toBe(false);
+    expect(destroysGitWork('git push origin feature')).toBe(false);
+    expect(alwaysConfirms('git_worktree_remove', { path: 'wt' })).toBe(true);
+  });
+});

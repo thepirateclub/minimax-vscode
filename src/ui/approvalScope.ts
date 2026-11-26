@@ -20,7 +20,7 @@ const SHELL_OPERATORS = /[;&|`<>\r\n]|\$\(/;
 // The tools that ask the reader every time. A rule of the reader never
 // covers them: the deletion of a file is never silent. The list lives here
 // because the panel and the host read it without the tools of the extension.
-export const ALWAYS_CONFIRM_TOOLS = ['delete_files'];
+export const ALWAYS_CONFIRM_TOOLS = ['delete_files', 'git_worktree_remove'];
 
 export function alwaysConfirms(toolName: string, input?: Record<string, unknown>): boolean {
   if (ALWAYS_CONFIRM_TOOLS.includes(toolName)) {
@@ -55,11 +55,13 @@ export function destroysGitWork(command: string): boolean {
     if (
       (sub === 'clean' && (has('--force') || short('f'))) ||
       (sub === 'reset' && has('--hard', '--merge', '--keep')) ||
-      (sub === 'push' && (has('--force', '--force-with-lease', '--mirror', '--delete') || short('f') || short('d') || rest.some((word) => word.startsWith('+') || word.startsWith('--force')))) ||
+      (sub === 'push' && (has('--force', '--force-with-lease', '--mirror', '--delete') || short('f') || short('d') || rest.some((word) => word.startsWith('+') || word.startsWith(':') || word.startsWith('--force')))) ||
       (sub === 'stash' && has('drop', 'clear')) ||
       (sub === 'branch' && (short('D') || (has('--delete', '-d') && has('--force', '-f')))) ||
       (sub === 'checkout' && (has('--', '.', '-f', '--force'))) ||
       sub === 'restore' ||
+      sub === 'rebase' ||
+      (sub === 'commit' && has('--amend')) ||
       sub === 'filter-branch' ||
       (sub === 'reflog' && has('expire', 'delete')) ||
       (sub === 'update-ref' && has('-d'))

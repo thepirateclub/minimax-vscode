@@ -71,3 +71,18 @@ describe('the MCP servers', () => {
     expect(await entry.execute({}, ctx)).toEqual({ content: 'The MCP server gone is not running.', isError: true });
   });
 });
+
+describe('the transport of a server by url', () => {
+  it('sends the headers only over https or to this machine', () => {
+    const servers = parseServers({
+      remote: { url: 'http://example.com/mcp', headers: { Authorization: 'Bearer t' } },
+      secure: { url: 'https://example.com/mcp' },
+      local: { url: 'http://localhost:3000/mcp' }
+    }, 'settings');
+    expect(servers.map((server) => server.name).sort()).toEqual(['local', 'secure']);
+  });
+
+  it('names a broken answer instead of a raw exception', () => {
+    expect(() => readHttpAnswer('application/json', '{oops', 1)).toThrow(/broken answer/);
+  });
+});

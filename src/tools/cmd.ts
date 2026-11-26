@@ -118,6 +118,8 @@ export function createCmdTools(): ToolEntry[] {
         // shell receives backslashes and prints them, a command with quotes
         // came back corrupted (echo "a b" gave \"a b\").
         // The timeout and the stop kill the whole tree of the command.
+        // The callback runs after the guard exists: exec never answers synchronously.
+        let guard: ReturnType<typeof guardTree> | undefined;
         const child = exec(
           command,
           {
@@ -126,8 +128,8 @@ export function createCmdTools(): ToolEntry[] {
             windowsHide: true
           },
           (error: ExecException | null, stdout: string, stderr: string) => {
-            guard.dispose();
-            if (guard.timedOut()) {
+            guard?.dispose();
+            if (guard?.timedOut()) {
               stderr += '\nthe command timed out after ' + Math.round(timeout / 1000) + 's, its processes are stopped';
             }
             const parts: string[] = [];
@@ -156,7 +158,7 @@ export function createCmdTools(): ToolEntry[] {
             });
           }
         );
-        const guard = guardTree(child, timeout, ctx.signal);
+        guard = guardTree(child, timeout, ctx.signal);
       });
     }
   };

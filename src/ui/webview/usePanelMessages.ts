@@ -298,7 +298,11 @@ export function usePanelMessages(
 
     window.addEventListener('message', onMessage);
     vscode.postMessage({ type: 'ready' });
-    return () => window.removeEventListener('message', onMessage);
+    return () => {
+      window.removeEventListener('message', onMessage);
+      // A timer of the batch must not write into an unmounted panel.
+      batch.clear();
+    };
   }, [vscode]);
 }
 export function resetAssistant(messages: UiMessage[]): UiMessage[] {

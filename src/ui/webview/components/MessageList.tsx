@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { UiMessage } from '../../protocol';
 import { collectFileSources } from '../codeBlock';
 import { commandHints, type CommandHint } from '../commandHistory';
@@ -168,26 +168,33 @@ export function MessageList({
 
   // The files the agent has read, a snippet of one of them gets the name
   // of the file in its header.
-  const sources = collectFileSources(messages);
+  // The lists walk the whole chat: they are counted once per change of the
+  // messages, not on every render of the feed (scroll, the visible window).
+  const sources = useMemo(() => collectFileSources(messages), [messages]);
   // The request can be repeated only when the turn of it failed.
-  const failed = failedRequests(messages);
-  // The command that ran before every message of the chat.
-  const commands = commandHints(messages);
+  const failed = useMemo(() => failedRequests(messages), [messages]);
   // The command of a message by its id: the steps of the tools break the
   // order of the feed, the index of the message is not its place anymore.
-  const commandsById = new Map<string, CommandHint | undefined>();
-  messages.forEach((message, index) => {
-    commandsById.set(message.id, commands[index]);
-  });
+  const commandsById = useMemo(() => {
+    const commands = commandHints(messages);
+    const byId = new Map<string, CommandHint | undefined>();
+    messages.forEach((message, index) => {
+      byId.set(message.id, commands[index]);
+    });
+    return byId;
+  }, [messages]);
 
-  const shown = messages.length > visible ? messages.slice(-visible) : messages;
+  const shown = useMemo(
+    () => (messages.length > visible ? messages.slice(-visible) : messages),
+    [messages, visible]
+  );
   const hidden = messages.length - shown.length;
   // The messages the panel does not draw yet: the ones it holds and the
   // ones the host keeps.
   const pendingCount = hidden + olderMessages;
   // The feed of the chat, the steps of the actions and the messages of the
   // model in the order they came.
-  const feed = groupToolSteps(shown);
+  const feed = useMemo(() => groupToolSteps(shown), [shown]);
 
   return (
     <div className="messages-wrap">

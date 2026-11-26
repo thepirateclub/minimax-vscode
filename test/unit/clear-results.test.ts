@@ -77,3 +77,13 @@ describe('the request of the agent', () => {
     expect(results(result.messages)[0]).toBe(LONG);
   });
 });
+
+describe('the count of the kept results', () => {
+  it('keeps eight long results whole, short ones in between do not take their place', () => {
+    const long = Array.from({ length: KEEP_RECENT_RESULTS + 1 }, (_, i) => pair(i)).flat();
+    const short = Array.from({ length: 4 }, (_, i) => pair(100 + i, 'ok')).flat();
+    const shown = results(clearOldToolResults([...long, ...short]));
+    expect(shown.filter((content) => content === LONG)).toHaveLength(KEEP_RECENT_RESULTS);
+    expect(shown[0]).toContain('read_file f0.ts');
+  });
+});
