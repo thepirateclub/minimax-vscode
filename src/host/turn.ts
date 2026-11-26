@@ -1,6 +1,5 @@
-import { discoverSkills, readSkillText } from '../skills/skills';
+import { calledSkillBlocks } from './skillBlocks';
 import { selectionBlock } from '../agent/editorPrompts';
-import { mentionedSkills } from '../ui/skillMentions';
 import type { MiniMaxController } from '../extension';
 import type { RuntimeSession } from './runtime';
 import type { UiSelection, QueuedMessage } from '../ui/protocol';
@@ -361,15 +360,8 @@ export async function buildPromptText(host: MiniMaxController, text: string,
   if (mentionsProblems(text)) {
     blocks.push(formatWorkspaceProblems(workspaceDiagnostics(host.workspaceRoot())));
   }
-  // A skill called with `/name` comes with the request: its instructions
-  // and the list of its files.
-  const skills = await discoverSkills(host.workspaceRoot()).catch(() => []);
-  for (const name of mentionedSkills(text, skills.map((skill) => skill.name))) {
-    const skill = skills.find((item) => item.name === name);
-    if (skill) {
-      blocks.push('Use the skill ' + name + ' for this request:\n' + (await readSkillText(skill)));
-    }
-  }
+  // A skill or a command called with `/name` comes with the request.
+  blocks.push(...(await calledSkillBlocks(host.workspaceRoot(), text)));
   for (const selection of selections) {
     blocks.push(selectionBlock(selection));
   }
