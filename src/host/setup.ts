@@ -1,3 +1,4 @@
+import { warmUp } from './warmup';
 import { notesFor } from './notes';
 import { renderNotes } from '../notes/store';
 import { discoverSkills, renderSkills } from '../skills/skills';
@@ -122,6 +123,8 @@ export async function ensureAgent(host: MiniMaxController, runtime: RuntimeSessi
   if (runtime.agent) {
     return runtime.agent;
   }
+  // A turn from a command of the editor can come before the panel.
+  warmUp(host);
   const key = await getApiKey(host.context.secrets);
   if (!key) {
     host.logger.error('no API key found in the secret storage');
