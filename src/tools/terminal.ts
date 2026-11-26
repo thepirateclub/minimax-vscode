@@ -1,9 +1,9 @@
 import { cutMiddle, dropExitEcho, posixScript, powershellScript, splitLeadingCd, stripAnsi, tailLines } from './commandOutput';
 import { deleteToolFor } from './deleteCommand';
 import { SCRATCH_REFUSAL, writesScratch } from './scratch';
-import { exec, execFile, type ExecFileException } from 'node:child_process';
+import { execFile, type ExecFileException } from 'node:child_process';
 import { resolveWorkspacePath } from '../paths';
-import { guardTree, TREE_OPTIONS, type TreeGuard } from './processTree';
+import { guardTree, spawnShell, type TreeGuard } from './processTree';
 import { watchOutput, type LiveOutput } from './liveOutput';
 import type { ToolEntry } from './types';
 
@@ -243,11 +243,7 @@ export function createTerminalTools(): ToolEntry[] {
           });
           return;
         }
-        const child = exec(
-          posixScript(command),
-          { cwd, maxBuffer: 10 * 1024 * 1024, windowsHide: true, ...TREE_OPTIONS },
-          done
-        );
+        const child = spawnShell(posixScript(command), { cwd, maxBuffer: 10 * 1024 * 1024 }, done);
         guard = guardTree(child, timeout, ctx.signal);
         live = watchOutput(child, ctx.progress);
       });
