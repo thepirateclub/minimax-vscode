@@ -35,6 +35,7 @@ import { applySettings, addApiKey, clearApiKey, setEndpoint, warnAboutTheBaseUrl
 import { showLogs, showUsage, generateCommitMessage, refreshQuota, undoLastChange, refreshContext, reindex } from './host/commands';
 import { searchFor, addFileToChat } from './host/workspace';
 import { registerEditorActions } from './host/editorActions';
+import { exportChat } from './host/exportChat';
 import type { AgentState } from './ui/protocol';
 import { getApiKey } from './config/secrets';
 import { resolveBaseUrl, MODELS } from './config/models';
@@ -184,10 +185,9 @@ export class MiniMaxController {
       vscode.commands.registerCommand('minimax.refreshContext', () => void refreshContext(this, ))
     );
     context.subscriptions.push(
-      vscode.commands.registerCommand('minimax.showLogs', () => showLogs(this, ))
-    );
-    context.subscriptions.push(
-      vscode.commands.registerCommand('minimax.showUsage', () => void showUsage(this, ))
+      vscode.commands.registerCommand('minimax.showLogs', () => showLogs(this, )),
+      vscode.commands.registerCommand('minimax.showUsage', () => void showUsage(this, )),
+      vscode.commands.registerCommand('minimax.exportChat', () => void exportChat(this))
     );
     context.subscriptions.push(
       vscode.commands.registerCommand('minimax.generateCommitMessage', () =>

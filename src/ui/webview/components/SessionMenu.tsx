@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { UiSessionSummary } from '../../protocol';
-import { IconClose, IconFolder, IconHistory, IconLayers, IconPlus } from '../icons';
+import { IconClose, IconDownload, IconFolder, IconHistory, IconLayers, IconPlus } from '../icons';
 import { visibleSessions } from '../sessionScope';
 import { filterSessions, type SessionSearch } from '../sessionFilter';
 import { STRINGS } from '../strings';
@@ -26,6 +26,7 @@ export function SessionMenu({
   workspaceLabel,
   onSelect,
   onDelete,
+  onExport,
   onNewChat,
   onSearch
 }: {
@@ -37,6 +38,7 @@ export function SessionMenu({
   workspaceLabel: string;
   onSelect: (id: string) => void;
   onDelete: (id: string) => void;
+  onExport: (id: string) => void;
   onNewChat: () => void;
   onSearch: (query: string) => void;
 }) {
@@ -155,6 +157,17 @@ export function SessionMenu({
                 ) : null}
                 <span className="session-time">{formatTime(session.updatedAt)}</span>
                 {snippet ? <span className="session-snippet">{snippet}</span> : null}
+              </button>
+              <button
+                className="session-delete session-export"
+                title={STRINGS.exportChat}
+                aria-label={STRINGS.exportChat}
+                onClick={() => {
+                  setOpen(false);
+                  onExport(session.id);
+                }}
+              >
+                <IconDownload />
               </button>
               <button
                 className="session-delete"

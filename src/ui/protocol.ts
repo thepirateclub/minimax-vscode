@@ -310,6 +310,7 @@ export type WebToExt =
   | { type: 'new_session' }
   | { type: 'select_session'; id: string }
   | { type: 'delete_session'; id: string }
+  | { type: 'export_session'; id: string }
   | { type: 'search_sessions'; query: string }
   | {
       type: 'set_goal';
