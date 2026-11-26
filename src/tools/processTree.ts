@@ -1,4 +1,4 @@
-import { execFile, type ChildProcess } from 'node:child_process';
+import { execFile, spawn, type ChildProcess, type ExecFileException } from 'node:child_process';
 
 // The timeout and the stop of a command killed only the shell: a server or
 // a watcher started by the command lived on after the timeout and after the
@@ -49,4 +49,53 @@ export function guardTree(child: ChildProcess, timeoutMs: number, signal?: Abort
   };
   child.once('exit', dispose);
   return { timedOut: () => expired, dispose };
+}
+
+// The shell of a POSIX command that leads its own group. Only `spawn` makes
+// the child a group leader: `exec` and `execFile` drop `detached` without a
+// word, the kill of the group failed with ESRCH, only the shell died and a
+// child of the command held its output open, the turn hung. The answer has
+// the shape of the callback of `exec`.
+export function spawnShell(
+  script: string,
+  options: { cwd: string; maxBuffer: number },
+  done: (error: ExecFileException | null, stdout: string, stderr: string) => void
+): ChildProcess {
+  const child = spawn('/bin/sh', ['-c', script], { cwd: options.cwd, detached: true, windowsHide: true });
+  let stdout = '';
+  let stderr = '';
+  const take = (current: string, chunk: Buffer): string =>
+    current.length >= options.maxBuffer ? current : (current + chunk.toString('utf8')).slice(0, options.maxBuffer);
+  child.stdout.on('data', (chunk: Buffer) => {
+    stdout = take(stdout, chunk);
+  });
+  child.stderr.on('data', (chunk: Buffer) => {
+    stderr = take(stderr, chunk);
+  });
+  let finished = false;
+  const finish = (error: ExecFileException | null): void => {
+    if (!finished) {
+      finished = true;
+      done(error, stdout, stderr);
+    }
+  };
+  child.on('error', (error) => finish(error));
+  child.on('close', (code, signal) => {
+    if (code === 0) {
+      finish(null);
+      return;
+    }
+    const error: ExecFileException = new Error(
+      'Command failed: ' + (signal ? 'killed by ' + signal : 'exit code ' + String(code))
+    );
+    if (code !== null) {
+      error.code = code;
+    }
+    if (signal !== null) {
+      error.signal = signal;
+    }
+    error.killed = signal !== null;
+    finish(error);
+  });
+  return child;
 }
